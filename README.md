@@ -149,10 +149,10 @@ Encode Forge is actively being developed. Current work includes:
 - **Jellyfin Integration** - Direct integration with Jellyfin media servers
 - **Plex Integration** - Direct integration with Plex media servers
 - **UI Improvements** - Enhanced user experience and additional customization options
-- **Performance Optimizations** - Faster processing and better resource management
+- **Performance Optimizations** - Faster processing and better resource management (0.3.2 Finished)
 - **Full MetaData Grabber** - Grab all missing metadata info for files, including artwork
 - **Preview Window** - Visual Preview of applied subtitles
-- **Audio Normalization** - Implement loudness normalization
+- **Audio Normalization** - Implement loudness normalization (0.3.3 Finished)
 - **Audio Syncing** - Fix Audio/Subtitle syncing intelligently
 
 ## System Requirements
