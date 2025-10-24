@@ -9,6 +9,7 @@ develop-eggs/
 dist/
 dist-deb/
 dist-rpm/
+dist-macos/
 downloads/
 eggs/
 .eggs/
