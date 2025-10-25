@@ -1,199 +1,288 @@
-# EncodeForge - FFmpeg GUI for Batch Video Encoding, AI Subtitles & Media File Renaming
-
 <div align="center">
-  <img src="EncodeForge/src/main/resources/icons/app-icon.png" alt="EncodeForge Logo - FFmpeg GUI Desktop Application" width="128" height="128">
-  
-  **Version 0.4.1**
-  
-  *Free open-source FFmpeg GUI for Windows, macOS, and Linux - Hardware-accelerated video transcoding, AI-powered subtitle generation, and automated media file organization*
-  
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/SirStig/EncodeForge/releases)
-  [![GitHub release](https://img.shields.io/github/v/release/SirStig/EncodeForge)](https://github.com/SirStig/EncodeForge/releases/latest)
+
+# EncodeForge
+
+<img src="resources/icons/app-icon.png" alt="EncodeForge Logo" width="128" height="128">
+
+### Professional FFmpeg GUI for Video Encoding, AI Subtitles & Media Management
+
+*A powerful cross-platform application built with Python & PySide6*
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/SirStig/EncodeForge/releases)
+[![GitHub release](https://img.shields.io/github/v/release/SirStig/EncodeForge)](https://github.com/SirStig/EncodeForge/releases/latest)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing)
+
 </div>
 
 ---
 
-## What is EncodeForge?
+## 🎯 About The Project
 
-**EncodeForge** is a free, open-source **FFmpeg GUI** and media processing application for Windows, macOS, and Linux. Perfect for anyone who wants to:
-- **Batch convert videos** with hardware acceleration (NVIDIA NVENC, AMD AMF, Intel QuickSync, Apple VideoToolbox)
-- **Generate AI subtitles** using OpenAI Whisper (90+ languages, runs locally on your computer)
-- **Automatically rename media files** using metadata from TMDB, TVDB, AniDB, and 7+ other providers
+## 🎯 About The Project
 
-Built with JavaFX and Python, EncodeForge provides a modern dark-themed desktop interface for video transcoding, subtitle management, and smart file organization - no command-line experience required.
+**EncodeForge** is a free, open-source **FFmpeg GUI** built with Python and PySide6. It's designed to make professional video encoding, subtitle generation, and media file management accessible to everyone - no command-line experience required.
 
-## Features
+### Why EncodeForge?
 
-### Video Encoding
-- **Hardware Acceleration** - Supports NVIDIA NVENC, AMD AMF, Intel Quick Sync, and Apple VideoToolbox
-- **Smart Codec Selection** - Automatically chooses the best codec for your hardware
-- **Batch Processing** - Process entire libraries with real-time progress tracking
-- **Stream Copying** - Preserve quality while converting containers
-- **Audio Normalization** - Ensure consistent audio levels across all media files
+- 🎬 **Batch Processing** - Convert entire video libraries while you sleep
+- ⚡ **Hardware Accelerated** - Leverage your GPU for lightning-fast encoding
+- 🤖 **AI-Powered** - Generate high-quality subtitles in 90+ languages locally
+- 🎨 **Modern UI** - Clean, intuitive PySide6 interface with dark theme
+- 🌍 **Cross-Platform** - Works on Windows, macOS, and Linux
+- 📦 **Self-Contained** - Compiled with Nuitka for easy distribution
 
-### Subtitle Generation
-- **AI-Powered Subtitles** - Can't find subtitles you want? Generate subtitles using OpenAI Whisper (90+ languages)
-- **GPU Acceleration** - 10x-20x faster subtitle generation with NVIDIA, AMD, or Apple Silicon GPUs
-- **9 Subtitle Providers** - Download from multiple sources including anime-specific providers (Note: Most Web Scrapping Providers do not work. Currently only OpenSubtitles works.)
-- **Multiple Language Support** - Handle multiple audio tracks and subtitle languages
-- **Preview Mode** - Review subtitles before applying (WIP/ComingSoon)
+### Built With
 
-### Smart File Renaming
-- **10 Metadata Providers** - TMDB, TVDB, OMDB, Trakt, Fanart.tv + 5 free providers (no API key needed)
-- **4 Free Providers Always Available** - AniDB, Kitsu, Jikan/MAL, TVmaze (no configuration needed) (Note: AniDB is rate limited heavily)
-- **Movie Support** - Automatically detect and rename movies using multiple database
-- **Anime Support** - Specialized anime detection with AniDB, Kitsu, and Jikan/MAL
-- **TV Show Detection** - Automatically detect and rename TV episodes using multiple databases
-- **Custom Patterns** - Define your own naming conventions with powerful variables (Example: {title} - S##E## - {episode-title})
-- **Preview Changes** - See exactly what will be renamed before applying
-
-### Modern Interface
-- **Dark Theme** - Easy on the eyes during long processing sessions
-- **Real-time Progress** - See exactly what's happening with detailed progress bars
-- **Queue Management** - Add, remove, and reorder processing jobs
-- **Comprehensive Logging** - Export and filter logs for troubleshooting
-
-## Installation
-
-### Desktop Application (Recommended)
-Download the latest release for your platform:
-- **Windows**: `.exe` or `.msi` installer
-- **macOS**: `.dmg` package
-- **Linux**: `.deb` or `.rpm` packages
-
-**First Launch Setup:**
-On first launch, EncodeForge will automatically:
-- Download and install FFmpeg (~100-150 MB)
-- Install required Python libraries (~50 MB)
-- Configure everything for you with a progress window
-
-This one-time setup takes 2-5 minutes depending on your connection. After that, you're ready to go!
-
-**Optional AI Features:**
-AI subtitle generation (OpenAI Whisper) can be installed later through the Tools menu when needed. The installer automatically detects your GPU (NVIDIA, AMD, Apple Silicon) and downloads the appropriate PyTorch version for maximum performance.
-
-### Alternative Interfaces (Not up to date - Will be updated once Java app is 1.0)
-For developers and advanced users, Encode Forge also provides:
-
-**Command Line Interface** - For automation and scripting
-```bash
-python ffmpeg_cli.py encoder /path/to/videos --use-nvenc
-python ffmpeg_cli.py subtitle /path/to/videos --enable-subtitle-generation  
-python ffmpeg_cli.py renamer /path/to/videos --tmdb-api-key YOUR_KEY --preview-only
-```
-
-**Web Interface** - For server deployment
-```bash
-./start_web_ui.sh  # or start_web_ui.bat on Windows
-```
-
-## Quick Start
-
-1. **Download** the installer for your platform from Releases
-2. **Run the installer** and follow the installation wizard
-3. **Launch** Encode Forge
-4. **Wait for first-time setup** - EncodeForge will download FFmpeg and Python libraries (one-time, 2-5 minutes)
-5. **Add files** by dragging and dropping or using the file browser
-6. **Configure** your processing options
-7. **Start processing** and watch the real-time progress
-
-**Optional:** Install AI subtitle generation via Tools → Setup AI Subtitles for Whisper support.
-
-## Configuration
-
-### API Keys (Optional but Recommended)
-
-**Metadata Providers (File Renaming)**
-
-*Free Providers - No API Key Required:*
-- **AniDB** - Anime metadata (always available)
-- **Kitsu** - Anime metadata (always available)
-- **Jikan (MyAnimeList)** - Anime metadata (always available, read-only)
-- **TVmaze** - TV show metadata (always available)
-
-*API Key Providers - Free Keys Available:*
-
-| Service | Purpose | Get it here |
-|---------|---------|-------------|
-| TMDB | Movies & TV metadata | [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) |
-| TVDB | TV show metadata | [thetvdb.com/dashboard/account/apikey](https://thetvdb.com/dashboard/account/apikey) |
-| OMDB | Movies & TV metadata | [omdbapi.com/apikey.aspx](http://www.omdbapi.com/apikey.aspx) |
-| Trakt | Movies & TV tracking | [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications) |
-| Fanart.tv | Media artwork | [fanart.tv/get-an-api-key](https://fanart.tv/get-an-api-key/) |
-
-**Subtitle Providers**
-
-*Free Providers - WIP*
-- **Addic7ed** - Movies, TV shows, and anime subtitles
-- **SubDL** - Movie & TV subtitles
-- **Subf2m** - Movie & TV subtitles
-- **YIFY Subtitles** - Movie subtitles
-- **Podnapisi** - Multilingual subtitles (all content types)
-- **SubDivX** - Spanish subtitles
-- **Kitsunekko** - Anime subtitles (English & Japanese)
-- **Jimaku** - Anime subtitles (multiple languages)
-
-*Account Providers*
-
-| Service | Purpose | Limits | Get it here |
-|---------|---------|--------|-------------|
-| OpenSubtitles | Subtitle downloads | 5/day free, 200/day VIP | [opensubtitles.com/consumers](https://www.opensubtitles.com/en/consumers) |
-
-> **Note**: Search works without login unlimited, downloads limited to 5 free per day without account, 20 per day with account, and 200 per day with VIP.
-
-### Hardware Acceleration
-Encode Forge automatically detects and uses available hardware acceleration:
-- **NVIDIA** - NVENC (GTX 600+)
-- **AMD** - AMF (Windows only, recent cards)
-- **Intel** - Quick Sync (6th gen+)
-- **Apple** - VideoToolbox (all modern Macs)
-
-## Screenshots
-
-*Screenshots will be added here showing the main window with the three modes and the settings window.*
-
-## Recent Updates (v0.4.0)
-
-### What's New
-- **Audio Normalization** - Ensure consistent volume levels across all your media files
-- **GPU-Accelerated AI Subtitles** - 10x-20x faster Whisper subtitle generation with automatic GPU detection
-- **Performance Improvements** - Faster startup times and reduced memory usage through lazy loading
-- **UI Enhancements** - Improved visual depth, better component scaling, and enhanced dark theme
-
-See [CHANGELOG.md](CHANGELOG.md) for complete release notes.
-
-## Roadmap
-
-Encode Forge is actively being developed. Planned features include:
-- **Plugin Support** (v1.0) - Extensible architecture for custom processing plugins, themes, and so on
-- **Jellyfin Integration** - Direct integration with Jellyfin media servers
-- **Plex Integration** - Direct integration with Plex media servers
-- **Preview Window** - Visual preview of applied subtitles
-- **Full Metadata Grabber** - Grab all missing metadata info for files, including artwork
-- **Audio Syncing** - Intelligent audio/subtitle synchronization fixes
-
-## System Requirements
-
-- **Windows**: Windows 10 or later
-- **macOS**: macOS 10.15 or later
-- **Linux**: Ubuntu 18.04+ or equivalent
-- **RAM**: 4GB minimum, 8GB recommended for AI subtitle generation
-- **Storage**: 
-  - 100 MB for application installer
-  - 250 MB for dependencies (FFmpeg + Python libraries, auto-downloaded)
-  - 300 MB - 3 GB for AI models (optional, only if using Whisper)
-  - Additional space for temporary files during processing
-- **Internet**: Required for first-time setup and optional AI model downloads
-
-## Support
-
-- **Bug Reports**: [GitHub Issues](https://github.com/SirStig/EncodeForge/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/SirStig/EncodeForge/discussions)
-- **Documentation**: [Wiki](https://github.com/SirStig/EncodeForge/wiki)
-
-## License
-
-MIT License - Use it, modify it, share it, sell it, whatever.
+- [PySide6](https://github.com/PySide/pyside-setup) - Qt for Python framework
+- [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) - Modern UI components
+- [FFmpeg](https://ffmpeg.org/) - Industry-standard video processing
+- [OpenAI Whisper](https://github.com/openai/whisper) - State-of-the-art speech recognition
+- [Nuitka](https://github.com/Nuitka/Nuitka) - Python compiler for distribution
 
 ---
+
+## ✨ Features
+
+### 🎞️ Video Encoding
+
+- **Hardware Acceleration** - NVIDIA NVENC, AMD AMF, Intel Quick Sync, Apple VideoToolbox
+- **Smart Codec Selection** - Automatic best-codec detection for your hardware
+- **Batch Processing** - Queue multiple files with real-time progress tracking
+- **Stream Preservation** - Copy streams without re-encoding when possible
+- **Audio Normalization** - Consistent volume levels across all media
+
+### 📝 Subtitle Generation
+
+- **AI-Powered Subtitles** - Generate subtitles using OpenAI Whisper (90+ languages)
+- **GPU Acceleration** - 10x-20x faster with NVIDIA, AMD, or Apple Silicon
+- **9 Subtitle Providers** - Download from multiple sources including anime-specific providers
+- **Multi-Language** - Handle multiple audio tracks and subtitle languages
+- **Format Support** - SRT, ASS, SSA, VTT, and more
+
+### 🏷️ Smart File Renaming
+
+- **10 Metadata Providers** - TMDB, TVDB, OMDB, Trakt, Fanart.tv, and 5 free providers
+- **Auto-Detection** - Intelligent movie, TV show, and anime recognition
+- **Custom Patterns** - Define naming conventions with powerful template variables
+- **Preview Mode** - See changes before applying
+- **Bulk Operations** - Rename entire libraries in seconds
+
+### 🎨 Modern Interface
+
+- **Dark Theme** - Easy on the eyes during long processing sessions
+- **Tabbed Interface** - Encoder, Subtitles, and Renamer in one window
+- **Real-Time Progress** - Detailed progress bars and logs
+- **Queue Management** - Add, remove, and reorder jobs easily
+- **Responsive Design** - Scales beautifully across screen sizes
+
+---
+
+## 📦 Installation
+
+### Pre-Built Binaries (Recommended)
+
+Download the latest release for your platform from the [Releases page](https://github.com/SirStig/EncodeForge/releases):
+
+- **Windows**: `.exe` installer or portable
+- **macOS**: `.dmg` package or `.app` bundle
+- **Linux**: `.AppImage` (universal) or distribution-specific packages
+
+### From Source
+
+#### Requirements
+
+- Python 3.10 or higher
+- pip (Python package manager)
+- Git (optional, for cloning)
+
+#### Steps
+
+```bash
+# Clone the repository
+git clone https://github.com/SirStig/EncodeForge.git
+cd EncodeForge
+
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python main.py
+```
+
+### Command Line Interface
+
+```bash
+# Install CLI globally
+pip install encodeforge
+
+# Or run directly
+python cli.py --help
+```
+
+---
+
+## 🚀 Quick Start
+
+### GUI Application
+
+1. **Launch** EncodeForge
+2. **Select Mode** - Choose Encoder, Subtitles, or Renamer tab
+3. **Add Files** - Drag and drop or use the file browser
+4. **Configure** - Set your encoding options, subtitle preferences, or renaming patterns
+5. **Process** - Click Start and watch real-time progress
+
+### CLI Usage
+
+```bash
+# Encode videos with hardware acceleration
+encodeforge-cli encode /path/to/videos --use-nvenc --codec h265
+
+# Generate AI subtitles
+encodeforge-cli subtitle /path/to/videos --generate --model medium
+
+# Rename media files
+encodeforge-cli rename /path/to/media --tmdb-key YOUR_KEY --preview
+
+# Launch GUI from CLI
+encodeforge-cli gui
+```
+
+---
+
+## 🔧 Configuration
+
+### API Keys (Optional)
+
+While EncodeForge works great without API keys, adding them unlocks additional metadata providers:
+
+| Service | Purpose | Free Tier | Get Key |
+|---------|---------|-----------|---------|
+| TMDB | Movies & TV metadata | Yes | [Get API Key](https://www.themoviedb.org/settings/api) |
+| TVDB | TV show metadata | Yes | [Get API Key](https://thetvdb.com/dashboard/account/apikey) |
+| OMDB | Alternative movie data | Yes | [Get API Key](http://www.omdbapi.com/apikey.aspx) |
+| Trakt | Tracking & stats | Yes | [Get API Key](https://trakt.tv/oauth/applications) |
+| OpenSubtitles | Subtitle downloads | 5/day free | [Get API Key](https://www.opensubtitles.com/en/consumers) |
+
+**Free Providers (Always Available):**
+- AniDB, Kitsu, Jikan/MAL, TVmaze - No API key required!
+
+### Hardware Acceleration
+
+EncodeForge automatically detects available hardware encoders:
+
+- **NVIDIA** - GTX 600 series and newer (NVENC)
+- **AMD** - Recent Radeon cards on Windows (AMF)
+- **Intel** - 6th generation processors and newer (Quick Sync)
+- **Apple** - All modern Macs (VideoToolbox)
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+
+</div>
+
+---
+
+## 🗺️ Roadmap
+
+- ✅ Complete Java to PySide6 migration
+- ✅ Modern Qt-based UI with Fluent Design
+- ✅ Nuitka compilation for all platforms
+- ✅ CLI interface preservation
+- ⏳ Enhanced concurrent task processing
+- ⏳ Plugin system architecture
+- ⏳ Jellyfin & Plex integration
+- ⏳ Advanced subtitle synchronization
+- ⏳ Metadata artwork grabber
+- ⏳ Preview window for subtitles
+
+See the [open issues](https://github.com/SirStig/EncodeForge/issues) for a full list of proposed features and known issues.
+
+---
+
+##  Contributing
+
+Contributions make the open source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**!
+
+### How to Contribute
+
+1. **Fork** the Project
+2. **Create** your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. **Commit** your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. **Push** to the Branch (`git push origin feature/AmazingFeature`)
+5. **Open** a Pull Request
+
+### Development Setup
+
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+pytest
+
+# Format code
+black .
+
+# Type checking
+mypy .
+```
+
+---
+
+##  System Requirements
+
+| Platform | Minimum | Recommended |
+|----------|---------|-------------|
+| **Windows** | Windows 10 | Windows 11 |
+| **macOS** | macOS 11.0 | macOS 13.0+ |
+| **Linux** | Ubuntu 20.04 | Ubuntu 22.04+ |
+| **RAM** | 4 GB | 8 GB (16 GB for AI) |
+| **Storage** | 500 MB | 2 GB |
+| **Python** | 3.10+ | 3.11+ |
+
+---
+
+##  License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+##  Acknowledgments
+
+- [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) - Beautiful Fluent Design widgets
+- [curl-cffi](https://github.com/lexiforest/curl_cffi) - HTTP client with browser impersonation
+- [desktop-notifier](https://github.com/samschott/desktop-notifier) - Cross-platform notifications
+- [Nuitka](https://github.com/Nuitka/Nuitka) - The Python compiler
+- [FFmpeg](https://ffmpeg.org/) - Multimedia processing framework
+- [OpenAI Whisper](https://github.com/openai/whisper) - Speech recognition model
+
+---
+
+##  Support
+
+- **Bug Reports**: [GitHub Issues](https://github.com/SirStig/EncodeForge/issues/new?template=bug_report.yml)
+- **Feature Requests**: [GitHub Issues](https://github.com/SirStig/EncodeForge/issues/new?template=feature_request.yml)
+- **Discussions**: [GitHub Discussions](https://github.com/SirStig/EncodeForge/discussions)
+- **Documentation**: [Wiki](https://github.com/SirStig/EncodeForge/wiki)
+
+---
+
+<div align="center">
+
+**Star If you find EncodeForge useful, please consider giving it a star!**
+
+Made by [SirStig](https://github.com/SirStig)
+
+</div>

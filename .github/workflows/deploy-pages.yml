@@ -47,9 +47,9 @@ jobs:
             cp screenshots/* _site/screenshots/
           fi
           
-          # Copy app icon
+          # Copy app icon from new location
           mkdir -p _site/assets
-          cp EncodeForge/src/main/resources/icons/app-icon.png _site/assets/logo.png || true
+          cp resources/icons/app-icon.png _site/assets/logo.png || true
           
           echo "Site build complete"
           ls -la _site/

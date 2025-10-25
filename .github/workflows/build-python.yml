@@ -1,0 +1,101 @@
+name: Build Python Application
+
+on:
+  push:
+    branches: [ main, 0.4.1, develop ]
+  pull_request:
+    branches: [ main, 0.4.1 ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Type check with mypy
+        run: |
+          mypy app/ core/ utils/ --ignore-missing-imports
+        continue-on-error: true
+      
+      - name: Run tests
+        run: |
+          pytest tests/ -v --cov=app --cov=core --cov=utils
+        continue-on-error: true
+
+  build-nuitka:
+    name: Build with Nuitka on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact-name: encodeforge-linux
+            output-file: dist/EncodeForge
+          - os: windows-latest
+            artifact-name: encodeforge-windows
+            output-file: dist/EncodeForge.exe
+          - os: macos-latest
+            artifact-name: encodeforge-macos
+            output-file: dist/EncodeForge.app
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install nuitka ordered-set zstandard
+      
+      - name: Build with Nuitka
+        run: |
+          python build_nuitka.py
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}-${{ github.run_number }}
+          path: |
+            dist/
+          retention-days: 7
+      
+      - name: Build summary
+        run: |
+          echo "## Build Summary - ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✓ Python 3.11 installed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✓ Dependencies installed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✓ Nuitka build completed" >> $GITHUB_STEP_SUMMARY

@@ -7,9 +7,6 @@ __pycache__/
 build/
 develop-eggs/
 dist/
-dist-deb/
-dist-rpm/
-dist-macos/
 downloads/
 eggs/
 .eggs/
@@ -41,32 +38,27 @@ coverage.xml
 chatmodes/
 .hypothesis/
 
-# Java / Maven
+# Nuitka Build
+*.build/
+*.dist/
+*.onefile-build/
+build/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Java / Maven (keeping for reference, Java folder preserved)
+target/
 *.class
 *.jar
 *.war
 *.ear
-hs_err_pid*
-.idea/
-.project
-.classpath
-.settings/
-.vscode/
-.metadata/
-.factorypath
-
-# Maven specific
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
 dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.properties
-.mvn/wrapper/maven-wrapper.jar
 
 # OS Files
 .DS_Store
@@ -81,8 +73,6 @@ desktop.ini
 .LSOverride
 Icon
 .fseventsd
-.Spotlight-V100
-.Trashes
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
 .AppleDB
@@ -128,7 +118,6 @@ ffprobe-*
 *.vtt
 *.sub
 *.idx
-*.sub
 converted/
 output/
 processed/
@@ -138,6 +127,7 @@ temp_media/
 *.log
 logs/
 log/
+encodeforge.log
 
 # Temporary files
 *.tmp
@@ -163,9 +153,13 @@ user_config.json
 whisper-models/
 models/
 .cache/whisper/
+*.pt
+*.pth
 
-# Streamlit
-.streamlit/
+# Qt
+*.qmlc
+*.jsc
+*.ui~
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -179,13 +173,6 @@ Pipfile.lock
 # PEP 582
 __pypackages__/
 
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
 # Environments
 .env
 .venv
@@ -195,16 +182,6 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
 # mypy
 .mypy_cache/
 .dmypy.json
@@ -213,10 +190,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Application specific
-*.pid
-*.seed
-*.pid.lock
+# User data
+profiles/
+presets/
 
-#docker
-/docker/
+# Obsolete directories (marked for deletion)
+dist-deb/
+dist-macos/
+dist-rpm/
+docker/

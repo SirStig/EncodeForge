@@ -1,4 +1,4 @@
-## Contributing to Encode Forge
+## Contributing to EncodeForge
 
 Thank you for your interest in contributing! This document provides guidelines and instructions for contributing to the project.
 
@@ -6,11 +6,9 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 1. **Fork the repository** and clone your fork locally
 2. **Set up your development environment**:
-   - Install Java 17 or later with JavaFX
-   - Install Python 3.9 or later
-   - Install Maven 3.8+ (or use the included Maven Wrapper)
+   - Install Python 3.10 or later
    - Install Git
-   - FFmpeg will be auto-downloaded on first run
+   - FFmpeg will be auto-downloaded on first run (or install manually)
 
 3. **Create a new branch** for your feature or fix:
    ```bash
@@ -19,56 +17,49 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ## Development Setup
 
-### Java/JavaFX Development
+### PySide6 Application Development
 ```bash
-cd EncodeForge
-./mvnw clean install
-./mvnw javafx:run
-```
-
-### Python Script Development
-```bash
-cd EncodeForge
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r ../requirements-core.txt  # Required libraries
-pip install -r ../requirements-ai.txt    # Optional AI libraries
-python src/main/resources/python/encodeforge_cli.py --help
+
+# Install dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# Run the GUI application
+python main.py
+
+# Run the CLI
+python cli.py --help
 ```
 
-### Building Installers
+### Building with Nuitka
 ```bash
-# Windows EXE installer
-.\build.bat
+# Build for your platform
+python build_nuitka.py
 
-# Windows MSI installer
-.\build.bat windows-msi
-
-# Linux DEB package
-./build.sh linux-deb
-
-# Linux RPM package
-./build.sh linux-rpm
-
-# macOS DMG
-./build.sh mac-dmg
+# Or use platform-specific scripts
+.\build.bat           # Windows
+./build.sh            # macOS/Linux
 ```
-
-See `BUILD.md` for detailed build instructions.
 
 ## Code Style
-
-### Java
-- Follow standard Java naming conventions
-- Use 4 spaces for indentation
-- Add JavaDoc comments for public methods
-- Keep lines under 120 characters when possible
 
 ### Python
 - Follow PEP 8 style guidelines
 - Use 4 spaces for indentation
 - Add docstrings for functions and classes
 - Use type hints where appropriate
+- Format code with `black`
+- Lint with `flake8`
+- Type check with `mypy`
+
+### PySide6/Qt
+- Follow Qt naming conventions for UI elements
+- Use signals/slots for communication
+- Keep UI and business logic separated
+- Document custom widgets thoroughly
 
 ## Making Changes
 
@@ -77,10 +68,38 @@ See `BUILD.md` for detailed build instructions.
 3. **Update documentation** if you're changing functionality
 4. **Follow the existing code structure** and patterns
 5. **Keep commits focused** - one logical change per commit
-6. **For Java changes**: Update JavaDoc comments for public methods
-7. **For Python changes**: Add docstrings for functions and classes
-8. **For UI changes**: Test on different screen resolutions and themes
+6. **Add docstrings** for new functions and classes
+7. **Add type hints** for function parameters and return values
+8. **For UI changes**: Test on different screen resolutions and ensure responsiveness
 9. **For backend changes**: Test with various file formats and codecs
+
+## Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app --cov=core --cov=utils
+
+# Run specific test file
+pytest tests/test_encoder.py -v
+```
+
+## Code Quality
+
+Before submitting, ensure your code passes:
+
+```bash
+# Format code
+black .
+
+# Lint
+flake8 app/ core/ utils/
+
+# Type check
+mypy app/ core/ utils/ --ignore-missing-imports
+```
 
 ## Commit Messages
 
@@ -100,6 +119,7 @@ Fixes #123
 2. **Create a Pull Request** with a clear title and description
 3. **Reference any related issues** in the PR description
 4. **Be responsive** to feedback and questions
+5. **Ensure CI passes** before requesting review
 
 ## Reporting Bugs
 
@@ -107,8 +127,9 @@ Use the bug report template when creating issues. Include:
 - Clear description of the bug
 - Steps to reproduce
 - Expected vs actual behavior
-- Environment details (OS, versions, etc.)
+- Environment details (OS, Python version, PySide6 version, etc.)
 - Screenshots or logs if applicable
+- Installation method (Nuitka binary, pip, from source)
 
 ## Feature Requests
 
@@ -116,6 +137,7 @@ Use the feature request template. Explain:
 - What problem the feature solves
 - How you envision it working
 - Why it would be valuable
+- Any UI mockups or designs (if applicable)
 
 ## Code Review Process
 
@@ -123,28 +145,37 @@ Use the feature request template. Explain:
 - Reviewers may request changes or ask questions
 - Be patient and respectful during the review process
 - Address all feedback before the PR can be merged
+- CI must pass for PR to be approved
 
-## Testing
+## Testing Guidelines
 
-- Test your changes with various file formats
-- Test on your platform (Windows/macOS/Linux if possible)
-- Ensure existing functionality still works
-- Add unit tests for new features when applicable
-- Test JavaFX UI changes in the desktop application
-- Test Python backend changes with CLI interface
-- Test hardware acceleration (NVENC, AMF, Quick Sync, VideoToolbox)
-- Test first-time setup with automatic dependency installation
-- Test FFmpeg detection and download (DependencyManager)
-- Test Python library installation via pip
-- Test optional Whisper AI setup wizard
-- Test subtitle generation with Whisper (if installed)
-- Test subtitle downloads with OpenSubtitles
-- Test file renaming with metadata providers
-- Verify log files are generated correctly in `~/.encodeforge/logs/` or `%APPDATA%\.encodeforge\logs\`
+Test your changes with:
+- Various file formats (mp4, mkv, avi, mov, etc.)
+- Different codecs (h264, h265, vp9, av1)
+- Hardware acceleration (NVENC, AMF, Quick Sync, VideoToolbox)
+- CPU encoding fallback
+- Multiple platforms (Windows/macOS/Linux if possible)
+- Edge cases (large files, special characters in filenames, etc.)
+- UI responsiveness and thread safety
+- Subtitle providers (OpenSubtitles, Whisper, etc.)
+- Metadata providers (TMDB, TVDB, AniDB, etc.)
+- Notification system
+- Log file generation
+
+## Project Structure
+
+```
+app/          # PySide6 UI components
+core/         # Business logic
+  providers/  # External service providers
+  handlers/   # Operation handlers
+utils/        # Utility functions
+resources/    # Icons, styles, assets
+```
 
 ## Questions?
 
-Feel free to open an issue for questions or reach out to the maintainers.
+Feel free to open an issue for questions or reach out to the maintainers in Discussions.
 
 Thank you for contributing!
 

@@ -1,0 +1,26 @@
+# EncodeForge Development Requirements
+# Install with: pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+# ==================== Code Quality ====================
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+isort>=5.12.0
+pylint>=3.0.0
+
+# ==================== Testing ====================
+pytest>=7.0.0
+pytest-qt>=4.2.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+
+# ==================== Documentation ====================
+sphinx>=7.0.0
+sphinx-rtd-theme>=1.3.0
+
+# ==================== Build Tools ====================
+build>=1.0.0
+wheel>=0.41.0
+setuptools>=68.0.0
