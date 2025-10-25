@@ -1,0 +1,233 @@
+/* ========================================
+   RENAMER TAB STYLES
+   Extracted from renamer_tab.py setStyleSheet block
+   ======================================== */
+
+/* Main widget styling */
+RenamerTab QWidget {
+    background-color: #2d2d2d;
+    color: #ffffff;
+}
+
+/* Buttons */
+RenamerTab QPushButton {
+    background-color: #0a84ff;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+RenamerTab QPushButton:hover {
+    background-color: #0077ed;
+}
+
+RenamerTab QPushButton:pressed {
+    background-color: #006adc;
+}
+
+RenamerTab QPushButton:disabled {
+    background-color: #3a3a3c;
+    color: #636366;
+}
+
+/* Secondary Buttons */
+RenamerTab QPushButton[secondary="true"] {
+    background-color: #48484a;
+}
+
+RenamerTab QPushButton[secondary="true"]:hover {
+    background-color: #5a5a5c;
+}
+
+/* Tables */
+RenamerTab QTableWidget {
+    background-color: #1e1e1e;
+    alternate-background-color: #252525;
+    gridline-color: #3a3a3a;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+}
+
+RenamerTab QTableWidget::item {
+    padding: 8px;
+    color: #ffffff;
+}
+
+RenamerTab QTableWidget::item:selected {
+    background-color: #0a84ff;
+}
+
+RenamerTab QHeaderView::section {
+    background-color: #2a2a2a;
+    color: #8e8e93;
+    padding: 10px;
+    border: none;
+    border-bottom: 1px solid #3a3a3a;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* Group Boxes */
+RenamerTab QGroupBox {
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    color: #ffffff;
+}
+
+RenamerTab QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 8px;
+    color: #8e8e93;
+}
+
+/* List Widgets */
+RenamerTab QListWidget {
+    background-color: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+RenamerTab QListWidget::item {
+    padding: 8px;
+    border-radius: 4px;
+    color: #ffffff;
+}
+
+RenamerTab QListWidget::item:selected {
+    background-color: #0a84ff;
+}
+
+RenamerTab QListWidget::item:hover:!selected {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Combo Boxes */
+RenamerTab QComboBox {
+    background-color: #3a3a3c;
+    border: 1px solid #48484a;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #ffffff;
+    min-width: 120px;
+}
+
+RenamerTab QComboBox:hover {
+    border-color: #0a84ff;
+}
+
+RenamerTab QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+RenamerTab QComboBox QAbstractItemView {
+    background-color: #2d2d2d;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    selection-background-color: #0a84ff;
+    color: #ffffff;
+}
+
+/* Line Edits */
+RenamerTab QLineEdit {
+    background-color: #3a3a3c;
+    border: 1px solid #48484a;
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #ffffff;
+    font-family: 'Consolas', 'Courier New', monospace;
+}
+
+RenamerTab QLineEdit:hover {
+    border-color: #0a84ff;
+}
+
+RenamerTab QLineEdit:focus {
+    border-color: #0a84ff;
+    border-width: 2px;
+}
+
+/* Text Edits */
+RenamerTab QTextEdit {
+    background-color: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    padding: 8px;
+    color: #ffffff;
+    font-size: 12px;
+}
+
+/* Check Boxes */
+RenamerTab QCheckBox {
+    color: #ffffff;
+    spacing: 8px;
+}
+
+RenamerTab QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #48484a;
+    border-radius: 4px;
+    background-color: #3a3a3c;
+}
+
+RenamerTab QCheckBox::indicator:checked {
+    background-color: #0a84ff;
+    border-color: #0a84ff;
+}
+
+RenamerTab QCheckBox::indicator:hover {
+    border-color: #0a84ff;
+}
+
+/* Progress Bars */
+RenamerTab QProgressBar {
+    background-color: #3a3a3c;
+    border: none;
+    border-radius: 4px;
+    height: 8px;
+    text-align: center;
+}
+
+RenamerTab QProgressBar::chunk {
+    background-color: #0a84ff;
+    border-radius: 4px;
+}
+
+/* Labels */
+RenamerTab QLabel {
+    color: #ffffff;
+}
+
+/* Splitter */
+RenamerTab QSplitter::handle {
+    background-color: #3a3a3a;
+    width: 1px;
+}
+
+/* Individual component styling */
+RenamerTab QLabel#api_key_label {
+    color: #8e8e93;
+    font-size: 11px;
+}
+
+RenamerTab QLabel#pattern_help {
+    color: #8e8e93;
+    font-size: 11px;
+}
+
+RenamerTab QLabel#presets_label {
+    color: #8e8e93;
+    font-size: 11px;
+    margin-top: 8px;
+}

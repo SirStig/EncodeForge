@@ -1,0 +1,84 @@
+/* ========================================
+   MAIN WINDOW STYLES
+   ======================================== */
+
+/* Main window background */
+MainWindow {
+    background-color: #1e1e1e;
+}
+
+/* Sidebar styling - proper sidebar with border */
+MainWindow QFrame#sidebar {
+    background-color: #252526;
+    border-right: 2px solid #0a84ff;
+}
+
+/* Section labels */
+MainWindow QLabel.section_label {
+    color: #cccccc;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 12px 4px 12px;
+    margin-top: 8px;
+}
+
+/* Sidebar buttons - tab-like styling */
+MainWindow QFrame#sidebar QToolButton {
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    color: #cccccc;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 12px;
+    margin: 2px 8px;
+    text-align: left;
+    min-height: 20px;
+}
+
+MainWindow QFrame#sidebar QToolButton:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+}
+
+MainWindow QFrame#sidebar QToolButton:checked {
+    background-color: #0a84ff;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+MainWindow QFrame#sidebar QToolButton:pressed {
+    background-color: rgba(10, 132, 255, 0.8);
+}
+
+/* Sidebar icons */
+MainWindow QFrame#sidebar QToolButton::icon {
+    margin-right: 8px;
+}
+
+/* Regular buttons in sidebar */
+MainWindow QFrame#sidebar QPushButton {
+    background-color: #3a3a3c;
+    border: none;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 12px;
+    padding: 8px 12px;
+    margin: 2px 8px;
+}
+
+MainWindow QFrame#sidebar QPushButton:hover {
+    background-color: #4a4a4c;
+}
+
+MainWindow QFrame#sidebar QPushButton:pressed {
+    background-color: #2a2a2c;
+}
+
+/* Processes button styling - active state when processes are running */
+MainWindow QToolButton#processes_btn_active {
+    color: #0a84ff;
+    font-weight: bold;
+}

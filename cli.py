@@ -15,10 +15,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from core import ffmpeg_manager, subtitle_manager, metadata_grabber
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Setup logging
+try:
+    from utils.logging_config import setup_logging
+    setup_logging()
+except ImportError:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 logger = logging.getLogger(__name__)
 
 

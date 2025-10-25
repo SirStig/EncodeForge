@@ -1,0 +1,235 @@
+/* ========================================
+   SUBTITLE TAB STYLES
+   Extracted from subtitle_tab.py setStyleSheet block
+   ======================================== */
+
+/* Main widget styling */
+SubtitleTab QWidget {
+    background-color: #2d2d2d;
+    color: #ffffff;
+}
+
+/* Buttons */
+SubtitleTab QPushButton {
+    background-color: #0a84ff;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+SubtitleTab QPushButton:hover {
+    background-color: #0077ed;
+}
+
+SubtitleTab QPushButton:pressed {
+    background-color: #006adc;
+}
+
+SubtitleTab QPushButton:disabled {
+    background-color: #3a3a3c;
+    color: #636366;
+}
+
+/* Secondary Buttons */
+SubtitleTab QPushButton[secondary="true"] {
+    background-color: #48484a;
+}
+
+SubtitleTab QPushButton[secondary="true"]:hover {
+    background-color: #5a5a5c;
+}
+
+/* Tables */
+SubtitleTab QTableWidget {
+    background-color: #1e1e1e;
+    alternate-background-color: #252525;
+    gridline-color: #3a3a3a;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+}
+
+SubtitleTab QTableWidget::item {
+    padding: 8px;
+    color: #ffffff;
+}
+
+SubtitleTab QTableWidget::item:selected {
+    background-color: #0a84ff;
+}
+
+SubtitleTab QHeaderView::section {
+    background-color: #2a2a2a;
+    color: #8e8e93;
+    padding: 10px;
+    border: none;
+    border-bottom: 1px solid #3a3a3a;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* Group Boxes */
+SubtitleTab QGroupBox {
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    color: #ffffff;
+}
+
+SubtitleTab QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 8px;
+    color: #8e8e93;
+}
+
+/* List Widgets */
+SubtitleTab QListWidget {
+    background-color: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+SubtitleTab QListWidget::item {
+    padding: 8px;
+    border-radius: 4px;
+    color: #ffffff;
+}
+
+SubtitleTab QListWidget::item:selected {
+    background-color: #0a84ff;
+}
+
+SubtitleTab QListWidget::item:hover:!selected {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Combo Boxes */
+SubtitleTab QComboBox {
+    background-color: #3a3a3c;
+    border: 1px solid #48484a;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #ffffff;
+    min-width: 120px;
+}
+
+SubtitleTab QComboBox:hover {
+    border-color: #0a84ff;
+}
+
+SubtitleTab QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+SubtitleTab QComboBox QAbstractItemView {
+    background-color: #2d2d2d;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    selection-background-color: #0a84ff;
+    color: #ffffff;
+}
+
+/* Line Edits */
+SubtitleTab QLineEdit {
+    background-color: #3a3a3c;
+    border: 1px solid #48484a;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #ffffff;
+}
+
+SubtitleTab QLineEdit:hover {
+    border-color: #0a84ff;
+}
+
+SubtitleTab QLineEdit:focus {
+    border-color: #0a84ff;
+    border-width: 2px;
+}
+
+/* Text Edits */
+SubtitleTab QTextEdit {
+    background-color: #1e1e1e;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    padding: 8px;
+    color: #ffffff;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+}
+
+/* Check Boxes */
+SubtitleTab QCheckBox {
+    color: #ffffff;
+    spacing: 8px;
+}
+
+SubtitleTab QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #48484a;
+    border-radius: 4px;
+    background-color: #3a3a3c;
+}
+
+SubtitleTab QCheckBox::indicator:checked {
+    background-color: #0a84ff;
+    border-color: #0a84ff;
+}
+
+SubtitleTab QCheckBox::indicator:hover {
+    border-color: #0a84ff;
+}
+
+/* Progress Bars */
+SubtitleTab QProgressBar {
+    background-color: #3a3a3c;
+    border: none;
+    border-radius: 4px;
+    height: 8px;
+    text-align: center;
+}
+
+SubtitleTab QProgressBar::chunk {
+    background-color: #0a84ff;
+    border-radius: 4px;
+}
+
+/* Labels */
+SubtitleTab QLabel {
+    color: #ffffff;
+}
+
+/* Splitter */
+SubtitleTab QSplitter::handle {
+    background-color: #3a3a3a;
+    width: 1px;
+}
+
+/* Spin Boxes */
+SubtitleTab QSpinBox {
+    background-color: #3a3a3c;
+    border: 1px solid #48484a;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #ffffff;
+}
+
+SubtitleTab QSpinBox:hover {
+    border-color: #0a84ff;
+}
+
+/* Individual component styling */
+SubtitleTab QLabel#providers_label {
+    color: #8e8e93;
+    font-size: 11px;
+}

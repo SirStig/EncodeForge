@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 if TYPE_CHECKING:
-    from encodeforge_core import ConversionSettings
+    from .handlers import ConversionSettings
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class ProfileManager:
     def __init__(self, profiles_dir: Optional[Path] = None):
         if profiles_dir is None:
             # Default to user's home directory
-            from path_manager import get_profiles_dir
+            from .path_manager import get_profiles_dir
             profiles_dir = get_profiles_dir()
         
         self.profiles_dir = Path(profiles_dir)
@@ -37,7 +37,7 @@ class ProfileManager:
     
     def _profile_high_quality_hevc(self):
         """High quality H.265/HEVC profile"""
-        from ffmpeg_core import ConversionSettings
+        from .handlers import ConversionSettings
         settings = ConversionSettings()
         settings.use_nvenc = True
         settings.nvenc_preset = "p7"  # Slowest, best quality
@@ -53,7 +53,7 @@ class ProfileManager:
     
     def _profile_fast_h264(self):
         """Fast H.264 encoding"""
-        from ffmpeg_core import ConversionSettings
+        from .handlers import ConversionSettings
         settings = ConversionSettings()
         settings.use_nvenc = True
         settings.nvenc_preset = "p1"  # Fastest
@@ -69,7 +69,7 @@ class ProfileManager:
     
     def _profile_balanced(self):
         """Balanced quality and speed"""
-        from ffmpeg_core import ConversionSettings
+        from .handlers import ConversionSettings
         settings = ConversionSettings()
         settings.use_nvenc = True
         settings.nvenc_preset = "p4"  # Balanced
@@ -85,7 +85,7 @@ class ProfileManager:
     
     def _profile_small_size(self):
         """Optimize for small file size"""
-        from ffmpeg_core import ConversionSettings
+        from .handlers import ConversionSettings
         settings = ConversionSettings()
         settings.use_nvenc = True
         settings.nvenc_preset = "p7"  # Slow for better compression
@@ -102,7 +102,7 @@ class ProfileManager:
     
     def _profile_archive(self):
         """Archive quality - maximum quality"""
-        from ffmpeg_core import ConversionSettings
+        from .handlers import ConversionSettings
         settings = ConversionSettings()
         settings.use_nvenc = True
         settings.nvenc_preset = "p7"
@@ -146,7 +146,7 @@ class ProfileManager:
                 data = json.load(f)
             
             # Create ConversionSettings from dict
-            from ffmpeg_core import ConversionSettings
+            from .handlers import ConversionSettings
             settings = ConversionSettings()
             
             # Update settings from dict
@@ -269,6 +269,10 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    try:
+        from utils.logging_config import setup_logging
+        setup_logging()
+    except ImportError:
+        logging.basicConfig(level=logging.INFO)
     main()
 

@@ -46,7 +46,7 @@ class AniDBProvider(BaseMetadataProvider):
     def __init__(self, language_preference: str = "en"):
         super().__init__(language_preference=language_preference)
         # Set up cache directory
-        from path_manager import get_cache_dir
+        from core.path_manager import get_cache_dir
         cache_dir = get_cache_dir()
         cache_dir.mkdir(parents=True, exist_ok=True)
         AniDBProvider._cache_file = cache_dir / "anidb-titles.xml"

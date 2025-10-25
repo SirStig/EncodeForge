@@ -9,7 +9,7 @@ import struct
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from providers.subtitle import (
+from core.providers.subtitle import (
     Addic7edProvider,
     JimakuProvider,
     KitsunekkoProvider,
@@ -525,24 +525,24 @@ def main():
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python subtitle_providers.py <video_file>")
+        logger.error("Usage: python subtitle_providers.py <video_file>")
         return
     
     video_file = sys.argv[1]
     providers = SubtitleProviders()
     
-    print(f"Searching subtitles for: {Path(video_file).name}")
+    logger.info(f"Searching subtitles for: {Path(video_file).name}")
     results = providers.search_all_providers(video_file, ["en", "es"])
     
-    print(f"\nFound {len(results)} subtitle(s):")
+    logger.info(f"Found {len(results)} subtitle(s)")
     for i, result in enumerate(results, 1):
-        print(f"\n{i}. {result.get('file_name', 'Unknown')}")
-        print(f"   Provider: {result.get('provider', 'Unknown')}")
-        print(f"   Language: {result.get('language', 'Unknown')}")
-        print(f"   Downloads: {result.get('downloads', 0)}")
-        print(f"   Rating: {result.get('rating', 0)}")
+        logger.info(f"{i}. {result.get('file_name', 'Unknown')} - Provider: {result.get('provider', 'Unknown')} - Language: {result.get('language', 'Unknown')} - Downloads: {result.get('downloads', 0)} - Rating: {result.get('rating', 0)}")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    try:
+        from utils.logging_config import setup_logging
+        setup_logging()
+    except ImportError:
+        logging.basicConfig(level=logging.INFO)
     main()

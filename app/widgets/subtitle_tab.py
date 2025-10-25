@@ -53,6 +53,7 @@ class SubtitleTab(QWidget):
         
         self._setup_ui()
         self._connect_signals()
+        self._load_styles()
     
     def _setup_ui(self):
         """Set up the user interface."""
@@ -60,232 +61,7 @@ class SubtitleTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # Apply macOS-inspired styling
-        self.setStyleSheet("""
-            /* Subtitle Tab Styling */
-            QWidget {
-                background-color: #2d2d2d;
-                color: #ffffff;
-            }
-            
-            /* Buttons */
-            QPushButton {
-                background-color: #0a84ff;
-                color: #ffffff;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-size: 13px;
-                font-weight: 500;
-            }
-            
-            QPushButton:hover {
-                background-color: #0077ed;
-            }
-            
-            QPushButton:pressed {
-                background-color: #006adc;
-            }
-            
-            QPushButton:disabled {
-                background-color: #3a3a3c;
-                color: #636366;
-            }
-            
-            /* Secondary Buttons */
-            QPushButton[secondary="true"] {
-                background-color: #48484a;
-            }
-            
-            QPushButton[secondary="true"]:hover {
-                background-color: #5a5a5c;
-            }
-            
-            /* Tables */
-            QTableWidget {
-                background-color: #1e1e1e;
-                alternate-background-color: #252525;
-                gridline-color: #3a3a3a;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-            }
-            
-            QTableWidget::item {
-                padding: 8px;
-                color: #ffffff;
-            }
-            
-            QTableWidget::item:selected {
-                background-color: #0a84ff;
-            }
-            
-            QHeaderView::section {
-                background-color: #2a2a2a;
-                color: #8e8e93;
-                padding: 10px;
-                border: none;
-                border-bottom: 1px solid #3a3a3a;
-                font-size: 12px;
-                font-weight: 600;
-                text-transform: uppercase;
-            }
-            
-            /* Group Boxes */
-            QGroupBox {
-                font-size: 13px;
-                font-weight: 600;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-                margin-top: 12px;
-                padding-top: 12px;
-                color: #ffffff;
-            }
-            
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                padding: 0 8px;
-                color: #8e8e93;
-            }
-            
-            /* List Widgets */
-            QListWidget {
-                background-color: #1e1e1e;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-                padding: 4px;
-            }
-            
-            QListWidget::item {
-                padding: 8px;
-                border-radius: 4px;
-                color: #ffffff;
-            }
-            
-            QListWidget::item:selected {
-                background-color: #0a84ff;
-            }
-            
-            QListWidget::item:hover:!selected {
-                background-color: rgba(255, 255, 255, 0.05);
-            }
-            
-            /* Combo Boxes */
-            QComboBox {
-                background-color: #3a3a3c;
-                border: 1px solid #48484a;
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: #ffffff;
-                min-width: 120px;
-            }
-            
-            QComboBox:hover {
-                border-color: #0a84ff;
-            }
-            
-            QComboBox::drop-down {
-                border: none;
-                width: 20px;
-            }
-            
-            QComboBox QAbstractItemView {
-                background-color: #2d2d2d;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-                selection-background-color: #0a84ff;
-                color: #ffffff;
-            }
-            
-            /* Line Edits */
-            QLineEdit {
-                background-color: #3a3a3c;
-                border: 1px solid #48484a;
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: #ffffff;
-            }
-            
-            QLineEdit:hover {
-                border-color: #0a84ff;
-            }
-            
-            QLineEdit:focus {
-                border-color: #0a84ff;
-                border-width: 2px;
-            }
-            
-            /* Text Edits */
-            QTextEdit {
-                background-color: #1e1e1e;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-                padding: 8px;
-                color: #ffffff;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 12px;
-            }
-            
-            /* Check Boxes */
-            QCheckBox {
-                color: #ffffff;
-                spacing: 8px;
-            }
-            
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border: 2px solid #48484a;
-                border-radius: 4px;
-                background-color: #3a3a3c;
-            }
-            
-            QCheckBox::indicator:checked {
-                background-color: #0a84ff;
-                border-color: #0a84ff;
-            }
-            
-            QCheckBox::indicator:hover {
-                border-color: #0a84ff;
-            }
-            
-            /* Progress Bars */
-            QProgressBar {
-                background-color: #3a3a3c;
-                border: none;
-                border-radius: 4px;
-                height: 8px;
-                text-align: center;
-            }
-            
-            QProgressBar::chunk {
-                background-color: #0a84ff;
-                border-radius: 4px;
-            }
-            
-            /* Labels */
-            QLabel {
-                color: #ffffff;
-            }
-            
-            /* Splitter */
-            QSplitter::handle {
-                background-color: #3a3a3a;
-                width: 1px;
-            }
-            
-            /* Spin Boxes */
-            QSpinBox {
-                background-color: #3a3a3c;
-                border: 1px solid #48484a;
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: #ffffff;
-            }
-            
-            QSpinBox:hover {
-                border-color: #0a84ff;
-            }
-        """)
+        # self.setStyleSheet("""...""")  # Moved to external CSS file
         
         # Main splitter
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -407,7 +183,7 @@ class SubtitleTab(QWidget):
         provider_layout = QVBoxLayout()
         
         providers_label = QLabel("Select providers to search:")
-        providers_label.setStyleSheet("color: #8e8e93; font-size: 11px;")
+        providers_label.setObjectName("providers_label")
         provider_layout.addWidget(providers_label)
         
         self.provider_list = QListWidget()
@@ -523,6 +299,29 @@ class SubtitleTab(QWidget):
         
         # Preview
         self.load_preview_btn.clicked.connect(self._load_preview)
+    
+    def _load_styles(self):
+        """Load CSS styles for the subtitle tab."""
+        try:
+            from PySide6.QtCore import QFile, QTextStream
+            
+            css_file = Path(__file__).parent.parent.parent / "resources" / "styles" / "subtitle_tab.css"
+            if css_file.exists():
+                file = QFile(str(css_file))
+                if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
+                    stream = QTextStream(file)
+                    css_content = stream.readAll()
+                    file.close()
+                    
+                    # Apply the CSS
+                    self.setStyleSheet(css_content)
+                    logger.debug("Subtitle tab styles loaded successfully")
+                else:
+                    logger.warning("Failed to open subtitle_tab.css file")
+            else:
+                logger.warning("subtitle_tab.css file not found")
+        except Exception as e:
+            logger.error(f"Failed to load subtitle tab styles: {e}")
     
     def _on_mode_changed(self):
         """Handle processing mode change."""

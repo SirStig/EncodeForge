@@ -8,6 +8,7 @@ PySide6-Essentials>=6.6.0
 
 # Modern Qt Widgets (Free version only)
 PyQt-Fluent-Widgets>=1.5.0
+qtawesome>=1.3.0
 
 # ==================== Build & Compilation ====================
 Nuitka>=2.0.0

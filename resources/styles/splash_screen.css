@@ -1,0 +1,48 @@
+/* ========================================
+   SPLASH SCREEN STYLES
+   Extracted from splash_screen.py setStyleSheet block
+   ======================================== */
+
+/* Main widget styling */
+SplashScreen QWidget {
+    background-color: #1e1e1e;
+    border-radius: 16px;
+}
+
+SplashScreen QLabel {
+    color: #ffffff;
+}
+
+SplashScreen QProgressBar {
+    border: none;
+    border-radius: 8px;
+    background-color: #3a3a3c;
+    height: 8px;
+    text-align: center;
+}
+
+SplashScreen QProgressBar::chunk {
+    background-color: #0a84ff;
+    border-radius: 8px;
+}
+
+/* Individual component styling */
+SplashScreen QLabel#title_label {
+    color: #ffffff;
+    margin-bottom: 10px;
+}
+
+SplashScreen QLabel#version_label {
+    color: #8e8e93;
+    margin-bottom: 20px;
+}
+
+SplashScreen QLabel#status_label {
+    color: #c7c7cc;
+    margin-top: 20px;
+}
+
+SplashScreen QLabel#tagline_label {
+    color: #636366;
+    margin-top: 10px;
+}

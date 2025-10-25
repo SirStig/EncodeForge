@@ -6,10 +6,13 @@ All application data is stored in a single location:
 - macOS: ~/Library/Application Support/EncodeForge/
 """
 
+import logging
 import os
 import platform
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 APP_NAME = "EncodeForge"
 _base_dir: Optional[Path] = None
@@ -22,6 +25,7 @@ def get_base_dir() -> Path:
         _base_dir = _determine_base_dir()
         # Ensure the directory exists
         _base_dir.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Base directory set to: {_base_dir}")
     return _base_dir
 
 
@@ -74,6 +78,7 @@ def _get_sub_dir(sub_dir_name: str) -> Path:
     """Get a subdirectory under the base directory"""
     sub_dir = get_base_dir() / sub_dir_name
     sub_dir.mkdir(parents=True, exist_ok=True)
+    logger.debug(f"Created/accessed subdirectory: {sub_dir}")
     return sub_dir
 
 
@@ -85,16 +90,19 @@ def _determine_base_dir() -> Path:
         # Windows: AppData/Local/EncodeForge/
         local_app_data = os.getenv("LOCALAPPDATA")
         if local_app_data:
-            return Path(local_app_data) / APP_NAME
+            base_dir = Path(local_app_data) / APP_NAME
         else:
             # Fallback to user home
-            return Path.home() / "AppData" / "Local" / APP_NAME
+            base_dir = Path.home() / "AppData" / "Local" / APP_NAME
     elif system == "darwin":
         # macOS: ~/Library/Application Support/EncodeForge/
-        return Path.home() / "Library" / "Application Support" / APP_NAME
+        base_dir = Path.home() / "Library" / "Application Support" / APP_NAME
     else:
         # Linux/Unix: ~/.local/share/EncodeForge/
-        return Path.home() / ".local" / "share" / APP_NAME
+        base_dir = Path.home() / ".local" / "share" / APP_NAME
+    
+    logger.info(f"Determined base directory for {system}: {base_dir}")
+    return base_dir
 
 
 def get_base_dir_string() -> str:

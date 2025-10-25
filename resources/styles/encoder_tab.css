@@ -1,0 +1,200 @@
+/* ========================================
+   ENCODER TAB STYLES
+   Dark theme styling for encoder tab
+   ======================================== */
+
+/* Main widget styling */
+EncoderTab QWidget {
+    background-color: #1e1e1e;
+    color: #cccccc;
+}
+
+EncoderTab QGroupBox {
+    font-weight: bold;
+    border: 1px solid #3e3e42;
+    border-radius: 6px;
+    margin-top: 1ex;
+    padding-top: 10px;
+    background-color: #252526;
+}
+
+EncoderTab QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px 0 5px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+EncoderTab QTableWidget {
+    gridline-color: #3e3e42;
+    selection-background-color: #0a84ff;
+    background-color: #1e1e1e;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+}
+
+EncoderTab QTableWidget::item {
+    padding: 4px;
+    border-bottom: 1px solid #2d2d30;
+}
+
+EncoderTab QTableWidget::item:selected {
+    background-color: #0a84ff;
+    color: #ffffff;
+}
+
+EncoderTab QHeaderView::section {
+    background-color: #2d2d30;
+    padding: 8px;
+    border: 1px solid #3e3e42;
+    font-weight: 600;
+    color: #cccccc;
+    text-align: left;
+}
+
+EncoderTab QPushButton {
+    background-color: #0a84ff;
+    color: #ffffff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+EncoderTab QPushButton:hover {
+    background-color: #1a94ff;
+}
+
+EncoderTab QPushButton:pressed {
+    background-color: #0078d4;
+}
+
+EncoderTab QPushButton:disabled {
+    background-color: #3e3e42;
+    color: #666666;
+}
+
+EncoderTab QComboBox {
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 6px 8px;
+    background-color: #252526;
+    color: #cccccc;
+    min-width: 120px;
+}
+
+EncoderTab QComboBox:hover {
+    border-color: #0a84ff;
+}
+
+EncoderTab QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+EncoderTab QComboBox::down-arrow {
+    image: url(down_arrow.png);
+    width: 12px;
+    height: 12px;
+}
+
+EncoderTab QComboBox QAbstractItemView {
+    background-color: #252526;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    selection-background-color: #0a84ff;
+}
+
+EncoderTab QCheckBox {
+    spacing: 8px;
+    color: #cccccc;
+}
+
+EncoderTab QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    background-color: #252526;
+}
+
+EncoderTab QCheckBox::indicator:checked {
+    background-color: #0a84ff;
+    border-color: #0a84ff;
+}
+
+EncoderTab QCheckBox::indicator:unchecked {
+    background-color: #1e1e1e;
+}
+
+EncoderTab QLabel {
+    color: #cccccc;
+}
+
+EncoderTab QSpinBox, EncoderTab QDoubleSpinBox {
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 4px 8px;
+    background-color: #252526;
+    color: #cccccc;
+}
+
+EncoderTab QSpinBox:hover, EncoderTab QDoubleSpinBox:hover {
+    border-color: #0a84ff;
+}
+
+EncoderTab QSlider::groove:horizontal {
+    border: 1px solid #3e3e42;
+    height: 4px;
+    background: #2d2d30;
+    margin: 2px 0;
+    border-radius: 2px;
+}
+
+EncoderTab QSlider::handle:horizontal {
+    background: #0a84ff;
+    border: none;
+    width: 16px;
+    height: 16px;
+    margin: -6px 0;
+    border-radius: 8px;
+}
+
+EncoderTab QSlider::handle:horizontal:hover {
+    background: #1a94ff;
+}
+
+EncoderTab QProgressBar {
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    text-align: center;
+    background-color: #252526;
+}
+
+EncoderTab QProgressBar::chunk {
+    background-color: #0a84ff;
+    border-radius: 2px;
+}
+
+/* Individual component styling */
+EncoderTab QLabel#title_label {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 5px;
+    color: #ffffff;
+}
+
+EncoderTab QLabel#preview_label {
+    border: 1px solid #3e3e42;
+    background-color: #252526;
+    border-radius: 4px;
+    color: #cccccc;
+}
+
+EncoderTab QLabel#path_label {
+    font-size: 10px;
+    color: #8e8e93;
+}

@@ -8,23 +8,27 @@ import logging
 import threading
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
-from handlers import (
+from core.handlers import (
     ConversionHandler,
     ConversionSettings,
     FileHandler,
     RenamingHandler,
     SubtitleHandler,
 )
-from ffmpeg_manager import FFmpegManager
-from metadata_grabber import MetadataGrabber
-from profile_manager import ProfileManager
-from subtitle_manager import SubtitleProviders
+from core.ffmpeg_manager import FFmpegManager
+from core.metadata_grabber import MetadataGrabber
+from core.profile_manager import ProfileManager
+from core.subtitle_manager import SubtitleProviders
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+try:
+    from utils.logging_config import setup_logging
+    setup_logging()
+except ImportError:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +75,7 @@ class EncodeForgeCore:
         """Lazy initialization of Whisper manager - checks at runtime"""
         if not self._whisper_checked:
             try:
-                from subtitle_providers.whisper_manager import WhisperManager
+                from core.providers.subtitle.whisper_manager import WhisperManager
                 self._whisper_mgr = WhisperManager()
                 logger.info("Whisper AI available for subtitle generation")
             except ImportError:

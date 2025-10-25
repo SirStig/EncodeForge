@@ -687,23 +687,27 @@ def main():
     
     status = manager.get_status()
     
-    print("Whisper Status:")
-    print(f"  Installed: {status['installed']}")
+    logger.info("Whisper Status:")
+    logger.info(f"  Installed: {status['installed']}")
     
     if status['installed']:
-        print("  Downloaded Models: " + (', '.join(status['models']) if status['models'] else 'None'))
-        print("\nAvailable Models:")
+        logger.info("  Downloaded Models: " + (', '.join(status['models']) if status['models'] else 'None'))
+        logger.info("Available Models:")
         for model in status['available_models']:
             info = manager.get_model_info(model)
             status_icon = "✅" if info['installed'] else "❌"
-            print(f"    {status_icon} {model} ({info['size']})")
+            logger.info(f"    {status_icon} {model} ({info['size']})")
     else:
-        print("\n❌ Whisper is not installed")
-        print("Install with: pip install openai-whisper")
-        print("\nOr use the application's auto-install feature")
+        logger.error("Whisper is not installed")
+        logger.info("Install with: pip install openai-whisper")
+        logger.info("Or use the application's auto-install feature")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    try:
+        from utils.logging_config import setup_logging
+        setup_logging()
+    except ImportError:
+        logging.basicConfig(level=logging.INFO)
     main()
 

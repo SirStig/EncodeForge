@@ -37,6 +37,7 @@ class LogsTab(QWidget):
         self._setup_ui()
         self._setup_timer()
         self._load_initial_logs()
+        self._load_styles()
         
         logger.info("Logs tab initialized")
     
@@ -127,127 +128,36 @@ class LogsTab(QWidget):
         info_layout.addStretch()
         
         self.log_file_label = QLabel(f"Log file: {self.log_file.name}")
-        self.log_file_label.setStyleSheet("color: #8e8e93; font-size: 11px;")
+        self.log_file_label.setObjectName("log_file_label")
         info_layout.addWidget(self.log_file_label)
         
         layout.addLayout(info_layout)
         
         # Apply styling
-        self._apply_styling()
+        # self._apply_styling()  # Moved to external CSS file
     
-    def _apply_styling(self):
-        """Apply dark theme styling to logs tab"""
-        self.setStyleSheet("""
-            /* Logs Tab Styling */
-            QWidget {
-                background-color: #2d2d2d;
-                color: #ffffff;
-            }
+    def _load_styles(self):
+        """Load CSS styles for the logs tab."""
+        try:
+            from PySide6.QtCore import QFile, QTextStream
             
-            QLabel {
-                color: #ffffff;
-                font-size: 13px;
-            }
-            
-            QGroupBox {
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-                margin-top: 12px;
-                padding-top: 12px;
-                font-size: 13px;
-                font-weight: 600;
-                color: #ffffff;
-            }
-            
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 12px;
-                padding: 0 5px;
-            }
-            
-            QPlainTextEdit {
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                border: 1px solid #3a3a3a;
-                border-radius: 6px;
-                padding: 8px;
-                selection-background-color: #0a84ff;
-            }
-            
-            QComboBox {
-                background-color: #3a3a3a;
-                color: #ffffff;
-                border: 1px solid #4a4a4a;
-                border-radius: 6px;
-                padding: 6px 12px;
-                min-width: 100px;
-            }
-            
-            QComboBox:hover {
-                border: 1px solid #0a84ff;
-            }
-            
-            QComboBox::drop-down {
-                border: none;
-                padding-right: 8px;
-            }
-            
-            QComboBox QAbstractItemView {
-                background-color: #3a3a3a;
-                color: #ffffff;
-                selection-background-color: #0a84ff;
-                border: 1px solid #4a4a4a;
-            }
-            
-            QLineEdit {
-                background-color: #3a3a3a;
-                color: #ffffff;
-                border: 1px solid #4a4a4a;
-                border-radius: 6px;
-                padding: 6px 12px;
-            }
-            
-            QLineEdit:focus {
-                border: 1px solid #0a84ff;
-            }
-            
-            QPushButton {
-                background-color: #0a84ff;
-                color: #ffffff;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-size: 13px;
-                font-weight: 500;
-            }
-            
-            QPushButton:hover {
-                background-color: #0071e3;
-            }
-            
-            QPushButton:pressed {
-                background-color: #005bb5;
-            }
-            
-            QCheckBox {
-                color: #ffffff;
-                spacing: 8px;
-            }
-            
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border: 2px solid #4a4a4a;
-                border-radius: 4px;
-                background-color: #3a3a3a;
-            }
-            
-            QCheckBox::indicator:checked {
-                background-color: #0a84ff;
-                border-color: #0a84ff;
-            }
-        """)
+            css_file = Path(__file__).parent.parent.parent / "resources" / "styles" / "logs_tab.css"
+            if css_file.exists():
+                file = QFile(str(css_file))
+                if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
+                    stream = QTextStream(file)
+                    css_content = stream.readAll()
+                    file.close()
+                    
+                    # Apply the CSS
+                    self.setStyleSheet(css_content)
+                    logger.debug("Logs tab styles loaded successfully")
+                else:
+                    logger.warning("Failed to open logs_tab.css file")
+            else:
+                logger.warning("logs_tab.css file not found")
+        except Exception as e:
+            logger.error(f"Failed to load logs tab styles: {e}")
     
     def _setup_timer(self):
         """Set up timer for auto-refresh"""
@@ -256,26 +166,27 @@ class LogsTab(QWidget):
         self.refresh_timer.start(1000)  # Check every second
     
     def _load_initial_logs(self):
-        """Load initial logs from file"""
+        """Load initial logs from file with proper filtering"""
         try:
             if self.log_file.exists():
-                # Read full file and apply filter
+                # Read full file
                 with open(self.log_file, 'r', encoding='utf-8') as f:
                     content = f.read()
 
                 # Apply filter if active
                 if self.current_filter != "ALL":
                     lines = content.split('\n')
-                    filtered = [line for line in lines if self.current_filter in line]
+                    filtered = []
+                    for line in lines:
+                        # Check if line contains the log level using proper log format detection
+                        if self._line_matches_filter(line, self.current_filter):
+                            filtered.append(line)
                     content_to_display = '\n'.join(filtered)
                 else:
                     content_to_display = content
 
                 self.log_display.setPlainText(content_to_display)
-                try:
-                    self.last_position = self.log_file.stat().st_size
-                except Exception:
-                    self.last_position = len(content)
+                self.last_position = self.log_file.stat().st_size
                 self._update_line_count()
 
                 # Scroll to bottom
@@ -285,7 +196,7 @@ class LogsTab(QWidget):
             logger.error(f"Failed to load initial logs: {e}")
     
     def _check_for_updates(self):
-        """Check for new log entries"""
+        """Check for new log entries with proper filtering"""
         try:
             if not self.log_file.exists():
                 return
@@ -301,7 +212,11 @@ class LogsTab(QWidget):
                     # Apply filter if active
                     if self.current_filter != "ALL":
                         lines = new_content.split('\n')
-                        filtered_lines = [line for line in lines if self.current_filter in line]
+                        filtered_lines = []
+                        for line in lines:
+                            # Use proper log level detection
+                            if self._line_matches_filter(line, self.current_filter):
+                                filtered_lines.append(line)
                         new_content = '\n'.join(filtered_lines)
 
                     # Append new content
@@ -323,32 +238,20 @@ class LogsTab(QWidget):
     def _on_search_changed(self, text: str):
         """Handle search text change"""
         if not text:
+            # Clear any existing highlights
             self.log_display.setExtraSelections([])
             return
         
-        # Highlight search matches using ExtraSelection
-        doc = self.log_display.document()
-        cursor = QTextCursor(doc)
+        # Simple search implementation - scroll to first match
+        cursor = self.log_display.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.Start)
-
-        fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#ffeb3b"))
-        fmt.setForeground(QColor("#000000"))
-
-        selections = []
-        while True:
-            found = doc.find(text, cursor)
-            if found.isNull():
-                break
-            sel = QTextEdit.ExtraSelection()
-            sel.cursor = found
-            sel.format = fmt
-            selections.append(sel)
-            # move cursor forward to avoid finding same match
-            cursor = found
-            cursor.setPosition(found.position())
-
-        self.log_display.setExtraSelections(selections)
+        
+        # Find first occurrence
+        found = self.log_display.document().find(text, cursor)
+        if not found.isNull():
+            # Select and scroll to the found text
+            self.log_display.setTextCursor(found)
+            self.log_display.centerCursor()
     
     def _on_auto_scroll_toggled(self, checked: bool):
         """Handle auto-scroll toggle"""
@@ -387,6 +290,30 @@ class LogsTab(QWidget):
             except Exception as e:
                 logger.error(f"Failed to save logs: {e}")
     
+    def _line_matches_filter(self, line: str, filter_level: str) -> bool:
+        """Check if a log line matches the current filter level"""
+        if filter_level == "ALL":
+            return True
+        
+        # Look for log level indicators in the line
+        # The log format is: "2024-01-01 12:00:00 | INFO     | module.name          | message"
+        # So we look for " | LEVEL " pattern
+        level_patterns = {
+            "DEBUG": [" | DEBUG", "DEBUG"],
+            "INFO": [" | INFO", "INFO"],
+            "WARNING": [" | WARNING", "WARNING", "WARN"],
+            "ERROR": [" | ERROR", "ERROR", "ERR"],
+            "CRITICAL": [" | CRITICAL", "CRITICAL", "FATAL"]
+        }
+        
+        if filter_level in level_patterns:
+            patterns = level_patterns[filter_level]
+            for pattern in patterns:
+                if pattern.upper() in line.upper():
+                    return True
+        
+        return False
+
     def _update_line_count(self):
         """Update the line count label"""
         line_count = self.log_display.blockCount()

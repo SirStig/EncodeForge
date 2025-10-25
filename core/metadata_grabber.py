@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-from providers.metadata import (
+from core.providers.metadata import (
     AniDBProvider,
     JikanProvider,
     KitsuProvider,
@@ -444,6 +444,10 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    try:
+        from utils.logging_config import setup_logging
+        setup_logging()
+    except ImportError:
+        logging.basicConfig(level=logging.INFO)
     main()
 

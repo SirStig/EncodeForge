@@ -33,6 +33,8 @@ class SplashScreen(QWidget):
         # Center on screen
         self.center_on_screen()
         
+        self._load_styles()
+        
         logger.debug("Splash screen initialized")
     
     def _setup_ui(self):
@@ -41,29 +43,7 @@ class SplashScreen(QWidget):
         self.setFixedSize(600, 400)
         
         # Apply styling
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #1e1e1e;
-                border-radius: 16px;
-            }
-            
-            QLabel {
-                color: #ffffff;
-            }
-            
-            QProgressBar {
-                border: none;
-                border-radius: 8px;
-                background-color: #3a3a3c;
-                height: 8px;
-                text-align: center;
-            }
-            
-            QProgressBar::chunk {
-                background-color: #0a84ff;
-                border-radius: 8px;
-            }
-        """)
+        # self.setStyleSheet("""...""")  # Moved to external CSS file
         
         # Main layout
         layout = QVBoxLayout(self)
@@ -78,7 +58,7 @@ class SplashScreen(QWidget):
         title_label.setAlignment(Qt.AlignCenter)
         title_font = QFont("Segoe UI", 36, QFont.Bold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #ffffff; margin-bottom: 10px;")
+        title_label.setObjectName("title_label")
         layout.addWidget(title_label)
         
         # Version
@@ -86,7 +66,7 @@ class SplashScreen(QWidget):
         version_label.setAlignment(Qt.AlignCenter)
         version_font = QFont("Segoe UI", 12)
         version_label.setFont(version_font)
-        version_label.setStyleSheet("color: #8e8e93; margin-bottom: 20px;")
+        version_label.setObjectName("version_label")
         layout.addWidget(version_label)
         
         # Status label
@@ -94,7 +74,7 @@ class SplashScreen(QWidget):
         self.status_label.setAlignment(Qt.AlignCenter)
         status_font = QFont("Segoe UI", 11)
         self.status_label.setFont(status_font)
-        self.status_label.setStyleSheet("color: #c7c7cc; margin-top: 20px;")
+        self.status_label.setObjectName("status_label")
         layout.addWidget(self.status_label)
         
         # Progress bar
@@ -109,11 +89,34 @@ class SplashScreen(QWidget):
         tagline_label.setAlignment(Qt.AlignCenter)
         tagline_font = QFont("Segoe UI", 10)
         tagline_label.setFont(tagline_font)
-        tagline_label.setStyleSheet("color: #636366; margin-top: 10px;")
+        tagline_label.setObjectName("tagline_label")
         layout.addWidget(tagline_label)
         
         # Add spacing at bottom
         layout.addStretch(1)
+    
+    def _load_styles(self):
+        """Load CSS styles for the splash screen."""
+        try:
+            from PySide6.QtCore import QFile, QTextStream
+            
+            css_file = Path(__file__).parent.parent / "resources" / "styles" / "splash_screen.css"
+            if css_file.exists():
+                file = QFile(str(css_file))
+                if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
+                    stream = QTextStream(file)
+                    css_content = stream.readAll()
+                    file.close()
+                    
+                    # Apply the CSS
+                    self.setStyleSheet(css_content)
+                    logger.debug("Splash screen styles loaded successfully")
+                else:
+                    logger.warning("Failed to open splash_screen.css file")
+            else:
+                logger.warning("splash_screen.css file not found")
+        except Exception as e:
+            logger.error(f"Failed to load splash screen styles: {e}")
     
     def center_on_screen(self):
         """Center the splash screen on the primary screen."""

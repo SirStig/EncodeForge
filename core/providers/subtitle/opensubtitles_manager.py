@@ -561,9 +561,9 @@ def main():
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python opensubtitles_manager.py <video_file>")
-        print("\nRequired environment variable:")
-        print("  OPENSUBTITLES_API_KEY - Get your free API key from https://www.opensubtitles.com/en/consumers")
+        logger.error("Usage: python opensubtitles_manager.py <video_file>")
+        logger.error("Required environment variable:")
+        logger.error("  OPENSUBTITLES_API_KEY - Get your free API key from https://www.opensubtitles.com/en/consumers")
         return
     
     import os
@@ -573,31 +573,31 @@ def main():
     api_key = os.getenv("OPENSUBTITLES_API_KEY", "")
     
     if not api_key:
-        print("❌ Error: OPENSUBTITLES_API_KEY environment variable is required")
-        print("Get your free API key from: https://www.opensubtitles.com/en/consumers")
+        logger.error("OPENSUBTITLES_API_KEY environment variable is required")
+        logger.error("Get your free API key from: https://www.opensubtitles.com/en/consumers")
         return
     
     manager = OpenSubtitlesManager(api_key)
     
     # Search for subtitles
-    print(f"\nSearching subtitles for: {Path(video_file).name}")
-    print("Searching in multiple languages (en, es, fr, de, etc.)...")
+    logger.info(f"Searching subtitles for: {Path(video_file).name}")
+    logger.info("Searching in multiple languages (en, es, fr, de, etc.)...")
     success, results = manager.search_subtitles(video_file, ["en", "es", "fr", "de"])
     
     if success and results:
-        print(f"\n✅ Found {len(results)} subtitle(s):")
+        logger.info(f"Found {len(results)} subtitle(s)")
         
         for i, result in enumerate(results, 1):
-            print(f"\n{i}. {result['file_name']}")
-            print(f"   Language: {result['language']}")
-            print(f"   Downloads: {result['downloads']}")
-            print(f"   Rating: {result['rating']}")
-            print(f"   Uploader: {result['uploader']}")
+            logger.info(f"{i}. {result['file_name']} - Language: {result['language']} - Downloads: {result['downloads']} - Rating: {result['rating']} - Uploader: {result['uploader']}")
     else:
-        print("❌ No subtitles found")
+        logger.warning("No subtitles found")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    try:
+        from utils.logging_config import setup_logging
+        setup_logging()
+    except ImportError:
+        logging.basicConfig(level=logging.INFO)
     main()
 

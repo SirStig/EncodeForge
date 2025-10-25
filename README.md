@@ -19,9 +19,7 @@
 
 ---
 
-## 🎯 About The Project
-
-## 🎯 About The Project
+##  About The Project
 
 **EncodeForge** is a free, open-source **FFmpeg GUI** built with Python and PySide6. It's designed to make professional video encoding, subtitle generation, and media file management accessible to everyone - no command-line experience required.
 
@@ -44,9 +42,9 @@
 
 ---
 
-## ✨ Features
+## Features
 
-### 🎞️ Video Encoding
+###  Video Encoding
 
 - **Hardware Acceleration** - NVIDIA NVENC, AMD AMF, Intel Quick Sync, Apple VideoToolbox
 - **Smart Codec Selection** - Automatic best-codec detection for your hardware
@@ -54,7 +52,7 @@
 - **Stream Preservation** - Copy streams without re-encoding when possible
 - **Audio Normalization** - Consistent volume levels across all media
 
-### 📝 Subtitle Generation
+###  Subtitle Generation
 
 - **AI-Powered Subtitles** - Generate subtitles using OpenAI Whisper (90+ languages)
 - **GPU Acceleration** - 10x-20x faster with NVIDIA, AMD, or Apple Silicon
@@ -62,7 +60,7 @@
 - **Multi-Language** - Handle multiple audio tracks and subtitle languages
 - **Format Support** - SRT, ASS, SSA, VTT, and more
 
-### 🏷️ Smart File Renaming
+###  Smart File Renaming
 
 - **10 Metadata Providers** - TMDB, TVDB, OMDB, Trakt, Fanart.tv, and 5 free providers
 - **Auto-Detection** - Intelligent movie, TV show, and anime recognition
@@ -70,7 +68,7 @@
 - **Preview Mode** - See changes before applying
 - **Bulk Operations** - Rename entire libraries in seconds
 
-### 🎨 Modern Interface
+###  Modern Interface
 
 - **Dark Theme** - Easy on the eyes during long processing sessions
 - **Tabbed Interface** - Encoder, Subtitles, and Renamer in one window
@@ -80,7 +78,7 @@
 
 ---
 
-## 📦 Installation
+##  Installation
 
 ### Pre-Built Binaries (Recommended)
 
@@ -128,7 +126,7 @@ python cli.py --help
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### GUI Application
 
@@ -156,7 +154,7 @@ encodeforge-cli gui
 
 ---
 
-## 🔧 Configuration
+##  Configuration
 
 ### API Keys (Optional)
 
@@ -184,7 +182,7 @@ EncodeForge automatically detects available hardware encoders:
 
 ---
 
-## 📸 Screenshots
+##  Screenshots
 
 <div align="center">
 
@@ -193,7 +191,7 @@ EncodeForge automatically detects available hardware encoders:
 
 ---
 
-## 🗺️ Roadmap
+##  Roadmap
 
 - ✅ Complete Java to PySide6 migration
 - ✅ Modern Qt-based UI with Fluent Design

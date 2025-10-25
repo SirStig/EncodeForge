@@ -60,7 +60,19 @@ class Worker(QRunnable):
         self._should_stop = False
         
         # Add progress callback to kwargs if function supports it
-        self.kwargs['progress_callback'] = self.signals.progress
+        def progress_callback_wrapper(progress_data):
+            """Convert progress callback dict to signal emission"""
+            if isinstance(progress_data, dict):
+                current = progress_data.get('progress', 0)
+                total = 100  # Default total
+                message = progress_data.get('message', '')
+                # Don't log progress messages to reduce log spam
+                self.signals.progress.emit(current, total, message)
+            else:
+                # Handle old-style progress callbacks
+                self.signals.progress.emit(progress_data, 100, "")
+        
+        self.kwargs['progress_callback'] = progress_callback_wrapper
     
     @Slot()
     def run(self):
@@ -123,18 +135,76 @@ class EncoderWorker(Worker):
             encoder_settings: Dictionary of encoding settings
             **kwargs: Additional arguments passed to parent
         """
-        from core.ffmpeg_core import encode_video  # Import here to avoid circular deps
+        from core.encodeforge_core import EncodeForgeCore
+        
+        # Create core instance
+        core = EncodeForgeCore()
+        
+        # Prepare conversion settings from encoder settings
+        from core.handlers import ConversionSettings
+        settings = ConversionSettings()
+        
+        # Map encoder settings to conversion settings
+        if 'codec' in encoder_settings:
+            codec_map = {
+                'H.264': 'libx264',
+                'H.265/HEVC': 'libx265', 
+                'AV1': 'libaom-av1',
+                'VP9': 'libvpx-vp9',
+                'Copy': 'copy',
+                'Auto': 'libx264'
+            }
+            settings.video_codec_fallback = codec_map.get(encoder_settings['codec'], 'libx264')
+        if 'preset' in encoder_settings:
+            settings.video_preset = encoder_settings['preset']
+        if 'quality' in encoder_settings:
+            # Parse quality string like "Medium (CQ 23)" to get CQ value
+            quality_str = encoder_settings['quality']
+            if 'CQ' in quality_str:
+                cq_value = int(quality_str.split('CQ')[1].strip().rstrip(')'))
+                settings.video_crf = cq_value
+        if 'hw_accel' in encoder_settings:
+            settings.use_nvenc = encoder_settings['hw_accel']
+        if 'normalize_audio' in encoder_settings:
+            settings.normalize_audio = encoder_settings['normalize_audio']
+        if 'format' in encoder_settings:
+            format_map = {
+                'MP4': 'mp4',
+                'MKV': 'mkv', 
+                'WebM': 'webm',
+                'AVI': 'avi',
+                'MOV': 'mov'
+            }
+            settings.output_format = format_map.get(encoder_settings['format'], 'mp4')
+        
+        # Update core with settings
+        core.settings = settings
+        
+        # Store reference to conversion handler for cancellation
+        self.conversion_handler = core.conversion_handler
         
         super().__init__(
-            encode_video,
-            file_path=file_path,
-            output_path=output_path,
-            settings=encoder_settings,
+            core.convert_file,
+            input_path=str(file_path),
+            output_path=str(output_path),
             **kwargs
         )
         self.file_path = file_path
         self.output_path = output_path
         self.encoder_settings = encoder_settings
+    
+    def stop(self):
+        """Stop the encoding process."""
+        # Call parent stop first
+        super().stop()
+        
+        # Cancel the conversion handler
+        if hasattr(self, 'conversion_handler') and self.conversion_handler:
+            try:
+                self.conversion_handler.cancel_current()
+                logger.info(f"Cancelled encoding for {self.file_path}")
+            except Exception as e:
+                logger.error(f"Error cancelling encoding: {e}")
 
 
 class SubtitleWorker(Worker):
@@ -154,12 +224,15 @@ class SubtitleWorker(Worker):
             subtitle_settings: Dictionary of subtitle settings
             **kwargs: Additional arguments passed to parent
         """
-        from core.subtitle_manager import process_subtitles
+        from core.encodeforge_core import EncodeForgeCore
+        
+        # Create core instance
+        core = EncodeForgeCore()
         
         super().__init__(
-            process_subtitles,
-            file_path=file_path,
-            settings=subtitle_settings,
+            core.download_subtitles,
+            file_path=str(file_path),
+            languages=subtitle_settings.get('languages', ['eng']),
             **kwargs
         )
         self.file_path = file_path
@@ -183,12 +256,16 @@ class RenamerWorker(Worker):
             renaming_settings: Dictionary of renaming settings
             **kwargs: Additional arguments passed to parent
         """
-        from core.metadata_grabber import rename_file
+        from core.encodeforge_core import EncodeForgeCore
+        
+        # Create core instance
+        core = EncodeForgeCore()
         
         super().__init__(
-            rename_file,
-            file_path=file_path,
-            settings=renaming_settings,
+            core.rename_files,
+            file_paths=[str(file_path)],
+            dry_run=renaming_settings.get('dry_run', False),
+            create_backup=renaming_settings.get('create_backup', False),
             **kwargs
         )
         self.file_path = file_path

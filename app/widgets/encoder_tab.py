@@ -10,10 +10,13 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableWidget, QTableWidgetItem, QPushButton, QProgressBar,
     QLabel, QComboBox, QSlider, QGroupBox, QFormLayout,
-    QCheckBox, QSpinBox, QFileDialog, QHeaderView, QAbstractItemView
+    QCheckBox, QSpinBox, QFileDialog, QHeaderView, QAbstractItemView,
+    QMenu
 )
 from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
+
+import qtawesome as qta
 
 from utils.workers import EncoderWorker
 from utils.notifications import get_notification_manager
@@ -58,392 +61,295 @@ class EncoderTab(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Apply macOS-inspired styling
-        self.setStyleSheet("""
-            /* Encoder Tab Styling */
-            QWidget {
-                background-color: #2d2d2d;
-                color: #ffffff;
-            }
-            
-            /* Buttons */
-            QPushButton {
-                background-color: #0a84ff;
-                color: #ffffff;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-size: 13px;
-                font-weight: 500;
-            }
-            
-            QPushButton:hover {
-                background-color: #0077ed;
-            }
-            
-            QPushButton:pressed {
-                background-color: #006adc;
-            }
-            
-            QPushButton:disabled {
-                background-color: #3a3a3c;
-                color: #636366;
-            }
-            
-            /* Tables */
-            QTableWidget {
-                background-color: #1e1e1e;
-                alternate-background-color: #252525;
-                gridline-color: #3a3a3a;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-            }
-            
-            QTableWidget::item {
-                padding: 8px;
-                color: #ffffff;
-            }
-            
-            QTableWidget::item:selected {
-                background-color: #0a84ff;
-            }
-            
-            QHeaderView::section {
-                background-color: #2a2a2a;
-                color: #8e8e93;
-                padding: 10px;
-                border: none;
-                border-bottom: 1px solid #3a3a3a;
-                font-size: 12px;
-                font-weight: 600;
-                text-transform: uppercase;
-            }
-            
-            /* Group Boxes */
-            QGroupBox {
-                font-size: 13px;
-                font-weight: 600;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-                margin-top: 12px;
-                padding-top: 12px;
-                color: #ffffff;
-            }
-            
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                padding: 0 8px;
-                color: #8e8e93;
-            }
-            
-            /* Combo Boxes */
-            QComboBox {
-                background-color: #3a3a3c;
-                border: 1px solid #48484a;
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: #ffffff;
-                min-width: 120px;
-            }
-            
-            QComboBox:hover {
-                border-color: #0a84ff;
-            }
-            
-            QComboBox::drop-down {
-                border: none;
-                width: 20px;
-            }
-            
-            QComboBox QAbstractItemView {
-                background-color: #2d2d2d;
-                border: 1px solid #3a3a3a;
-                border-radius: 8px;
-                selection-background-color: #0a84ff;
-                color: #ffffff;
-            }
-            
-            /* Sliders */
-            QSlider::groove:horizontal {
-                background-color: #3a3a3c;
-                height: 6px;
-                border-radius: 3px;
-            }
-            
-            QSlider::handle:horizontal {
-                background-color: #0a84ff;
-                width: 18px;
-                height: 18px;
-                margin: -6px 0;
-                border-radius: 9px;
-            }
-            
-            QSlider::handle:horizontal:hover {
-                background-color: #0077ed;
-            }
-            
-            /* Spin Boxes */
-            QSpinBox {
-                background-color: #3a3a3c;
-                border: 1px solid #48484a;
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: #ffffff;
-            }
-            
-            QSpinBox:hover {
-                border-color: #0a84ff;
-            }
-            
-            QSpinBox::up-button, QSpinBox::down-button {
-                background-color: transparent;
-                border: none;
-                width: 16px;
-            }
-            
-            /* Check Boxes */
-            QCheckBox {
-                color: #ffffff;
-                spacing: 8px;
-            }
-            
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border: 2px solid #48484a;
-                border-radius: 4px;
-                background-color: #3a3a3c;
-            }
-            
-            QCheckBox::indicator:checked {
-                background-color: #0a84ff;
-                border-color: #0a84ff;
-            }
-            
-            QCheckBox::indicator:hover {
-                border-color: #0a84ff;
-            }
-            
-            /* Progress Bars */
-            QProgressBar {
-                background-color: #3a3a3c;
-                border: none;
-                border-radius: 4px;
-                height: 8px;
-                text-align: center;
-            }
-            
-            QProgressBar::chunk {
-                background-color: #0a84ff;
-                border-radius: 4px;
-            }
-            
-            /* Labels */
-            QLabel {
-                color: #ffffff;
-            }
-            
-            /* Splitter */
-            QSplitter::handle {
-                background-color: #3a3a3a;
-                width: 1px;
-            }
-        """)
+        # Main splitter: Left (tables) | Right (file info)
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Main splitter
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Left side: Settings + Tables
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Left panel: File list and queue
-        left_panel = self._create_file_panel()
-        splitter.addWidget(left_panel)
+        # Top: Video Settings
+        self._setup_video_settings(left_layout)
         
-        # Right panel: Settings
-        right_panel = self._create_settings_panel()
-        splitter.addWidget(right_panel)
+        # Below: Tables splitter (Queued | Processing | Completed)
+        self._setup_tables_area(left_layout)
         
-        # Set initial sizes (70/30 split)
-        splitter.setSizes([700, 300])
+        main_splitter.addWidget(left_widget)
         
-        layout.addWidget(splitter)
+        # Right side: File Info sidebar
+        self._setup_file_info_sidebar(main_splitter)
+        
+        # Set splitter proportions (more space for tables, less for sidebar)
+        main_splitter.setSizes([700, 320])
+        
+        layout.addWidget(main_splitter)
+        
+        # Load styles
+        self._load_styles()
     
-    def _create_file_panel(self) -> QWidget:
-        """Create file list and queue management panel."""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
+    def _load_styles(self):
+        """Load CSS styles for the encoder tab."""
+        try:
+            from PySide6.QtCore import QFile, QTextStream
+            
+            css_file = Path(__file__).parent.parent.parent / "resources" / "styles" / "encoder_tab.css"
+            if css_file.exists():
+                file = QFile(str(css_file))
+                if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
+                    stream = QTextStream(file)
+                    css_content = stream.readAll()
+                    file.close()
+                    
+                    # Apply the CSS
+                    self.setStyleSheet(css_content)
+                    logger.debug("Encoder tab styles loaded successfully")
+                else:
+                    logger.warning("Failed to open encoder_tab.css file")
+            else:
+                logger.warning("encoder_tab.css file not found")
+        except Exception as e:
+            logger.error(f"Failed to load encoder tab styles: {e}")
+    
+    def _setup_video_settings(self, parent_layout):
+        """Set up the top video settings panel."""
+        # Settings container
+        settings_widget = QWidget()
+        settings_layout = QHBoxLayout(settings_widget)
+        settings_layout.setContentsMargins(10, 10, 10, 10)
+        settings_layout.setSpacing(15)
         
-        # Toolbar
-        toolbar = QHBoxLayout()
+        # Format dropdown
+        format_label = QLabel("Format:")
+        format_label.setMinimumWidth(50)
+        format_label.setMaximumWidth(80)
+        self.format_combo = QComboBox()
+        self.format_combo.addItems(["MP4", "MKV", "WebM", "AVI", "MOV"])
+        self.format_combo.setMinimumWidth(80)
+        self.format_combo.setMaximumWidth(120)
+        settings_layout.addWidget(format_label)
+        settings_layout.addWidget(self.format_combo)
+
+        # Codec dropdown
+        codec_label = QLabel("Codec:")
+        codec_label.setMinimumWidth(50)
+        codec_label.setMaximumWidth(80)
+        self.codec_combo = QComboBox()
+        self.codec_combo.addItems(["H.264", "H.265/HEVC", "AV1", "VP9", "Copy", "Auto"])
+        self.codec_combo.setCurrentText("Auto")
+        self.codec_combo.setMinimumWidth(100)
+        self.codec_combo.setMaximumWidth(140)
+        settings_layout.addWidget(codec_label)
+        settings_layout.addWidget(self.codec_combo)
+
+        # Quality dropdown
+        quality_label = QLabel("Quality:")
+        quality_label.setMinimumWidth(50)
+        quality_label.setMaximumWidth(80)
+        self.quality_combo = QComboBox()
+        self.quality_combo.addItems(["High (CQ 18)", "Medium (CQ 23)", "Low (CQ 28)", "Very Low (CQ 33)"])
+        self.quality_combo.setCurrentText("Medium (CQ 23)")
+        self.quality_combo.setMinimumWidth(120)
+        self.quality_combo.setMaximumWidth(160)
+        settings_layout.addWidget(quality_label)
+        settings_layout.addWidget(self.quality_combo)
+
+        # Preset dropdown
+        preset_label = QLabel("Preset:")
+        preset_label.setMinimumWidth(50)
+        preset_label.setMaximumWidth(80)
+        self.preset_combo = QComboBox()
+        self.preset_combo.addItems(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"])
+        self.preset_combo.setCurrentText("medium")
+        self.preset_combo.setMinimumWidth(100)
+        self.preset_combo.setMaximumWidth(140)
+        settings_layout.addWidget(preset_label)
+        settings_layout.addWidget(self.preset_combo)
         
-        from PySide6.QtWidgets import QStyle
+        # Hardware acceleration checkbox
+        self.hw_accel_check = QCheckBox("HW Acceleration")
+        self.hw_accel_check.setChecked(True)
+        self.hw_accel_check.setMinimumWidth(120)
+        self.hw_accel_check.setMaximumWidth(160)
+        settings_layout.addWidget(self.hw_accel_check)
+
+        # Normalize audio checkbox
+        self.normalize_audio_check = QCheckBox("Normalize Audio")
+        self.normalize_audio_check.setMinimumWidth(120)
+        self.normalize_audio_check.setMaximumWidth(160)
+        settings_layout.addWidget(self.normalize_audio_check)
+
+        # Spacer
+        settings_layout.addStretch()
+
+        # Stop button
+        self.stop_btn = QPushButton("Stop")
+        self.stop_btn.setIcon(qta.icon('fa5s.stop'))
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.setMinimumWidth(80)
+        self.stop_btn.setMaximumWidth(120)
+        settings_layout.addWidget(self.stop_btn)
+
+        # Start button
+        self.start_btn = QPushButton("Start Encoding")
+        self.start_btn.setIcon(qta.icon('fa5s.play'))
+        self.start_btn.setMinimumWidth(120)
+        self.start_btn.setMaximumWidth(160)
+        settings_layout.addWidget(self.start_btn)
+        
+        parent_layout.addWidget(settings_widget)
+    
+    def _setup_tables_area(self, parent_layout):
+        """Set up the single file table with all encoding states."""
+        # Main table container
+        table_group = QGroupBox("Files")
+        table_layout = QVBoxLayout(table_group)
+        
+        # Single comprehensive table
+        self.files_table = QTableWidget()
+        self.files_table.setColumnCount(8)
+        self.files_table.setHorizontalHeaderLabels([
+            "#", "File Name", "Output", "Size", "New Size", 
+            "Progress", "ETA", "Status"
+        ])
+        self.files_table.horizontalHeader().setStretchLastSection(True)
+        self.files_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.files_table.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
+        self.files_table.setAlternatingRowColors(True)
+        
+        # Enable context menu
+        self.files_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.files_table.customContextMenuRequested.connect(self._show_context_menu)
+        
+        table_layout.addWidget(self.files_table)
+        
+        # Table control buttons
+        buttons_layout = QHBoxLayout()
         
         self.add_files_btn = QPushButton("Add Files")
-        self.add_files_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
-        self.add_folder_btn = QPushButton("Add Folder")
-        self.add_folder_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
-        self.remove_btn = QPushButton("Remove")
-        self.remove_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
-        self.clear_btn = QPushButton("Clear All")
+        self.add_files_btn.setIcon(qta.icon('fa5s.plus'))
+        self.add_files_btn.clicked.connect(self._add_files)
+        self.add_files_btn.setMinimumWidth(100)
+        self.add_files_btn.setMaximumWidth(140)
         
-        toolbar.addWidget(self.add_files_btn)
-        toolbar.addWidget(self.add_folder_btn)
-        toolbar.addWidget(self.remove_btn)
-        toolbar.addWidget(self.clear_btn)
-        toolbar.addStretch()
+        self.add_folder_btn = QPushButton("Add Folder") 
+        self.add_folder_btn.setIcon(qta.icon('fa5s.folder-plus'))
+        self.add_folder_btn.clicked.connect(self._add_folder)
+        self.add_folder_btn.setMinimumWidth(100)
+        self.add_folder_btn.setMaximumWidth(140)
         
-        layout.addLayout(toolbar)
+        self.remove_selected_btn = QPushButton("Remove Selected")
+        self.remove_selected_btn.setIcon(qta.icon('fa5s.trash'))
+        self.remove_selected_btn.clicked.connect(self._remove_selected_files)
+        self.remove_selected_btn.setMinimumWidth(120)
+        self.remove_selected_btn.setMaximumWidth(160)
         
-        # File table
-        self.file_table = QTableWidget()
-        self.file_table.setColumnCount(5)
-        self.file_table.setHorizontalHeaderLabels([
-            "File", "Size", "Status", "Progress", "Output"
-        ])
-        self.file_table.horizontalHeader().setStretchLastSection(True)
-        self.file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.file_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.file_table.setAlternatingRowColors(True)
-        self.file_table.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
-        self.file_table.setAcceptDrops(True)
+        self.clear_completed_btn = QPushButton("Clear Completed")
+        self.clear_completed_btn.setIcon(qta.icon('fa5s.broom'))
+        self.clear_completed_btn.clicked.connect(self._clear_completed_files)
+        self.clear_completed_btn.setMinimumWidth(120)
+        self.clear_completed_btn.setMaximumWidth(160)
         
-        # Enable drag and drop
-        self.file_table.dragEnterEvent = self._drag_enter_event
-        self.file_table.dropEvent = self._drop_event
+        buttons_layout.addWidget(self.add_files_btn)
+        buttons_layout.addWidget(self.add_folder_btn)
+        buttons_layout.addWidget(self.remove_selected_btn)
+        buttons_layout.addWidget(self.clear_completed_btn)
+        buttons_layout.addStretch()
         
-        layout.addWidget(self.file_table)
+        table_layout.addLayout(buttons_layout)
         
-        # Queue controls
-        queue_controls = QHBoxLayout()
-        
-        self.start_btn = QPushButton("Start Encoding")
-        self.start_btn.setEnabled(False)
-        self.pause_btn = QPushButton("Pause")
-        self.pause_btn.setEnabled(False)
-        self.stop_btn = QPushButton("Stop")
-        self.stop_btn.setEnabled(False)
-        
-        queue_controls.addWidget(self.start_btn)
-        queue_controls.addWidget(self.pause_btn)
-        queue_controls.addWidget(self.stop_btn)
-        queue_controls.addStretch()
-        
-        layout.addLayout(queue_controls)
-        
-        return panel
+        parent_layout.addWidget(table_group)
     
-    def _create_settings_panel(self) -> QWidget:
-        """Create encoder settings panel."""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
+    def _setup_file_info_sidebar(self, splitter):
+        """Set up the file info sidebar on the right."""
+        sidebar = QWidget()
+        sidebar.setFixedWidth(320)
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+        sidebar_layout.setSpacing(10)
         
-        # Codec settings
-        codec_group = QGroupBox("Codec Settings")
-        codec_layout = QFormLayout()
+        # Title
+        title_label = QLabel("File Information")
+        title_label.setObjectName("title_label")
+        sidebar_layout.addWidget(title_label)
         
-        self.codec_combo = QComboBox()
-        self.codec_combo.addItems(["H.264", "H.265/HEVC", "AV1", "VP9", "Copy"])
-        codec_layout.addRow("Video Codec:", self.codec_combo)
+        # Preview area
+        preview_group = QGroupBox("Preview")
+        preview_layout = QVBoxLayout(preview_group)
+        self.preview_label = QLabel("No file selected")
+        self.preview_label.setObjectName("preview_label")
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_label.setMinimumHeight(120)
+        preview_layout.addWidget(self.preview_label)
+        sidebar_layout.addWidget(preview_group)
         
-        self.preset_combo = QComboBox()
-        self.preset_combo.addItems([
-            "ultrafast", "superfast", "veryfast", "faster", 
-            "fast", "medium", "slow", "slower", "veryslow"
-        ])
-        self.preset_combo.setCurrentText("medium")
-        codec_layout.addRow("Preset:", self.preset_combo)
+        # File Information Section
+        file_group = QGroupBox("File Details")
+        file_layout = QFormLayout(file_group)
+        file_layout.setSpacing(8)
         
-        codec_group.setLayout(codec_layout)
-        layout.addWidget(codec_group)
+        self.name_label = QLabel("-")
+        self.size_label = QLabel("-")
+        self.duration_label = QLabel("-")
+        self.path_label = QLabel("-")
+        self.path_label.setObjectName("path_label")
+        self.path_label.setWordWrap(True)
         
-        # Quality settings
-        quality_group = QGroupBox("Quality Settings")
-        quality_layout = QFormLayout()
+        file_layout.addRow("Name:", self.name_label)
+        file_layout.addRow("Size:", self.size_label)
+        file_layout.addRow("Duration:", self.duration_label)
+        file_layout.addRow("Path:", self.path_label)
         
-        crf_layout = QHBoxLayout()
-        self.crf_slider = QSlider(Qt.Orientation.Horizontal)
-        self.crf_slider.setRange(0, 51)
-        self.crf_slider.setValue(23)
-        self.crf_label = QLabel("23")
-        self.crf_slider.valueChanged.connect(
-            lambda v: self.crf_label.setText(str(v))
-        )
-        crf_layout.addWidget(self.crf_slider)
-        crf_layout.addWidget(self.crf_label)
-        quality_layout.addRow("CRF:", crf_layout)
+        sidebar_layout.addWidget(file_group)
         
-        self.audio_codec_combo = QComboBox()
-        self.audio_codec_combo.addItems(["AAC", "Opus", "MP3", "Copy"])
-        quality_layout.addRow("Audio Codec:", self.audio_codec_combo)
+        # Video Information Section
+        video_group = QGroupBox("Video Properties")
+        video_layout = QFormLayout(video_group)
+        video_layout.setSpacing(8)
         
-        self.audio_bitrate = QSpinBox()
-        self.audio_bitrate.setRange(64, 512)
-        self.audio_bitrate.setValue(192)
-        self.audio_bitrate.setSuffix(" kbps")
-        quality_layout.addRow("Audio Bitrate:", self.audio_bitrate)
+        self.codec_label = QLabel("-")
+        self.resolution_label = QLabel("-")
+        self.frame_rate_label = QLabel("-")
+        self.bitrate_label = QLabel("-")
         
-        quality_group.setLayout(quality_layout)
-        layout.addWidget(quality_group)
+        video_layout.addRow("Codec:", self.codec_label)
+        video_layout.addRow("Resolution:", self.resolution_label)
+        video_layout.addRow("Frame Rate:", self.frame_rate_label)
+        video_layout.addRow("Bitrate:", self.bitrate_label)
         
-        # Hardware acceleration
-        hw_group = QGroupBox("Hardware Acceleration")
-        hw_layout = QFormLayout()
+        sidebar_layout.addWidget(video_group)
         
-        self.hw_accel_combo = QComboBox()
-        self.hw_accel_combo.addItems([
-            "None", "NVENC (NVIDIA)", "AMF (AMD)", 
-            "QuickSync (Intel)", "VideoToolbox (macOS)"
-        ])
-        hw_layout.addRow("Acceleration:", self.hw_accel_combo)
+        # Audio Information Section
+        audio_group = QGroupBox("Audio Properties")
+        audio_layout = QFormLayout(audio_group)
+        audio_layout.setSpacing(8)
         
-        hw_group.setLayout(hw_layout)
-        layout.addWidget(hw_group)
+        self.audio_codec_label = QLabel("-")
+        self.audio_channels_label = QLabel("-")
+        self.sample_rate_label = QLabel("-")
+        self.audio_bitrate_label = QLabel("-")
         
-        # Output settings
-        output_group = QGroupBox("Output Settings")
-        output_layout = QFormLayout()
+        audio_layout.addRow("Codec:", self.audio_codec_label)
+        audio_layout.addRow("Channels:", self.audio_channels_label)
+        audio_layout.addRow("Sample Rate:", self.sample_rate_label)
+        audio_layout.addRow("Bitrate:", self.audio_bitrate_label)
         
-        self.container_combo = QComboBox()
-        self.container_combo.addItems(["MP4", "MKV", "WebM", "AVI"])
-        output_layout.addRow("Container:", self.container_combo)
+        sidebar_layout.addWidget(audio_group)
         
-        self.two_pass_check = QCheckBox("Enable 2-pass encoding")
-        output_layout.addRow("", self.two_pass_check)
+        sidebar_layout.addStretch()
         
-        self.preserve_metadata_check = QCheckBox("Preserve metadata")
-        self.preserve_metadata_check.setChecked(True)
-        output_layout.addRow("", self.preserve_metadata_check)
-        
-        output_group.setLayout(output_layout)
-        layout.addWidget(output_group)
-        
-        layout.addStretch()
-        
-        return panel
+        splitter.addWidget(sidebar)
     
     def _connect_signals(self):
         """Connect widget signals to slots."""
-        self.add_files_btn.clicked.connect(self._add_files)
-        self.add_folder_btn.clicked.connect(self._add_folder)
-        self.remove_btn.clicked.connect(self._remove_selected)
-        self.clear_btn.clicked.connect(self._clear_all)
+        # Connect table signals
+        self.files_table.itemSelectionChanged.connect(self._on_file_selected)
+        self.files_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.files_table.customContextMenuRequested.connect(self._show_context_menu)
+        
+        # Button connections
         self.start_btn.clicked.connect(self._start_encoding)
         self.stop_btn.clicked.connect(self._stop_encoding)
-    
-    def _drag_enter_event(self, event: QDragEnterEvent):
-        """Handle drag enter event."""
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-    
-    def _drop_event(self, event: QDropEvent):
-        """Handle drop event."""
-        urls = event.mimeData().urls()
-        for url in urls:
-            file_path = Path(url.toLocalFile())
-            if file_path.is_file() and self._is_video_file(file_path):
-                self._add_file_to_table(file_path)
-            elif file_path.is_dir():
-                self._add_folder_to_table(file_path)
-        event.acceptProposedAction()
     
     def _is_video_file(self, file_path: Path) -> bool:
         """Check if file is a video file."""
@@ -453,55 +359,41 @@ class EncoderTab(QWidget):
         }
         return file_path.suffix.lower() in video_extensions
     
-    def _add_files(self):
-        """Open file dialog to add files."""
-        files, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Select Video Files",
-            "",
-            "Video Files (*.mp4 *.mkv *.avi *.mov *.wmv *.flv *.webm *.m4v);;All Files (*.*)"
-        )
-        for file in files:
-            self._add_file_to_table(Path(file))
-    
-    def _add_folder(self):
-        """Open folder dialog to add all videos in folder."""
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "Select Folder"
-        )
-        if folder:
-            self._add_folder_to_table(Path(folder))
-    
     def _add_file_to_table(self, file_path: Path):
-        """Add file to the encoding queue."""
+        """Add file to the single files table."""
         if not file_path.exists():
             logger.warning(f"File not found: {file_path}")
             return
         
-        row = self.file_table.rowCount()
-        self.file_table.insertRow(row)
+        row = self.files_table.rowCount()
+        self.files_table.insertRow(row)
+        
+        # Index
+        self.files_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
         
         # File name
-        self.file_table.setItem(row, 0, QTableWidgetItem(file_path.name))
+        name_item = QTableWidgetItem(file_path.name)
+        name_item.setData(Qt.ItemDataRole.UserRole, str(file_path))
+        self.files_table.setItem(row, 1, name_item)
+        
+        # Output (placeholder)
+        self.files_table.setItem(row, 2, QTableWidgetItem(""))
         
         # File size
         size_mb = file_path.stat().st_size / (1024 * 1024)
-        self.file_table.setItem(row, 1, QTableWidgetItem(f"{size_mb:.2f} MB"))
+        self.files_table.setItem(row, 3, QTableWidgetItem(f"{size_mb:.2f} MB"))
+        
+        # New size (placeholder)
+        self.files_table.setItem(row, 4, QTableWidgetItem("-"))
+        
+        # Progress (placeholder)
+        self.files_table.setItem(row, 5, QTableWidgetItem("-"))
+        
+        # ETA (placeholder)
+        self.files_table.setItem(row, 6, QTableWidgetItem("-"))
         
         # Status
-        self.file_table.setItem(row, 2, QTableWidgetItem("Queued"))
-        
-        # Progress bar
-        progress = QProgressBar()
-        progress.setValue(0)
-        self.file_table.setCellWidget(row, 3, progress)
-        
-        # Output path (will be set when encoding starts)
-        self.file_table.setItem(row, 4, QTableWidgetItem(""))
-        
-        # Store full path in item data
-        self.file_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, str(file_path))
+        self.files_table.setItem(row, 7, QTableWidgetItem("Queued"))
         
         self.start_btn.setEnabled(True)
         logger.info(f"Added file to queue: {file_path.name}")
@@ -515,44 +407,46 @@ class EncoderTab(QWidget):
                 count += 1
         logger.info(f"Added {count} files from {folder_path}")
     
-    def _remove_selected(self):
-        """Remove selected rows from table."""
-        selected_rows = sorted(
-            set(index.row() for index in self.file_table.selectedIndexes()),
-            reverse=True
-        )
-        for row in selected_rows:
-            self.file_table.removeRow(row)
-        
-        if self.file_table.rowCount() == 0:
-            self.start_btn.setEnabled(False)
-    
-    def _clear_all(self):
-        """Clear all files from table."""
-        self.file_table.setRowCount(0)
-        self.start_btn.setEnabled(False)
-    
     def _start_encoding(self):
         """Start encoding all queued files."""
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         
-        for row in range(self.file_table.rowCount()):
-            status_item = self.file_table.item(row, 2)
-            if status_item.text() == "Queued":
-                self._encode_file(row)
+        # Find all queued files and start encoding them
+        for row in range(self.files_table.rowCount()):
+            status_item = self.files_table.item(row, 7)  # Status column
+            if status_item and status_item.text() == "Queued":
+                self._start_encoding_file(row)
     
-    def _encode_file(self, row: int):
-        """Start encoding a single file."""
-        file_item = self.file_table.item(row, 0)
-        file_path = Path(file_item.data(Qt.ItemDataRole.UserRole))
+    def _start_encoding_file(self, row: int):
+        """Start encoding a file in the specified row."""
+        # Get data from the table
+        name_item = self.files_table.item(row, 1)
+        if not name_item:
+            return
         
+        file_path = Path(name_item.data(Qt.ItemDataRole.UserRole))
+        if not file_path:
+            return
+        
+        # Update status to processing
+        self.files_table.setItem(row, 7, QTableWidgetItem("Encoding..."))
+        
+        # Add progress bar to progress column
+        progress = QProgressBar()
+        progress.setValue(0)
+        self.files_table.setCellWidget(row, 5, progress)
+        
+        # Update ETA
+        self.files_table.setItem(row, 6, QTableWidgetItem("-"))
+        
+        # Start encoding
+        self._encode_file(row, file_path)
+    
+    def _encode_file(self, proc_row: int, file_path: Path):
+        """Start encoding a single file."""
         # Generate output path
         output_path = self._generate_output_path(file_path)
-        self.file_table.item(row, 4).setText(str(output_path))
-        
-        # Update status
-        self.file_table.item(row, 2).setText("Encoding...")
         
         # Get encoder settings
         settings = self._get_encoder_settings()
@@ -562,16 +456,16 @@ class EncoderTab(QWidget):
         
         # Connect signals
         worker.signals.started.connect(
-            lambda: self._on_encode_started(row, str(file_path))
+            lambda: self._on_encode_started(proc_row, str(file_path))
         )
         worker.signals.progress.connect(
-            lambda cur, tot, msg: self._on_encode_progress(row, cur, tot, msg)
+            lambda cur, tot, msg: self._on_encode_progress(proc_row, cur, tot, msg)
         )
         worker.signals.result.connect(
-            lambda result: self._on_encode_completed(row, str(file_path))
+            lambda result: self._on_encode_completed(proc_row, str(file_path))
         )
         worker.signals.error.connect(
-            lambda error: self._on_encode_error(row, str(file_path), error)
+            lambda error: self._on_encode_error(proc_row, str(file_path), error)
         )
         
         # Track worker
@@ -583,22 +477,29 @@ class EncoderTab(QWidget):
     
     def _generate_output_path(self, input_path: Path) -> Path:
         """Generate output file path based on settings."""
-        container = self.container_combo.currentText().lower()
-        output_name = f"{input_path.stem}_encoded.{container}"
+        format_text = self.format_combo.currentText().lower()
+        # Map format names to extensions
+        format_map = {
+            'mp4': 'mp4',
+            'mkv': 'mkv',
+            'webm': 'webm',
+            'avi': 'avi',
+            'mov': 'mov'
+        }
+        extension = format_map.get(format_text, 'mp4')
+        output_name = f"{input_path.stem}_encoded.{extension}"
         return input_path.parent / output_name
     
     def _get_encoder_settings(self) -> Dict[str, Any]:
         """Get current encoder settings as dictionary."""
         return {
+            'format': self.format_combo.currentText(),
             'codec': self.codec_combo.currentText(),
+            'quality': self.quality_combo.currentText(),
             'preset': self.preset_combo.currentText(),
-            'crf': self.crf_slider.value(),
-            'audio_codec': self.audio_codec_combo.currentText(),
-            'audio_bitrate': self.audio_bitrate.value(),
-            'hw_accel': self.hw_accel_combo.currentText(),
-            'container': self.container_combo.currentText(),
-            'two_pass': self.two_pass_check.isChecked(),
-            'preserve_metadata': self.preserve_metadata_check.isChecked()
+            'hw_accel': self.hw_accel_check.isChecked(),
+            'normalize_audio': self.normalize_audio_check.isChecked(),
+            'container': self.format_combo.currentText().lower()
         }
     
     def _on_encode_started(self, row: int, file_path: str):
@@ -606,50 +507,69 @@ class EncoderTab(QWidget):
         self.encode_started.emit(file_path)
         logger.debug(f"Encode started for row {row}: {file_path}")
     
-    def _on_encode_progress(self, row: int, current: int, total: int, message: str):
+    def _on_encode_progress(self, proc_row: int, current: int, total: int, message: str):
         """Handle encoding progress update."""
-        progress_bar = self.file_table.cellWidget(row, 3)
+        progress_bar = self.files_table.cellWidget(proc_row, 5)
         if progress_bar and isinstance(progress_bar, QProgressBar):
             progress_bar.setValue(int((current / total) * 100))
         
-        file_item = self.file_table.item(row, 0)
-        file_path = file_item.data(Qt.ItemDataRole.UserRole)
-        self.encode_progress.emit(file_path, current, total, message)
+        # Update status
+        status_item = self.files_table.item(proc_row, 7)
+        if status_item:
+            status_item.setText(f"Encoding... {int((current / total) * 100)}%")
+        
+        file_item = self.files_table.item(proc_row, 1)
+        if file_item:
+            file_path = file_item.data(Qt.ItemDataRole.UserRole)
+            self.encode_progress.emit(file_path, current, total, message)
     
-    def _on_encode_completed(self, row: int, file_path: str):
+    def _on_encode_completed(self, proc_row: int, file_path: str):
         """Handle encoding completed event."""
-        self.file_table.item(row, 2).setText("Completed")
-        progress_bar = self.file_table.cellWidget(row, 3)
-        if progress_bar:
+        # Update status to completed
+        self.files_table.setItem(proc_row, 7, QTableWidgetItem("Completed"))
+        
+        # Update progress to 100%
+        progress_bar = self.files_table.cellWidget(proc_row, 5)
+        if progress_bar and isinstance(progress_bar, QProgressBar):
             progress_bar.setValue(100)
+        
+        # Update ETA to completion time
+        self.files_table.setItem(proc_row, 6, QTableWidgetItem("00:00"))
+        
+        # Update output file size if available
+        output_path = self._generate_output_path(Path(file_path))
+        if output_path.exists():
+            new_size = output_path.stat().st_size / (1024 * 1024)  # MB
+            self.files_table.setItem(proc_row, 4, QTableWidgetItem(f"{new_size:.2f} MB"))
         
         # Remove from active workers
         if file_path in self.active_workers:
             del self.active_workers[file_path]
         
         self.encode_completed.emit(file_path)
-        
-        # Note: Notification would be async, but we're in a sync context
-        # Consider using QTimer or asyncio integration for async notifications
         logger.info(f"Encode completed: {file_path}")
         
         # Check if all done
         self._check_queue_complete()
     
-    def _on_encode_error(self, row: int, file_path: str, error: tuple):
+
+    
+    def _on_encode_error(self, proc_row: int, file_path: str, error: tuple):
         """Handle encoding error event."""
         exc_type, value, tb = error
         error_msg = str(value)
         
-        self.file_table.item(row, 2).setText(f"Error: {error_msg}")
+        # Update status to error
+        self.files_table.setItem(proc_row, 7, QTableWidgetItem(f"Error: {error_msg}"))
+        
+        # Remove progress bar
+        self.files_table.removeCellWidget(proc_row, 5)
         
         # Remove from active workers
         if file_path in self.active_workers:
             del self.active_workers[file_path]
         
         self.encode_error.emit(file_path, error_msg)
-        
-        # Note: Notification would be async, but we're in a sync context
         logger.error(f"Encode error for {file_path}: {error_msg}")
         
         # Check if all done
@@ -671,12 +591,361 @@ class EncoderTab(QWidget):
             self.stop_btn.setEnabled(False)
             self.start_btn.setEnabled(True)
             
-            # Count completed
-            completed = sum(
-                1 for row in range(self.file_table.rowCount())
-                if self.file_table.item(row, 2).text() == "Completed"
-            )
+            # Count completed files
+            completed_count = 0
+            for row in range(self.files_table.rowCount()):
+                status_item = self.files_table.item(row, 7)
+                if status_item and status_item.text() == "Completed":
+                    completed_count += 1
             
-            if completed > 0:
-                # Note: Notifications would be async
-                logger.info(f"Batch encoding complete: {completed} files")
+            if completed_count > 0:
+                logger.info(f"Batch encoding complete: {completed_count} files")
+    
+    def _remove_selected_queued(self):
+        """Remove selected rows from files table that are in queued status."""
+        selected_rows = sorted(
+            set(index.row() for index in self.files_table.selectedIndexes()),
+            reverse=True
+        )
+        for row in selected_rows:
+            status_item = self.files_table.item(row, 7)
+            if status_item and status_item.text() == "Queued":
+                self.files_table.removeRow(row)
+        
+        # Check if any queued files remain
+        has_queued = False
+        for row in range(self.files_table.rowCount()):
+            status_item = self.files_table.item(row, 7)
+            if status_item and status_item.text() == "Queued":
+                has_queued = True
+                break
+        
+        if not has_queued:
+            self.start_btn.setEnabled(False)
+    
+    def _clear_queued(self):
+        """Clear all queued files from the table."""
+        rows_to_remove = []
+        for row in range(self.files_table.rowCount()):
+            status_item = self.files_table.item(row, 7)
+            if status_item and status_item.text() == "Queued":
+                rows_to_remove.append(row)
+        
+        # Remove in reverse order to maintain indices
+        for row in sorted(rows_to_remove, reverse=True):
+            self.files_table.removeRow(row)
+        
+        self.start_btn.setEnabled(False)
+    
+    def _cancel_selected_processing(self):
+        """Cancel selected processing tasks."""
+        selected_rows = sorted(
+            set(index.row() for index in self.files_table.selectedIndexes()),
+            reverse=True
+        )
+        for row in selected_rows:
+            status_item = self.files_table.item(row, 7)
+            if status_item and "Encoding" in status_item.text():
+                name_item = self.files_table.item(row, 1)
+                if name_item:
+                    file_path = name_item.data(Qt.ItemDataRole.UserRole)
+                    if file_path in self.active_workers:
+                        self.active_workers[file_path].stop()
+                        del self.active_workers[file_path]
+                
+                # Update status to cancelled
+                self.files_table.setItem(row, 7, QTableWidgetItem("Cancelled"))
+                # Remove progress bar
+                self.files_table.removeCellWidget(row, 5)
+    
+    def _cancel_all_processing(self):
+        """Cancel all processing tasks."""
+        self._stop_encoding()
+        
+        # Update status for all encoding files
+        for row in range(self.files_table.rowCount()):
+            status_item = self.files_table.item(row, 7)
+            if status_item and "Encoding" in status_item.text():
+                self.files_table.setItem(row, 7, QTableWidgetItem("Cancelled"))
+                self.files_table.removeCellWidget(row, 5)
+    
+    def _clear_completed(self):
+        """Clear all completed files from the table."""
+        rows_to_remove = []
+        for row in range(self.files_table.rowCount()):
+            status_item = self.files_table.item(row, 7)
+            if status_item and status_item.text() == "Completed":
+                rows_to_remove.append(row)
+        
+        # Remove in reverse order to maintain indices
+        for row in sorted(rows_to_remove, reverse=True):
+            self.files_table.removeRow(row)
+    
+    def _on_file_selected(self):
+        """Handle file selection in the table."""
+        # Get selected file path
+        file_path = None
+        
+        selected_items = self.files_table.selectedItems()
+        if selected_items:
+            row = selected_items[0].row()
+            name_item = self.files_table.item(row, 1)
+            if name_item:
+                file_path = name_item.data(Qt.ItemDataRole.UserRole)
+        
+        if file_path:
+            self._update_file_info(file_path)
+    
+    def _show_context_menu(self, position):
+        """Show context menu for file operations."""
+        # Get the row at the position
+        index = self.files_table.indexAt(position)
+        if not index.isValid():
+            return
+        
+        row = index.row()
+        status_item = self.files_table.item(row, 7)
+        if not status_item:
+            return
+        
+        status = status_item.text()
+        
+        # Get selected rows
+        selected_rows = sorted(
+            set(index.row() for index in self.files_table.selectedIndexes())
+        )
+        
+        # If only one row selected or right-clicked row is selected, use single actions
+        # If multiple rows selected, show batch actions
+        is_multiple_selection = len(selected_rows) > 1
+        
+        # Create context menu
+        menu = QMenu(self)
+        
+        if is_multiple_selection:
+            # Batch actions for multiple selections
+            selected_statuses = []
+            for r in selected_rows:
+                status_item = self.files_table.item(r, 7)
+                if status_item:
+                    selected_statuses.append(status_item.text())
+            
+            # Check if all selected have the same status
+            all_same_status = len(set(selected_statuses)) == 1
+            
+            if all_same_status and selected_statuses[0] == "Queued":
+                remove_action = menu.addAction(f"Remove {len(selected_rows)} Queued Files")
+                remove_action.triggered.connect(lambda: self._remove_selected_files())
+                
+            elif all_same_status and "Encoding" in selected_statuses[0]:
+                cancel_action = menu.addAction(f"Cancel {len(selected_rows)} Encoding Tasks")
+                cancel_action.triggered.connect(lambda: self._cancel_selected_processing())
+                
+            elif all_same_status and selected_statuses[0] == "Completed":
+                remove_action = menu.addAction(f"Remove {len(selected_rows)} Completed Files")
+                remove_action.triggered.connect(lambda: self._remove_selected_files())
+                
+            else:
+                # Mixed statuses - show individual actions
+                remove_action = menu.addAction(f"Remove {len(selected_rows)} Selected Files")
+                remove_action.triggered.connect(lambda: self._remove_selected_files())
+        else:
+            # Single file actions
+            if status == "Queued":
+                # Actions for queued files
+                remove_action = menu.addAction("Remove from Queue")
+                remove_action.triggered.connect(lambda: self._remove_file_row(row))
+                
+            elif "Encoding" in status:
+                # Actions for encoding files
+                cancel_action = menu.addAction("Cancel Encoding")
+                cancel_action.triggered.connect(lambda: self._cancel_file_encoding(row))
+                
+            elif status == "Completed":
+                # Actions for completed files
+                remove_action = menu.addAction("Remove from List")
+                remove_action.triggered.connect(lambda: self._remove_file_row(row))
+                
+                # Add option to open output folder
+                open_folder_action = menu.addAction("Open Output Folder")
+                open_folder_action.triggered.connect(lambda: self._open_output_folder(row))
+                
+            elif status == "Cancelled" or "Error" in status:
+                # Actions for cancelled/error files
+                retry_action = menu.addAction("Retry Encoding")
+                retry_action.triggered.connect(lambda: self._retry_file_encoding(row))
+                
+                remove_action = menu.addAction("Remove from List")
+                remove_action.triggered.connect(lambda: self._remove_file_row(row))
+        
+        # Show the menu at the cursor position
+        if not menu.isEmpty():
+            menu.exec(self.files_table.mapToGlobal(position))
+    
+    def _update_file_info(self, file_path: str):
+        """Update the file info sidebar with information about the selected file."""
+        try:
+            from core.encodeforge_core import EncodeForgeCore
+            core = EncodeForgeCore()
+            media_info = core.get_media_info(file_path)
+            
+            if media_info.get('status') == 'success':
+                info = media_info.get('info', {})
+                
+                # Update file details
+                self.name_label.setText(info.get('filename', 'Unknown'))
+                self.size_label.setText(f"{info.get('size_mb', 0):.2f} MB")
+                self.duration_label.setText(info.get('duration', 'Unknown'))
+                self.path_label.setText(file_path)
+                
+                # Update video properties
+                self.codec_label.setText(info.get('video_codec', 'Unknown'))
+                self.resolution_label.setText(f"{info.get('width', 0)}x{info.get('height', 0)}")
+                self.frame_rate_label.setText(f"{info.get('frame_rate', 0):.2f} fps")
+                self.bitrate_label.setText(f"{info.get('bitrate', 0)} kbps")
+                
+                # Update audio properties
+                self.audio_codec_label.setText(info.get('audio_codec', 'Unknown'))
+                self.audio_channels_label.setText(str(info.get('audio_channels', 'Unknown')))
+                self.sample_rate_label.setText(f"{info.get('sample_rate', 0)} Hz")
+                self.audio_bitrate_label.setText(f"{info.get('audio_bitrate', 0)} kbps")
+                
+                # TODO: Set preview image if available
+                self.preview_label.setText("Preview not available")
+            else:
+                # Clear labels on error
+                self._clear_file_info()
+        except Exception as e:
+            logger.error(f"Failed to get file info: {e}")
+            self._clear_file_info()
+    
+    def _clear_file_info(self):
+        """Clear all file info labels."""
+        self.name_label.setText("-")
+        self.size_label.setText("-")
+        self.duration_label.setText("-")
+        self.path_label.setText("-")
+        self.codec_label.setText("-")
+        self.resolution_label.setText("-")
+        self.frame_rate_label.setText("-")
+        self.bitrate_label.setText("-")
+        self.audio_codec_label.setText("-")
+        self.audio_channels_label.setText("-")
+        self.sample_rate_label.setText("-")
+        self.audio_bitrate_label.setText("-")
+        self.preview_label.setText("No file selected")
+    
+    def _add_files(self):
+        """Add files to the encoding queue."""
+        file_dialog = QFileDialog(self)
+        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
+        file_dialog.setNameFilter("Video files (*.mp4 *.mkv *.avi *.mov *.wmv *.flv *.webm *.m4v *.mpg *.mpeg *.3gp)")
+        
+        if file_dialog.exec():
+            selected_files = file_dialog.selectedFiles()
+            for file_path in selected_files:
+                self._add_file_to_table(Path(file_path))
+    
+    def _add_folder(self):
+        """Add all video files from a folder to the encoding queue."""
+        folder_dialog = QFileDialog(self)
+        folder_dialog.setFileMode(QFileDialog.FileMode.Directory)
+        
+        if folder_dialog.exec():
+            selected_folder = folder_dialog.selectedFiles()[0]
+            self._add_folder_to_table(Path(selected_folder))
+    
+    def _remove_selected_files(self):
+        """Remove selected files from the table."""
+        selected_rows = sorted(
+            set(index.row() for index in self.files_table.selectedIndexes()),
+            reverse=True
+        )
+        for row in selected_rows:
+            # Stop encoding if file is currently being encoded
+            status_item = self.files_table.item(row, 7)
+            if status_item and "Encoding" in status_item.text():
+                name_item = self.files_table.item(row, 1)
+                if name_item:
+                    file_path = name_item.data(Qt.ItemDataRole.UserRole)
+                    if file_path in self.active_workers:
+                        self.active_workers[file_path].stop()
+                        del self.active_workers[file_path]
+            
+            self.files_table.removeRow(row)
+        
+        # Check if any queued files remain
+        has_queued = False
+        for row in range(self.files_table.rowCount()):
+            status_item = self.files_table.item(row, 7)
+            if status_item and status_item.text() == "Queued":
+                has_queued = True
+                break
+        
+        if not has_queued:
+            self.start_btn.setEnabled(False)
+    
+    def _clear_completed_files(self):
+        """Clear all completed files from the table."""
+        self._clear_completed()
+    
+    def _remove_file_row(self, row: int):
+        """Remove a specific row from the table."""
+        # Stop encoding if file is currently being encoded
+        status_item = self.files_table.item(row, 7)
+        if status_item and "Encoding" in status_item.text():
+            name_item = self.files_table.item(row, 1)
+            if name_item:
+                file_path = name_item.data(Qt.ItemDataRole.UserRole)
+                if file_path in self.active_workers:
+                    self.active_workers[file_path].stop()
+                    del self.active_workers[file_path]
+        
+        self.files_table.removeRow(row)
+        
+        # Check if any queued files remain
+        has_queued = False
+        for r in range(self.files_table.rowCount()):
+            status_item = self.files_table.item(r, 7)
+            if status_item and status_item.text() == "Queued":
+                has_queued = True
+                break
+        
+        if not has_queued:
+            self.start_btn.setEnabled(False)
+    
+    def _cancel_file_encoding(self, row: int):
+        """Cancel encoding for a specific file."""
+        name_item = self.files_table.item(row, 1)
+        if name_item:
+            file_path = name_item.data(Qt.ItemDataRole.UserRole)
+            if file_path in self.active_workers:
+                self.active_workers[file_path].stop()
+                del self.active_workers[file_path]
+            
+            # Update status to cancelled
+            self.files_table.setItem(row, 7, QTableWidgetItem("Cancelled"))
+            # Remove progress bar
+            self.files_table.removeCellWidget(row, 5)
+    
+    def _open_output_folder(self, row: int):
+        """Open the output folder for a completed file."""
+        name_item = self.files_table.item(row, 1)
+        if name_item:
+            file_path = Path(name_item.data(Qt.ItemDataRole.UserRole))
+            output_path = self._generate_output_path(file_path)
+            if output_path.exists():
+                import os
+                os.startfile(str(output_path.parent))
+    
+    def _retry_file_encoding(self, row: int):
+        """Retry encoding for a failed or cancelled file."""
+        # Reset status to queued
+        self.files_table.setItem(row, 7, QTableWidgetItem("Queued"))
+        # Clear progress and ETA
+        self.files_table.setItem(row, 5, QTableWidgetItem("-"))
+        self.files_table.setItem(row, 6, QTableWidgetItem("-"))
+        # Clear new size
+        self.files_table.setItem(row, 4, QTableWidgetItem("-"))
+        
+        self.start_btn.setEnabled(True)

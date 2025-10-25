@@ -37,7 +37,7 @@ def main():
     app.setOrganizationName("EncodeForge")
     
     # Set application icon
-    icon_path = Path(__file__).parent / "resources" / "icons" / "app-icon.png"
+    icon_path = Path(__file__).parent / "resources" / "icons" / "app-icon.ico"
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
     

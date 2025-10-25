@@ -6,17 +6,22 @@ Called by Java DependencyManager to manage Python dependencies
 
 import importlib
 import json
+import logging
 import subprocess
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def check_package(package_name: str) -> bool:
     """Check if a package is importable"""
     try:
         importlib.import_module(package_name)
+        logger.debug(f"Package '{package_name}' is available")
         return True
     except ImportError:
+        logger.debug(f"Package '{package_name}' is not available")
         return False
 
 
@@ -37,7 +42,7 @@ def check_optional_packages() -> Dict[str, bool]:
     }
 
 
-def install_package(package_spec: str, target_dir: str = None) -> Tuple[bool, str]:
+def install_package(package_spec: str, target_dir: Optional[str] = None) -> Tuple[bool, str]:
     """
     Install a package via pip
     
@@ -54,6 +59,7 @@ def install_package(package_spec: str, target_dir: str = None) -> Tuple[bool, st
         cmd.extend(["--target", target_dir])
     
     try:
+        logger.info(f"Installing package: {package_spec}")
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -64,15 +70,22 @@ def install_package(package_spec: str, target_dir: str = None) -> Tuple[bool, st
         success = result.returncode == 0
         output = result.stdout + "\n" + result.stderr
         
+        if success:
+            logger.info(f"Successfully installed package: {package_spec}")
+        else:
+            logger.error(f"Failed to install package: {package_spec}")
+        
         return (success, output)
         
     except subprocess.TimeoutExpired:
+        logger.error(f"Installation timed out for package: {package_spec}")
         return (False, "Installation timed out after 5 minutes")
     except Exception as e:
+        logger.error(f"Installation failed for package: {package_spec} - {str(e)}")
         return (False, f"Installation failed: {str(e)}")
 
 
-def install_packages_from_file(requirements_file: str, target_dir: str = None) -> Tuple[bool, str]:
+def install_packages_from_file(requirements_file: str, target_dir: Optional[str] = None) -> Tuple[bool, str]:
     """
     Install packages from a requirements file
     
@@ -89,6 +102,7 @@ def install_packages_from_file(requirements_file: str, target_dir: str = None) -
         cmd.extend(["--target", target_dir])
     
     try:
+        logger.info(f"Installing packages from file: {requirements_file}")
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -99,11 +113,18 @@ def install_packages_from_file(requirements_file: str, target_dir: str = None) -
         success = result.returncode == 0
         output = result.stdout + "\n" + result.stderr
         
+        if success:
+            logger.info(f"Successfully installed packages from: {requirements_file}")
+        else:
+            logger.error(f"Failed to install packages from: {requirements_file}")
+        
         return (success, output)
         
     except subprocess.TimeoutExpired:
+        logger.error(f"Installation timed out for requirements file: {requirements_file}")
         return (False, "Installation timed out after 10 minutes")
     except Exception as e:
+        logger.error(f"Installation failed for requirements file: {requirements_file} - {str(e)}")
         return (False, f"Installation failed: {str(e)}")
 
 
