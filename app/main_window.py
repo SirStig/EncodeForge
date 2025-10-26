@@ -3,14 +3,27 @@
 
 import logging
 from pathlib import Path
-from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QStackedLayout, QStatusBar, QFrame, QToolButton, QFileDialog, QSizePolicy,
-    QComboBox, QSlider, QLineEdit, QCheckBox
-)
-from PySide6.QtCore import Qt
 
 import qtawesome as qta
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QSizePolicy,
+    QSlider,
+    QStackedLayout,
+    QStatusBar,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 try:
     # Optional project logging config (if present, apply it)
@@ -34,9 +47,9 @@ except Exception:
     SubtitleTab = None
 
 try:
-    from app.widgets.renamer_tab import RenamerTab
+    from app.widgets.metadata_tab import MetadataTab
 except Exception:
-    RenamerTab = None
+    MetadataTab = None
 
 try:
     from app.widgets.logs_tab import LogsTab
@@ -48,9 +61,14 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("EncodeForge")
-        self.resize(1000, 720)  # Reduced default width
-        self.setMinimumWidth(800)  # Set minimum width
-
+        
+        # Enable transparency for glassmorphism effect
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)  # Keep opaque for now
+        
+        # Set proper window sizing with responsive constraints
+        self.setMinimumSize(1250, 700)  # Reasonable minimum for toolbar and content
+        self.resize(1300, 750)  # Standard default size
+        
         # Initialize thread pool
         from PySide6.QtCore import QThreadPool
         self.threadpool = QThreadPool()
@@ -66,39 +84,17 @@ class MainWindow(QMainWindow):
         # Mode widgets
         self.encoder_tab = None
         self.subtitle_tab = None
-        self.renamer_tab = None
+        self.metadata_tab = None
         self.logs_tab = None
         self.settings_tab = None
 
         self._setup_ui()
         self._create_statusbar()
-        self._load_styles()
-    
-    def _load_styles(self):
-        """Load CSS styles for the main window."""
-        try:
-            from PySide6.QtCore import QFile, QTextStream
-            
-            css_file = Path(__file__).parent.parent / "resources" / "styles" / "main_window.css"
-            if css_file.exists():
-                file = QFile(str(css_file))
-                if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
-                    stream = QTextStream(file)
-                    css_content = stream.readAll()
-                    file.close()
-                    
-                    # Apply the CSS
-                    self.setStyleSheet(css_content)
-                    logger.debug("Main window styles loaded successfully")
-                else:
-                    logger.warning("Failed to open main_window.css file")
-            else:
-                logger.warning("main_window.css file not found")
-        except Exception as e:
-            logger.error(f"Failed to load main window styles: {e}")
+        logger.debug("Main window initialized - theme loaded at startup")
     
     def _setup_ui(self):
         central = QWidget()
+        central.setStyleSheet("background-color: #1a1a1c;")
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -107,7 +103,7 @@ class MainWindow(QMainWindow):
         # Sidebar (left)
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(200)  # Reduced from 220
+        sidebar.setFixedWidth(170)  # Narrower sidebar for better content space
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(12, 12, 12, 12)
         sidebar_layout.setSpacing(8)
@@ -117,23 +113,24 @@ class MainWindow(QMainWindow):
         modes_label.setObjectName("section_label")
         sidebar_layout.addWidget(modes_label)
 
-        # Mode buttons
-        self.sidebar_buttons = {}
-        modes = [
+        # Unified modes list (excluding settings, logs, processes - they go at bottom)
+        self.modes = [
             ("encoder", "Encoder", "fa5s.video"),
             ("subtitles", "Subtitles", "fa5s.closed-captioning"),
-            ("renamer", "Renamer", "fa5s.edit"),
-            ("logs", "Logs", "fa5s.list")
+            ("metadata", "Metadata", "fa5s.edit"),
         ]
-        for key, label, icon_name in modes:
+        self.sidebar_buttons = {}
+        
+        for idx, (key, label, icon_name) in enumerate(self.modes):
             btn = QToolButton()
-            btn.setText(label)
+            btn.setText(f"  {label}")  # Add space for icon spacing
             btn.setIcon(qta.icon(icon_name))
             btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
             btn.setCheckable(True)
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-            btn.setMinimumHeight(32)
-            btn.clicked.connect(lambda checked, k=key: self._switch_mode([m[0] for m in modes].index(k)))
+            btn.setMinimumHeight(28)
+            btn.setMaximumHeight(34)
+            btn.clicked.connect(lambda checked, i=idx: self._switch_mode(i))
             sidebar_layout.addWidget(btn)
             self.sidebar_buttons[key] = btn
 
@@ -144,50 +141,75 @@ class MainWindow(QMainWindow):
         files_label.setObjectName("section_label")
         sidebar_layout.addWidget(files_label)
 
-        # Add Files / Folder buttons
-        add_files_btn = QPushButton("Add Files")
+        # Add Files / Folder buttons (styled as ToolButtons now)
+        add_files_btn = QToolButton()
+        add_files_btn.setText("  Add Files")
         add_files_btn.setIcon(qta.icon('fa5s.file'))
+        add_files_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         add_files_btn.clicked.connect(self._handle_add_files)
-        add_files_btn.setMinimumHeight(32)
+        add_files_btn.setMinimumHeight(28)
+        add_files_btn.setMaximumHeight(34)
         sidebar_layout.addWidget(add_files_btn)
 
-        add_folder_btn = QPushButton("Add Folder")
+        add_folder_btn = QToolButton()
+        add_folder_btn.setText("  Add Folder")
         add_folder_btn.setIcon(qta.icon('fa5s.folder'))
+        add_folder_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         add_folder_btn.clicked.connect(self._handle_add_folder)
-        add_folder_btn.setMinimumHeight(32)
+        add_folder_btn.setMinimumHeight(28)
+        add_folder_btn.setMaximumHeight(34)
         sidebar_layout.addWidget(add_folder_btn)
 
-        sidebar_layout.addSpacing(8)
+        # Push everything to top, system section at bottom
+        sidebar_layout.addStretch()
 
-        # System section
+        # System section at bottom
         system_label = QLabel("SYSTEM")
         system_label.setObjectName("section_label")
         sidebar_layout.addWidget(system_label)
 
+        # Logs button
+        logs_btn = QToolButton()
+        logs_btn.setText("  Logs")
+        logs_btn.setIcon(qta.icon('fa5s.list'))
+        logs_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        logs_btn.setCheckable(True)
+        logs_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        logs_btn.setMinimumHeight(28)
+        logs_btn.setMaximumHeight(34)
+        logs_btn.clicked.connect(lambda checked: self._switch_mode(3))
+        sidebar_layout.addWidget(logs_btn)
+        self.sidebar_buttons["logs"] = logs_btn
+
         # Processes button with badge
         self.processes_btn = QToolButton()
-        self.processes_btn.setText("Processes")
+        self.processes_btn.setText("  Processes")
         self.processes_btn.setIcon(qta.icon('fa5s.cog'))
         self.processes_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.processes_btn.setObjectName("processes_btn")
         self.processes_btn.clicked.connect(self._show_processes_dialog)
-        self.processes_btn.setMinimumHeight(32)
+        self.processes_btn.setMinimumHeight(28)
+        self.processes_btn.setMaximumHeight(34)
         sidebar_layout.addWidget(self.processes_btn)
+
+        # Settings button
+        settings_btn = QToolButton()
+        settings_btn.setText("  Settings")
+        settings_btn.setIcon(qta.icon('fa5s.cogs'))
+        settings_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        settings_btn.setCheckable(True)
+        settings_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        settings_btn.setMinimumHeight(28)
+        settings_btn.setMaximumHeight(34)
+        settings_btn.clicked.connect(lambda checked: self._switch_mode(4))
+        sidebar_layout.addWidget(settings_btn)
+        self.sidebar_buttons["settings"] = settings_btn
 
         # Initialize badge count
         self._update_processes_badge(0)
 
-        sidebar_layout.addStretch()
-
-        # Settings at the bottom
-        settings_btn = QToolButton()
-        settings_btn.setText("Settings")
-        settings_btn.setIcon(qta.icon('fa5s.cogs'))
-        settings_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        settings_btn.setCheckable(True)
-        settings_btn.clicked.connect(lambda: self._switch_mode(4))
-        settings_btn.setMinimumHeight(32)
-        sidebar_layout.addWidget(settings_btn)
+        # Bottom spacing
+        sidebar_layout.addSpacing(12)
 
         # Main area (right) - now uses full height
         main_area = QWidget()
@@ -198,6 +220,23 @@ class MainWindow(QMainWindow):
         self.stacked_layout = QStackedLayout(main_area)
         self.stacked_layout.setContentsMargins(0, 0, 0, 0)
 
+        # Pre-create and add all tab widgets in modes order
+        self.encoder_tab = EncoderTab(self.threadpool) if EncoderTab is not None else None
+        self.subtitle_tab = SubtitleTab(self.threadpool) if SubtitleTab is not None else None
+        self.metadata_tab = MetadataTab(self.threadpool) if MetadataTab is not None else None
+        self.logs_tab = LogsTab() if LogsTab is not None else None
+        # For now, settings uses logs_tab as placeholder
+        self.settings_tab = self.logs_tab
+        self.tabs = [
+            self.encoder_tab,
+            self.subtitle_tab,
+            self.metadata_tab,
+            self.logs_tab,
+            self.settings_tab
+        ]
+        for tab in self.tabs:
+            self.stacked_layout.addWidget(tab if tab is not None else QWidget())
+
         # Default mode: encoder
         self._switch_mode(0)
 
@@ -207,32 +246,41 @@ class MainWindow(QMainWindow):
     def _safe_connect_signals(self):
         # Connect common signals if present, but don't fail if they are missing
         try:
-            if hasattr(self.encoder_tab, 'encode_started') and callable(getattr(self.encoder_tab, 'encode_started', None)):
-                self.encoder_tab.encode_started.connect(self._on_encode_started)
-                self.encoder_tab.encode_started.connect(self._on_process_count_changed)
-            if hasattr(self.encoder_tab, 'encode_progress') and callable(getattr(self.encoder_tab, 'encode_progress', None)):
-                self.encoder_tab.encode_progress.connect(self._on_encode_progress)
-            if hasattr(self.encoder_tab, 'encode_completed') and callable(getattr(self.encoder_tab, 'encode_completed', None)):
-                self.encoder_tab.encode_completed.connect(self._on_encode_completed)
-                self.encoder_tab.encode_completed.connect(self._on_process_count_changed)
-            if hasattr(self.encoder_tab, 'encode_error') and callable(getattr(self.encoder_tab, 'encode_error', None)):
-                self.encoder_tab.encode_error.connect(self._on_process_count_changed)
+            if self.encoder_tab is not None:
+                if hasattr(self.encoder_tab, 'encode_started') and callable(getattr(self.encoder_tab, 'encode_started', None)):
+                    self.encoder_tab.encode_started.connect(self._on_encode_started)
+                    self.encoder_tab.encode_started.connect(self._on_process_count_changed)
+                if hasattr(self.encoder_tab, 'encode_progress') and callable(getattr(self.encoder_tab, 'encode_progress', None)):
+                    self.encoder_tab.encode_progress.connect(self._on_encode_progress)
+                if hasattr(self.encoder_tab, 'encode_completed') and callable(getattr(self.encoder_tab, 'encode_completed', None)):
+                    self.encoder_tab.encode_completed.connect(self._on_encode_completed)
+                    self.encoder_tab.encode_completed.connect(self._on_process_count_changed)
+                if hasattr(self.encoder_tab, 'encode_error') and callable(getattr(self.encoder_tab, 'encode_error', None)):
+                    self.encoder_tab.encode_error.connect(self._on_process_count_changed)
         except Exception:
             logger.debug("Could not connect encoder signals")
 
         try:
-            if hasattr(self.subtitle_tab, 'subtitle_progress') and callable(getattr(self.subtitle_tab, 'subtitle_progress', None)):
-                self.subtitle_tab.subtitle_progress.connect(self._on_subtitle_progress)
+            if self.subtitle_tab is not None:
+                if hasattr(self.subtitle_tab, 'subtitle_progress') and callable(getattr(self.subtitle_tab, 'subtitle_progress', None)):
+                    self.subtitle_tab.subtitle_progress.connect(self._on_subtitle_progress)
         except Exception:
             logger.debug("Could not connect subtitle signals")
 
         try:
-            if hasattr(self.renamer_tab, 'rename_progress') and callable(getattr(self.renamer_tab, 'rename_progress', None)):
-                self.renamer_tab.rename_progress.connect(self._on_rename_progress)
+            if self.metadata_tab is not None:
+                if hasattr(self.metadata_tab, 'rename_progress') and callable(getattr(self.metadata_tab, 'rename_progress', None)):
+                    self.metadata_tab.rename_progress.connect(self._on_rename_progress)
         except Exception:
-            logger.debug("Could not connect renamer signals")
+            logger.debug("Could not connect metadata signals")
 
     def _switch_mode(self, idx: int):
+        """Switch between different modes/tabs."""
+        # Special handling for settings (last index)
+        if idx == len(self.modes) - 1:  # Settings is last in modes list
+            self._open_settings()
+            return
+
         # Uncheck all sidebar buttons first
         for btn in self.sidebar_buttons.values():
             try:
@@ -240,64 +288,15 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-        mode_names = ["encoder", "subtitles", "renamer", "logs", "settings"]
-        if 0 <= idx < len(mode_names):
-            name = mode_names[idx]
+        if 0 <= idx < len(self.modes):
+            name = self.modes[idx][0]
             if name in self.sidebar_buttons:
                 try:
                     self.sidebar_buttons[name].setChecked(True)
                 except Exception:
                     pass
 
-        # Create tab widget if it doesn't exist
-        tab_widget = None
-        if idx == 0:  # encoder
-            if self.encoder_tab is None and EncoderTab is not None:
-                try:
-                    self.encoder_tab = EncoderTab(self.threadpool)
-                    self.stacked_layout.addWidget(self.encoder_tab)
-                except Exception as e:
-                    logger.error(f"Failed to create encoder tab: {e}")
-                    return
-            tab_widget = self.encoder_tab
-        elif idx == 1:  # subtitles
-            if self.subtitle_tab is None and SubtitleTab is not None:
-                try:
-                    self.subtitle_tab = SubtitleTab(self.threadpool)
-                    self.stacked_layout.addWidget(self.subtitle_tab)
-                except Exception as e:
-                    logger.error(f"Failed to create subtitle tab: {e}")
-                    return
-            tab_widget = self.subtitle_tab
-        elif idx == 2:  # renamer
-            if self.renamer_tab is None and RenamerTab is not None:
-                try:
-                    self.renamer_tab = RenamerTab(self.threadpool)
-                    self.stacked_layout.addWidget(self.renamer_tab)
-                except Exception as e:
-                    logger.error(f"Failed to create renamer tab: {e}")
-                    return
-            tab_widget = self.renamer_tab
-        elif idx == 3:  # logs
-            if self.logs_tab is None and LogsTab is not None:
-                try:
-                    self.logs_tab = LogsTab()
-                    self.stacked_layout.addWidget(self.logs_tab)
-                except Exception as e:
-                    logger.error(f"Failed to create logs tab: {e}")
-                    return
-            tab_widget = self.logs_tab
-        elif idx == 4:  # settings - for now, just use logs tab
-            if self.logs_tab is None and LogsTab is not None:
-                try:
-                    self.logs_tab = LogsTab()
-                    self.stacked_layout.addWidget(self.logs_tab)
-                except Exception as e:
-                    logger.error(f"Failed to create logs tab: {e}")
-                    return
-            tab_widget = self.logs_tab
-
-        # Switch the stacked layout index if valid
+        # Only switch the stacked layout index
         if 0 <= idx < self.stacked_layout.count():
             self.stacked_layout.setCurrentIndex(idx)
 
@@ -309,7 +308,7 @@ class MainWindow(QMainWindow):
         if idx == 1:
             return self.subtitle_tab
         if idx == 2:
-            return self.renamer_tab
+            return self.metadata_tab
         if idx == 3:
             return self.logs_tab
         return None
@@ -373,7 +372,7 @@ class MainWindow(QMainWindow):
     def _on_process_count_changed(self, *args):
         """Update the processes badge when process count changes."""
         try:
-            if hasattr(self.encoder_tab, 'active_workers'):
+            if self.encoder_tab is not None and hasattr(self.encoder_tab, 'active_workers'):
                 count = len(self.encoder_tab.active_workers)
                 self._update_processes_badge(count)
         except Exception:
@@ -398,7 +397,13 @@ class MainWindow(QMainWindow):
 
     def _show_processes_dialog(self):
         """Show a dialog with current encoding processes."""
-        from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QListWidgetItem
+        from PySide6.QtWidgets import (
+            QDialog,
+            QLabel,
+            QListWidget,
+            QListWidgetItem,
+            QVBoxLayout,
+        )
         
         dialog = QDialog(self)
         dialog.setWindowTitle("Active Processes")
@@ -408,7 +413,7 @@ class MainWindow(QMainWindow):
         
         # Get active processes from encoder tab
         active_processes = []
-        if hasattr(self.encoder_tab, 'active_workers') and self.encoder_tab.active_workers:
+        if self.encoder_tab is not None and hasattr(self.encoder_tab, 'active_workers') and self.encoder_tab.active_workers:
             for file_path, worker in self.encoder_tab.active_workers.items():
                 active_processes.append(f"Encoding: {Path(file_path).name}")
         
@@ -425,6 +430,28 @@ class MainWindow(QMainWindow):
             layout.addWidget(no_processes_label)
         
         dialog.exec()
+    
+    def _open_settings(self):
+        """Open the settings dialog."""
+        from app.dialogs import SettingsDialog
+        
+        dialog = SettingsDialog(self)
+        dialog.settings_changed.connect(self._on_settings_changed)
+        
+        # Uncheck settings button after dialog closes
+        dialog.exec()
+        if "settings" in self.sidebar_buttons:
+            self.sidebar_buttons["settings"].setChecked(False)
+    
+    def _on_settings_changed(self):
+        """Handle settings changes."""
+        logger.info("Settings have been updated")
+        # TODO: Apply settings changes to active tabs
+        # - Reload encoder defaults
+        # - Update subtitle providers
+        # - Refresh metadata provider
+        # - Update thread pool size
+        # - Etc.
 
     def closeEvent(self, event):
         logger.info("Application closing")

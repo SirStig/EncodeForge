@@ -1,19 +1,27 @@
 """
 EncodeForge Logs Tab
-Real-time log viewer with filtering and search capabilities
+Real-time log viewer with filtering and search capabilities.
+Session-specific display with 5000-line circular buffer.
 """
 
 import logging
 from pathlib import Path
-from typing import Optional
+
+from PySide6.QtCore import QTimer, Signal
+from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPlainTextEdit,
-    QPushButton, QComboBox, QLabel, QLineEdit, QFileDialog,
-    QGroupBox, QCheckBox
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPlainTextEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat
-from PySide6.QtWidgets import QTextEdit
 
 from core import path_manager
 
@@ -30,16 +38,22 @@ class LogsTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.log_file = path_manager.get_logs_dir() / "encodeforge.log"
+        self.session_start_position = 0  # Track where this session started
         self.last_position = 0
         self.auto_scroll = True
         self.current_filter = "ALL"
+        self.max_lines = 5000  # Maximum lines to keep in display
+        
+        # Mark the session start position (current end of file)
+        if self.log_file.exists():
+            self.session_start_position = self.log_file.stat().st_size
+            self.last_position = self.session_start_position
         
         self._setup_ui()
         self._setup_timer()
         self._load_initial_logs()
-        self._load_styles()
         
-        logger.info("Logs tab initialized")
+        logger.info("Logs tab initialized - showing logs from this session only (base theme)")
     
     def _setup_ui(self):
         """Set up the logs viewer UI"""
@@ -133,31 +147,7 @@ class LogsTab(QWidget):
         
         layout.addLayout(info_layout)
         
-        # Apply styling
-        # self._apply_styling()  # Moved to external CSS file
-    
-    def _load_styles(self):
-        """Load CSS styles for the logs tab."""
-        try:
-            from PySide6.QtCore import QFile, QTextStream
-            
-            css_file = Path(__file__).parent.parent.parent / "resources" / "styles" / "logs_tab.css"
-            if css_file.exists():
-                file = QFile(str(css_file))
-                if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
-                    stream = QTextStream(file)
-                    css_content = stream.readAll()
-                    file.close()
-                    
-                    # Apply the CSS
-                    self.setStyleSheet(css_content)
-                    logger.debug("Logs tab styles loaded successfully")
-                else:
-                    logger.warning("Failed to open logs_tab.css file")
-            else:
-                logger.warning("logs_tab.css file not found")
-        except Exception as e:
-            logger.error(f"Failed to load logs tab styles: {e}")
+        # Styling handled by base glassmorphism theme
     
     def _setup_timer(self):
         """Set up timer for auto-refresh"""
@@ -166,12 +156,14 @@ class LogsTab(QWidget):
         self.refresh_timer.start(1000)  # Check every second
     
     def _load_initial_logs(self):
-        """Load initial logs from file with proper filtering"""
+        """Load initial logs from session start position only"""
         try:
             if self.log_file.exists():
-                # Read full file
+                # Read from session start position only
                 with open(self.log_file, 'r', encoding='utf-8') as f:
+                    f.seek(self.session_start_position)
                     content = f.read()
+                    self.last_position = f.tell()
 
                 # Apply filter if active
                 if self.current_filter != "ALL":
@@ -185,8 +177,13 @@ class LogsTab(QWidget):
                 else:
                     content_to_display = content
 
+                # Apply line limit
+                lines = content_to_display.split('\n')
+                if len(lines) > self.max_lines:
+                    lines = lines[-self.max_lines:]
+                    content_to_display = '\n'.join(lines)
+
                 self.log_display.setPlainText(content_to_display)
-                self.last_position = self.log_file.stat().st_size
                 self._update_line_count()
 
                 # Scroll to bottom
@@ -221,14 +218,27 @@ class LogsTab(QWidget):
 
                     # Append new content
                     if new_content:
-                        self.log_display.appendPlainText(new_content)
+                        current_text = self.log_display.toPlainText()
+                        if current_text:
+                            updated_text = current_text + '\n' + new_content
+                        else:
+                            updated_text = new_content
+                        
+                        # Enforce line limit (circular buffer)
+                        lines = updated_text.split('\n')
+                        if len(lines) > self.max_lines:
+                            lines = lines[-self.max_lines:]
+                            updated_text = '\n'.join(lines)
+                        
+                        self.log_display.setPlainText(updated_text)
                         self._update_line_count()
 
                         # Auto-scroll to bottom
                         if self.auto_scroll:
                             self.log_display.moveCursor(QTextCursor.MoveOperation.End)
+
         except Exception as e:
-            logger.error(f"Failed to check for log updates: {e}")
+            logger.error(f"Error checking for log updates: {e}")
     
     def _on_filter_changed(self, level: str):
         """Handle log level filter change"""

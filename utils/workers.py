@@ -4,9 +4,10 @@ QRunnable-based workers for parallel processing with progress signals
 """
 
 import logging
-from typing import Callable, Optional, Any, Dict
 from pathlib import Path
-from PySide6.QtCore import QRunnable, QObject, Signal, Slot
+from typing import Any, Callable, Dict
+
+from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,22 @@ class Worker(QRunnable):
     
     Automatically emits signals for progress tracking and result handling.
     Properly handles exceptions and cleanup.
+    
+    Usage:
+        worker = Worker(my_function, arg1, arg2, kwarg1=value1)
+        worker.signals.started.connect(on_started)
+        worker.signals.progress.connect(on_progress)
+        worker.signals.result.connect(on_result)
+        worker.signals.error.connect(on_error)
+        worker.signals.finished.connect(on_finished)
+        QThreadPool.globalInstance().start(worker)
+    
+    Signals:
+        started: Emitted when work begins (no arguments)
+        progress: Emitted with (current: int, total: int, message: str)
+        result: Emitted with result data when work completes (result: Any)
+        error: Emitted with (exc_type, value, traceback_str) on failure
+        finished: Emitted when work is done - success or failure (no arguments)
     """
     
     def __init__(
@@ -62,11 +79,13 @@ class Worker(QRunnable):
         # Add progress callback to kwargs if function supports it
         def progress_callback_wrapper(progress_data):
             """Convert progress callback dict to signal emission"""
+            if self._should_stop:
+                return  # Don't emit if stopped
+                
             if isinstance(progress_data, dict):
                 current = progress_data.get('progress', 0)
-                total = 100  # Default total
+                total = progress_data.get('total', 100)
                 message = progress_data.get('message', '')
-                # Don't log progress messages to reduce log spam
                 self.signals.progress.emit(current, total, message)
             else:
                 # Handle old-style progress callbacks
@@ -76,34 +95,64 @@ class Worker(QRunnable):
     
     @Slot()
     def run(self):
-        """Execute the worker function with exception handling."""
+        """
+        Execute the worker function with comprehensive error handling.
+        
+        This method:
+        1. Emits started signal
+        2. Executes the function with provided args/kwargs
+        3. Checks for cancellation requests periodically
+        4. Emits result on success
+        5. Catches and emits errors with full traceback
+        6. Always emits finished signal in finally block
+        """
+        import sys
+        import traceback
+        
+        result = None
+        
         try:
             self._is_running = True
             self.signals.started.emit()
-            logger.debug(f"Worker started: {self.fn.__name__}")
+            logger.info(f"Worker started: {self.fn.__name__}")
             
+            # Execute the function
             result = self.fn(*self.args, **self.kwargs)
             
+            # Only emit result if not cancelled
             if not self._should_stop:
                 self.signals.result.emit(result)
-                logger.debug(f"Worker completed: {self.fn.__name__}")
+                logger.info(f"Worker completed successfully: {self.fn.__name__}")
+            else:
+                logger.info(f"Worker cancelled: {self.fn.__name__}")
         
         except Exception as e:
-            import sys
-            import traceback
+            # Capture full exception information
             exctype, value, tb = sys.exc_info()
+            tb_str = traceback.format_exc()
+            
+            # Log the error
             logger.error(f"Worker error in {self.fn.__name__}: {e}")
-            logger.error(traceback.format_exc())
-            self.signals.error.emit((exctype, value, traceback.format_exc()))
+            logger.error(f"Traceback:\n{tb_str}")
+            
+            # Emit error signal with full information
+            self.signals.error.emit((exctype, value, tb_str))
         
         finally:
+            # Cleanup
             self._is_running = False
             self.signals.finished.emit()
+            logger.debug(f"Worker finished: {self.fn.__name__}")
     
     def stop(self):
-        """Request worker to stop (cooperative cancellation)."""
+        """
+        Request worker to stop (cooperative cancellation).
+        
+        Sets the should_stop flag. The worker function must check this
+        flag periodically and return early if it's set.
+        """
         self._should_stop = True
-        logger.debug(f"Stop requested for worker: {self.fn.__name__}")
+        logger.info(f"Stop requested for worker: {self.fn.__name__}")
     
     @property
     def is_running(self) -> bool:
@@ -117,7 +166,29 @@ class Worker(QRunnable):
 
 
 class EncoderWorker(Worker):
-    """Specialized worker for video encoding tasks."""
+    """
+    Specialized worker for video encoding tasks.
+    
+    Handles video conversion with FFmpeg, supporting various codecs,
+    quality settings, and hardware acceleration.
+    
+    Usage:
+        worker = EncoderWorker(
+            file_path=Path("input.mp4"),
+            output_path=Path("output.mkv"),
+            encoder_settings={'codec': 'H.265/HEVC', 'quality': 'High (CQ 18)'}
+        )
+        worker.signals.progress.connect(update_progress_bar)
+        worker.signals.result.connect(on_complete)
+        QThreadPool.globalInstance().start(worker)
+    
+    Signals (inherited from Worker):
+        started: Encoding started
+        progress: (current_frame, total_frames, status_message)
+        result: Encoding completed successfully with output path
+        error: Encoding failed with (exc_type, value, traceback)
+        finished: Encoding finished (success or failure)
+    """
     
     def __init__(
         self,
@@ -132,8 +203,14 @@ class EncoderWorker(Worker):
         Args:
             file_path: Input video file path
             output_path: Output file path
-            encoder_settings: Dictionary of encoding settings
-            **kwargs: Additional arguments passed to parent
+            encoder_settings: Dictionary of encoding settings:
+                - codec: str (e.g., 'H.264', 'H.265/HEVC', 'AV1')
+                - preset: str (e.g., 'ultrafast', 'medium', 'slow')
+                - quality: str (e.g., 'High (CQ 18)', 'Medium (CQ 23)')
+                - hw_accel: bool (use hardware acceleration)
+                - normalize_audio: bool
+                - format: str (e.g., 'MP4', 'MKV', 'WebM')
+            **kwargs: Additional arguments passed to parent Worker
         """
         from core.encodeforge_core import EncodeForgeCore
         
@@ -194,21 +271,46 @@ class EncoderWorker(Worker):
         self.encoder_settings = encoder_settings
     
     def stop(self):
-        """Stop the encoding process."""
+        """
+        Stop the encoding process.
+        
+        Requests cancellation of the FFmpeg process and sets the
+        should_stop flag for cooperative cancellation.
+        """
         # Call parent stop first
         super().stop()
         
-        # Cancel the conversion handler
+        # Cancel the conversion handler FFmpeg process
         if hasattr(self, 'conversion_handler') and self.conversion_handler:
             try:
                 self.conversion_handler.cancel_current()
-                logger.info(f"Cancelled encoding for {self.file_path}")
+                logger.info(f"Requested FFmpeg cancellation for {self.file_path}")
             except Exception as e:
                 logger.error(f"Error cancelling encoding: {e}")
 
 
 class SubtitleWorker(Worker):
-    """Specialized worker for subtitle generation/download tasks."""
+    """
+    Specialized worker for subtitle generation/download tasks.
+    
+    Supports downloading subtitles from various providers and
+    generating them using Whisper AI.
+    
+    Usage:
+        worker = SubtitleWorker(
+            file_path=Path("movie.mp4"),
+            subtitle_settings={'languages': ['eng', 'spa'], 'providers': ['opensubtitles']}
+        )
+        worker.signals.result.connect(on_subtitles_ready)
+        QThreadPool.globalInstance().start(worker)
+    
+    Signals (inherited from Worker):
+        started: Subtitle download/generation started
+        progress: (current, total, status_message)
+        result: Subtitle files downloaded/generated
+        error: Operation failed with (exc_type, value, traceback)
+        finished: Operation finished
+    """
     
     def __init__(
         self,
@@ -221,8 +323,11 @@ class SubtitleWorker(Worker):
         
         Args:
             file_path: Input video file path
-            subtitle_settings: Dictionary of subtitle settings
-            **kwargs: Additional arguments passed to parent
+            subtitle_settings: Dictionary of subtitle settings:
+                - languages: List[str] (e.g., ['eng', 'spa', 'fra'])
+                - providers: List[str] (e.g., ['opensubtitles', 'whisper'])
+                - whisper_model: str (e.g., 'base', 'small', 'medium')
+            **kwargs: Additional arguments passed to parent Worker
         """
         from core.encodeforge_core import EncodeForgeCore
         
@@ -240,7 +345,27 @@ class SubtitleWorker(Worker):
 
 
 class RenamerWorker(Worker):
-    """Specialized worker for file renaming tasks."""
+    """
+    Specialized worker for file renaming tasks.
+    
+    Renames files based on metadata from TMDB, TVDB, and other providers.
+    Supports pattern-based renaming with preview and undo capabilities.
+    
+    Usage:
+        worker = RenamerWorker(
+            file_path=Path("video.mkv"),
+            renaming_settings={'pattern': '{title} ({year})', 'dry_run': False}
+        )
+        worker.signals.result.connect(on_rename_complete)
+        QThreadPool.globalInstance().start(worker)
+    
+    Signals (inherited from Worker):
+        started: Renaming started
+        progress: (current, total, status_message)
+        result: Renaming completed with new paths
+        error: Renaming failed with (exc_type, value, traceback)
+        finished: Operation finished
+    """
     
     def __init__(
         self,
@@ -253,8 +378,12 @@ class RenamerWorker(Worker):
         
         Args:
             file_path: Input file path
-            renaming_settings: Dictionary of renaming settings
-            **kwargs: Additional arguments passed to parent
+            renaming_settings: Dictionary of renaming settings:
+                - pattern: str (e.g., '{title} ({year})')
+                - dry_run: bool (preview only, don't actually rename)
+                - create_backup: bool (create backup before renaming)
+                - provider: str (e.g., 'tmdb', 'tvdb', 'omdb')
+            **kwargs: Additional arguments passed to parent Worker
         """
         from core.encodeforge_core import EncodeForgeCore
         

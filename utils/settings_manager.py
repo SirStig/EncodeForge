@@ -5,9 +5,9 @@ Persistent application settings with validation and defaults
 
 import json
 import logging
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
-from dataclasses import dataclass, asdict, field
 
 from core import path_manager
 
@@ -77,6 +77,8 @@ class ApplicationSettings:
     max_threads: int = 4
     recent_files_limit: int = 10
     language: str = "en"
+    ffmpeg_path: str = ""  # Path to FFmpeg executable
+    ffprobe_path: str = ""  # Path to FFprobe executable
 
 
 class SettingsManager:

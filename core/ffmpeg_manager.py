@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 FFmpeg Manager - Handles FFmpeg detection, download, and version management
+
+NOTE: This module uses utils.ffmpeg_manager for centralized path detection
+and utils.gpu_detector for centralized hardware detection.
+This class provides additional functionality like encoder testing, hardware
+acceleration detection, and version parsing.
 """
 
 import logging
@@ -12,6 +17,10 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+# Import centralized managers
+from utils.ffmpeg_manager import get_ffmpeg_manager
+from utils.gpu_detector import get_gpu_info
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +86,9 @@ class FFmpegManager:
         """
         Detect FFmpeg installation and get version information
         
+        Uses centralized utils.ffmpeg_manager for path detection, then
+        performs additional version parsing and encoder detection.
+        
         Args:
             use_cache: If True, return cached results if available (default)
         
@@ -91,6 +103,38 @@ class FFmpegManager:
             if cache_age < 300:  # 5 minutes
                 logger.debug(f"Using cached FFmpeg detection (age: {cache_age:.1f}s)")
                 return self._detection_cache
+        
+        # Use centralized FFmpeg manager for path detection
+        central_mgr = get_ffmpeg_manager()
+        if central_mgr.detect_ffmpeg():
+            ffmpeg_path = central_mgr.get_ffmpeg_path()
+            ffprobe_path = central_mgr.get_ffprobe_path()
+            
+            if ffmpeg_path:
+                logger.info(f"Using centralized FFmpeg detection: {ffmpeg_path}")
+                self.ffmpeg_path = str(ffmpeg_path)
+                self.ffprobe_path = str(ffprobe_path) if ffprobe_path else str(ffmpeg_path).replace("ffmpeg", "ffprobe")
+                
+                # Get version info and encoders
+                success, version_info = self._get_version_info(self.ffmpeg_path)
+                if success:
+                    self.version_info = version_info
+                    
+                    # Cache the results
+                    result = (True, {
+                        "ffmpeg_path": self.ffmpeg_path,
+                        "ffprobe_path": self.ffprobe_path,
+                        "version": version_info.get("version", "Unknown"),
+                        "encoders": version_info.get("encoders", []),
+                        "decoders": version_info.get("decoders", [])
+                    })
+                    self._detection_cache = result
+                    self._cache_timestamp = time.time()
+                    return result
+        
+        # Fallback to old detection logic if centralized detection fails
+        logger.warning("Centralized FFmpeg detection failed, falling back to legacy detection")
+        
         paths_to_check = []
         
         # Check embedded FFmpeg first (highest priority)
@@ -597,7 +641,11 @@ class FFmpegManager:
             return False, f"Download failed: {str(e)}"
     
     def detect_hardware(self) -> Dict[str, Any]:
-        """Detect system hardware (GPU, CPU) for codec compatibility"""
+        """
+        Detect system hardware (GPU, CPU) for codec compatibility.
+        
+        Uses centralized utils.gpu_detector for GPU detection.
+        """
         hardware_info = {
             "gpu": {
                 "nvidia": False,
@@ -614,12 +662,25 @@ class FFmpegManager:
         }
         
         try:
-            # Detect GPU using multiple methods
-            self._detect_gpu_wmi(hardware_info)
-            self._detect_gpu_nvidia_smi(hardware_info)
-            self._detect_gpu_dxdiag(hardware_info)
+            # Use centralized GPU detector
+            gpus = get_gpu_info()
             
-            # Detect CPU
+            for gpu in gpus:
+                # Check vendor
+                if gpu.vendor.upper() == "NVIDIA":
+                    hardware_info["gpu"]["nvidia"] = True
+                    hardware_info["gpu"]["details"].append(f"NVIDIA GPU: {gpu.model}")
+                elif gpu.vendor.upper() == "AMD":
+                    hardware_info["gpu"]["amd"] = True
+                    hardware_info["gpu"]["details"].append(f"AMD GPU: {gpu.model}")
+                elif gpu.vendor.upper() == "INTEL":
+                    hardware_info["gpu"]["intel"] = True
+                    hardware_info["gpu"]["details"].append(f"Intel GPU: {gpu.model}")
+                elif gpu.vendor.upper() == "APPLE":
+                    hardware_info["gpu"]["apple"] = True
+                    hardware_info["gpu"]["details"].append(f"Apple GPU: {gpu.model}")
+            
+            # Detect CPU (keeping this as it's CPU-specific, not in GPU detector)
             self._detect_cpu(hardware_info)
             
         except Exception as e:

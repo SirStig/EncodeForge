@@ -4,7 +4,7 @@ Reusable UI components for the application
 """
 
 from .encoder_tab import EncoderTab
-from .subtitle_tab import SubtitleTab
-from .renamer_tab import RenamerTab
+__all__ = ['EncoderTab', 'SubtitleTab', 'MetadataTab']
+from .metadata_tab import MetadataTab
 
-__all__ = ['EncoderTab', 'SubtitleTab', 'RenamerTab']
+__all__ = ['EncoderTab', 'SubtitleTab', 'MetadataTab']

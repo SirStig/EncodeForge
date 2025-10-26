@@ -29,11 +29,6 @@ def get_base_dir() -> Path:
     return _base_dir
 
 
-def get_settings_dir() -> Path:
-    """Get the settings directory"""
-    return _get_sub_dir("settings")
-
-
 def get_logs_dir() -> Path:
     """Get the logs directory"""
     return _get_sub_dir("logs")
@@ -64,9 +59,17 @@ def get_models_dir() -> Path:
     return _get_sub_dir("models")
 
 
+def get_bin_dir() -> Path:
+    """Get the bin directory for FFmpeg and other executables"""
+    return _get_sub_dir("bin")
+
+
 def get_settings_file() -> Path:
-    """Get the settings file path"""
-    return get_settings_dir() / "settings.json"
+    """Get the settings file path (top-level, not in subdirectory)"""
+    settings_file = get_base_dir() / "settings.json"
+    # Ensure parent directory exists
+    settings_file.parent.mkdir(parents=True, exist_ok=True)
+    return settings_file
 
 
 def get_conversion_state_file() -> Path:
