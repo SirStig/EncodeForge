@@ -10,16 +10,22 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
+    QFormLayout,
     QFrame,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QSlider,
     QStackedLayout,
     QStatusBar,
+    QTabWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -113,7 +119,7 @@ class MainWindow(QMainWindow):
         modes_label.setObjectName("section_label")
         sidebar_layout.addWidget(modes_label)
 
-        # Unified modes list (excluding settings, logs, processes - they go at bottom)
+        # All tabs in order (encoder, subtitles, metadata, logs, settings, processes)
         self.modes = [
             ("encoder", "Encoder", "fa5s.video"),
             ("subtitles", "Subtitles", "fa5s.closed-captioning"),
@@ -181,17 +187,6 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(logs_btn)
         self.sidebar_buttons["logs"] = logs_btn
 
-        # Processes button with badge
-        self.processes_btn = QToolButton()
-        self.processes_btn.setText("  Processes")
-        self.processes_btn.setIcon(qta.icon('fa5s.cog'))
-        self.processes_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.processes_btn.setObjectName("processes_btn")
-        self.processes_btn.clicked.connect(self._show_processes_dialog)
-        self.processes_btn.setMinimumHeight(28)
-        self.processes_btn.setMaximumHeight(34)
-        sidebar_layout.addWidget(self.processes_btn)
-
         # Settings button
         settings_btn = QToolButton()
         settings_btn.setText("  Settings")
@@ -204,6 +199,20 @@ class MainWindow(QMainWindow):
         settings_btn.clicked.connect(lambda checked: self._switch_mode(4))
         sidebar_layout.addWidget(settings_btn)
         self.sidebar_buttons["settings"] = settings_btn
+
+        # Processes button with badge
+        self.processes_btn = QToolButton()
+        self.processes_btn.setText("  Processes")
+        self.processes_btn.setIcon(qta.icon('fa5s.cog'))
+        self.processes_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.processes_btn.setCheckable(True)
+        self.processes_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.processes_btn.setObjectName("processes_btn")
+        self.processes_btn.clicked.connect(lambda checked: self._switch_mode(5))
+        self.processes_btn.setMinimumHeight(28)
+        self.processes_btn.setMaximumHeight(34)
+        sidebar_layout.addWidget(self.processes_btn)
+        self.sidebar_buttons["processes"] = self.processes_btn
 
         # Initialize badge count
         self._update_processes_badge(0)
@@ -220,19 +229,21 @@ class MainWindow(QMainWindow):
         self.stacked_layout = QStackedLayout(main_area)
         self.stacked_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Pre-create and add all tab widgets in modes order
+        # Pre-create and add all tab widgets in order
         self.encoder_tab = EncoderTab(self.threadpool) if EncoderTab is not None else None
         self.subtitle_tab = SubtitleTab(self.threadpool) if SubtitleTab is not None else None
         self.metadata_tab = MetadataTab(self.threadpool) if MetadataTab is not None else None
         self.logs_tab = LogsTab() if LogsTab is not None else None
-        # For now, settings uses logs_tab as placeholder
-        self.settings_tab = self.logs_tab
+        self.settings_tab = self._create_settings_tab()
+        self.processes_tab = self._create_processes_tab()
+        
         self.tabs = [
-            self.encoder_tab,
-            self.subtitle_tab,
-            self.metadata_tab,
-            self.logs_tab,
-            self.settings_tab
+            self.encoder_tab,      # 0
+            self.subtitle_tab,     # 1
+            self.metadata_tab,     # 2
+            self.logs_tab,         # 3
+            self.settings_tab,     # 4
+            self.processes_tab     # 5
         ]
         for tab in self.tabs:
             self.stacked_layout.addWidget(tab if tab is not None else QWidget())
@@ -242,6 +253,141 @@ class MainWindow(QMainWindow):
 
         # If mode widgets expose signals we want to react to, connect them safely
         self._safe_connect_signals()
+    
+    def _create_settings_tab(self):
+        """Create the settings tab widget."""
+        # Create a wrapper widget that contains the settings dialog content
+        settings_widget = QWidget()
+        layout = QVBoxLayout(settings_widget)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Import the settings dialog and extract its content
+        from utils.settings_manager import SettingsManager
+        
+        settings = SettingsManager()
+        
+        # Create a tab widget for settings
+        tabs = QTabWidget()
+        
+        # General Tab
+        general_tab = QWidget()
+        general_layout = QVBoxLayout(general_tab)
+        
+        app_group = QGroupBox("Application")
+        app_layout = QFormLayout(app_group)
+        
+        self.settings_language_combo = QComboBox()
+        self.settings_language_combo.addItems(["English", "Spanish", "French", "German", "Japanese"])
+        self.settings_language_combo.setCurrentText(settings.application.language)
+        app_layout.addRow("Language:", self.settings_language_combo)
+        
+        self.settings_check_updates = QCheckBox("Check for updates on startup")
+        self.settings_check_updates.setChecked(settings.application.check_updates)
+        app_layout.addRow("", self.settings_check_updates)
+        
+        general_layout.addWidget(app_group)
+        
+        ui_group = QGroupBox("User Interface")
+        ui_layout = QFormLayout(ui_group)
+        
+        self.settings_theme_combo = QComboBox()
+        self.settings_theme_combo.addItems(["Dark", "Light", "Auto"])
+        self.settings_theme_combo.setCurrentText(settings.ui.theme.capitalize())
+        ui_layout.addRow("Theme:", self.settings_theme_combo)
+        
+        general_layout.addWidget(ui_group)
+        general_layout.addStretch()
+        
+        tabs.addTab(general_tab, "General")
+        
+        # Add more tabs as needed (simplified version)
+        tabs.addTab(QLabel("Encoder settings will be available here"), "Encoder")
+        tabs.addTab(QLabel("Subtitle settings will be available here"), "Subtitle")
+        tabs.addTab(QLabel("Advanced settings will be available here"), "Advanced")
+        
+        layout.addWidget(tabs)
+        
+        # Add save/apply buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        save_btn = QPushButton("Save Settings")
+        save_btn.setIcon(qta.icon('fa5s.save'))
+        save_btn.clicked.connect(self._save_settings_tab)
+        button_layout.addWidget(save_btn)
+        
+        layout.addLayout(button_layout)
+        
+        return settings_widget
+    
+    def _create_processes_tab(self):
+        """Create the processes monitoring tab."""
+        processes_widget = QWidget()
+        layout = QVBoxLayout(processes_widget)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Title
+        title = QLabel("Active Encoding Processes")
+        title.setProperty("heading", True)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        # Process list
+        self.process_list = QListWidget()
+        self.process_list.setAlternatingRowColors(True)
+        layout.addWidget(self.process_list)
+        
+        # Info label
+        self.process_info_label = QLabel("No active processes")
+        self.process_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.process_info_label)
+        
+        # Setup timer to update process list
+        from PySide6.QtCore import QTimer
+        self.process_timer = QTimer()
+        self.process_timer.timeout.connect(self._update_process_list)
+        self.process_timer.start(1000)  # Update every second
+        
+        return processes_widget
+    
+    def _update_process_list(self):
+        """Update the process list with current active processes."""
+        if not hasattr(self, 'process_list'):
+            return
+            
+        self.process_list.clear()
+        
+        active_processes = []
+        if self.encoder_tab is not None and hasattr(self.encoder_tab, 'active_workers') and self.encoder_tab.active_workers:
+            for file_path, worker in self.encoder_tab.active_workers.items():
+                item = QListWidgetItem(f"Encoding: {Path(file_path).name}")
+                item.setIcon(qta.icon('fa5s.cog'))
+                self.process_list.addItem(item)
+                active_processes.append(file_path)
+        
+        if active_processes:
+            self.process_info_label.setText(f"{len(active_processes)} active process(es)")
+        else:
+            self.process_info_label.setText("No active processes")
+    
+    def _save_settings_tab(self):
+        """Save settings from the settings tab."""
+        from utils.settings_manager import SettingsManager
+        settings = SettingsManager()
+        
+        # Update settings from UI
+        if hasattr(self, 'settings_language_combo'):
+            settings.application.language = self.settings_language_combo.currentText().lower()[:2]
+        if hasattr(self, 'settings_check_updates'):
+            settings.application.check_updates = self.settings_check_updates.isChecked()
+        if hasattr(self, 'settings_theme_combo'):
+            settings.ui.theme = self.settings_theme_combo.currentText().lower()
+        
+        settings.save()
+        logger.info("Settings saved successfully")
+        
+        QMessageBox.information(self, "Settings Saved", "Your settings have been saved successfully.")
+
 
     def _safe_connect_signals(self):
         # Connect common signals if present, but don't fail if they are missing
@@ -276,27 +422,20 @@ class MainWindow(QMainWindow):
 
     def _switch_mode(self, idx: int):
         """Switch between different modes/tabs."""
-        # Special handling for settings (last index)
-        if idx == len(self.modes) - 1:  # Settings is last in modes list
-            self._open_settings()
-            return
-
         # Uncheck all sidebar buttons first
         for btn in self.sidebar_buttons.values():
-            try:
-                btn.setChecked(False)
-            except Exception:
-                pass
+            btn.setChecked(False)
 
-        if 0 <= idx < len(self.modes):
-            name = self.modes[idx][0]
-            if name in self.sidebar_buttons:
-                try:
-                    self.sidebar_buttons[name].setChecked(True)
-                except Exception:
-                    pass
+        # Map index to button key
+        button_keys = ["encoder", "subtitles", "metadata", "logs", "settings", "processes"]
+        
+        # Check the appropriate button
+        if 0 <= idx < len(button_keys):
+            key = button_keys[idx]
+            if key in self.sidebar_buttons:
+                self.sidebar_buttons[key].setChecked(True)
 
-        # Only switch the stacked layout index
+        # Switch the stacked layout index
         if 0 <= idx < self.stacked_layout.count():
             self.stacked_layout.setCurrentIndex(idx)
 
@@ -389,69 +528,14 @@ class MainWindow(QMainWindow):
     def _update_processes_badge(self, count: int):
         """Update the processes button badge with the current count."""
         if count > 0:
-            self.processes_btn.setText(f"Processes ({count})")
+            self.processes_btn.setText(f"  Processes ({count})")
             self.processes_btn.setObjectName("processes_btn_active")
         else:
-            self.processes_btn.setText("Processes")
+            self.processes_btn.setText("  Processes")
             self.processes_btn.setObjectName("processes_btn")
-
-    def _show_processes_dialog(self):
-        """Show a dialog with current encoding processes."""
-        from PySide6.QtWidgets import (
-            QDialog,
-            QLabel,
-            QListWidget,
-            QListWidgetItem,
-            QVBoxLayout,
-        )
-        
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Active Processes")
-        dialog.resize(400, 300)
-        
-        layout = QVBoxLayout(dialog)
-        
-        # Get active processes from encoder tab
-        active_processes = []
-        if self.encoder_tab is not None and hasattr(self.encoder_tab, 'active_workers') and self.encoder_tab.active_workers:
-            for file_path, worker in self.encoder_tab.active_workers.items():
-                active_processes.append(f"Encoding: {Path(file_path).name}")
-        
-        if active_processes:
-            list_widget = QListWidget()
-            for process in active_processes:
-                item = QListWidgetItem(process)
-                item.setIcon(qta.icon('fa5s.cog'))
-                list_widget.addItem(item)
-            layout.addWidget(list_widget)
-        else:
-            no_processes_label = QLabel("No active processes")
-            no_processes_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addWidget(no_processes_label)
-        
-        dialog.exec()
-    
-    def _open_settings(self):
-        """Open the settings dialog."""
-        from app.dialogs import SettingsDialog
-        
-        dialog = SettingsDialog(self)
-        dialog.settings_changed.connect(self._on_settings_changed)
-        
-        # Uncheck settings button after dialog closes
-        dialog.exec()
-        if "settings" in self.sidebar_buttons:
-            self.sidebar_buttons["settings"].setChecked(False)
-    
-    def _on_settings_changed(self):
-        """Handle settings changes."""
-        logger.info("Settings have been updated")
-        # TODO: Apply settings changes to active tabs
-        # - Reload encoder defaults
-        # - Update subtitle providers
-        # - Refresh metadata provider
-        # - Update thread pool size
-        # - Etc.
+            # Re-apply style to update appearance
+            self.processes_btn.style().unpolish(self.processes_btn)
+            self.processes_btn.style().polish(self.processes_btn)
 
     def closeEvent(self, event):
         logger.info("Application closing")
