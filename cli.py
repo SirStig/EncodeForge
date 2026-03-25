@@ -2,7 +2,7 @@
 """
 EncodeForge CLI
 
-v0.5.0 ships the desktop app only. Commands other than ``gui`` are placeholders
+This release ships the desktop app only. Commands other than ``gui`` are placeholders
 and exit with a notice; full CLI may return in a later release.
 """
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 @click.group()
 @click.version_option(version=APP_VERSION)
 def cli():
-    """EncodeForge — desktop app (v0.5.0); CLI encode/subtitle/rename not implemented yet."""
+    """EncodeForge — desktop app; CLI encode/subtitle/rename not implemented yet."""
     pass
 
 
@@ -44,9 +44,9 @@ def cli():
 @click.option('--use-qsv', is_flag=True, help='Use Intel Quick Sync hardware acceleration')
 @click.option('--crf', type=int, default=23, help='Quality (CRF) value (0-51, lower is better)')
 def encode(input_path, output, codec, preset, use_nvenc, use_qsv, crf):
-    """Encode video files with FFmpeg (not available in v0.5.0 — use the GUI)."""
+    """Encode video files with FFmpeg (not available in this release — use the GUI)."""
     click.echo(
-        click.style("The encode command is not implemented in v0.5.0.", fg="yellow", bold=True)
+        click.style(f"The encode command is not implemented in v{APP_VERSION}.", fg="yellow", bold=True)
     )
     click.echo("Use the desktop application: python main.py   or   python cli.py gui")
     raise SystemExit(2)
@@ -59,9 +59,9 @@ def encode(input_path, output, codec, preset, use_nvenc, use_qsv, crf):
 @click.option('--model', default='base', help='Whisper model (tiny, base, small, medium, large)')
 @click.option('--provider', help='Subtitle provider (opensubtitles, addic7ed, etc.)')
 def subtitle(input_path, language, generate, model, provider):
-    """Download or generate subtitles (not available in v0.5.0 — use the GUI)."""
+    """Download or generate subtitles (not available in this release — use the GUI)."""
     click.echo(
-        click.style("The subtitle command is not implemented in v0.5.0.", fg="yellow", bold=True)
+        click.style(f"The subtitle command is not implemented in v{APP_VERSION}.", fg="yellow", bold=True)
     )
     click.echo("Use the desktop application: python main.py   or   python cli.py gui")
     raise SystemExit(2)
@@ -75,9 +75,9 @@ def subtitle(input_path, language, generate, model, provider):
 @click.option('--preview', is_flag=True, help='Preview changes without renaming')
 @click.option('--type', type=click.Choice(['movie', 'tv', 'anime', 'auto']), default='auto')
 def rename(input_path, tmdb_key, tvdb_key, pattern, preview, type):
-    """Rename media files using metadata (not available in v0.5.0 — use the GUI)."""
+    """Rename media files using metadata (not available in this release — use the GUI)."""
     click.echo(
-        click.style("The rename command is not implemented in v0.5.0.", fg="yellow", bold=True)
+        click.style(f"The rename command is not implemented in v{APP_VERSION}.", fg="yellow", bold=True)
     )
     click.echo("Use the desktop application: python main.py   or   python cli.py gui")
     raise SystemExit(2)

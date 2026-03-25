@@ -62,6 +62,13 @@ def _hint(text: str) -> QLabel:
     return lbl
 
 
+def _settings_form(parent: QWidget) -> QFormLayout:
+    lay = QFormLayout(parent)
+    lay.setVerticalSpacing(10)
+    lay.setHorizontalSpacing(12)
+    return lay
+
+
 class SettingsPanel(QWidget):
     """
     Tabbed settings editor for use in the main window or inside SettingsDialog.
@@ -157,7 +164,7 @@ class SettingsPanel(QWidget):
 
         # Application group
         app_group = QGroupBox("Application")
-        app_layout = QFormLayout(app_group)
+        app_layout = _settings_form(app_group)
 
         self.language_combo = QComboBox()
         self.language_combo.addItems(["English", "Spanish", "French", "German", "Japanese"])
@@ -192,7 +199,7 @@ class SettingsPanel(QWidget):
 
         # UI group
         ui_group = QGroupBox("User Interface")
-        ui_layout = QFormLayout(ui_group)
+        ui_layout = _settings_form(ui_group)
 
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["Dark", "Light", "Auto"])
@@ -223,7 +230,7 @@ class SettingsPanel(QWidget):
 
         encoder_group = QGroupBox("Default Encoder Settings")
         encoder_group.setToolTip("These values pre-fill the Encoder tab. You can override them per job.")
-        encoder_layout = QFormLayout(encoder_group)
+        encoder_layout = _settings_form(encoder_group)
 
         self.codec_combo = QComboBox()
         self.codec_combo.addItems(["H.264", "H.265/HEVC", "AV1", "VP9", "Auto"])
@@ -354,7 +361,7 @@ class SettingsPanel(QWidget):
         layout = QVBoxLayout(widget)
 
         subtitle_group = QGroupBox("Subtitle Settings")
-        subtitle_layout = QFormLayout(subtitle_group)
+        subtitle_layout = _settings_form(subtitle_group)
 
         self.subtitle_mode_combo = QComboBox()
         self.subtitle_mode_combo.addItems(["Download", "Whisper AI"])
@@ -432,7 +439,7 @@ class SettingsPanel(QWidget):
             "Settings for local AI-based subtitle generation using OpenAI Whisper.\n"
             "Only used when subtitle mode is 'Whisper AI'."
         )
-        whisper_layout = QFormLayout(whisper_group)
+        whisper_layout = _settings_form(whisper_group)
 
         self.whisper_model_combo = QComboBox()
         self.whisper_model_combo.addItems([
@@ -479,7 +486,7 @@ class SettingsPanel(QWidget):
         layout = QVBoxLayout(widget)
 
         renamer_group = QGroupBox("Renaming Settings")
-        renamer_layout = QFormLayout(renamer_group)
+        renamer_layout = _settings_form(renamer_group)
 
         self.media_type_combo = QComboBox()
         self.media_type_combo.addItems(["TV Show", "Movie", "Anime"])
@@ -574,7 +581,7 @@ class SettingsPanel(QWidget):
         ))
 
         meta = QGroupBox("Metadata API Keys (optional)")
-        meta_form = QFormLayout(meta)
+        meta_form = _settings_form(meta)
 
         self.tmdb_key_edit = QLineEdit()
         self.tmdb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
@@ -634,7 +641,7 @@ class SettingsPanel(QWidget):
         layout.addWidget(meta)
 
         subs = QGroupBox("OpenSubtitles Account (optional)")
-        subs_form = QFormLayout(subs)
+        subs_form = _settings_form(subs)
         subs.setToolTip(
             "Log in to your OpenSubtitles account for higher download quotas.\n"
             "Anonymous users are limited to a few downloads per day.\n"
@@ -803,7 +810,7 @@ class SettingsPanel(QWidget):
 
         # Performance settings
         perf_group = QGroupBox("Performance")
-        perf_layout = QFormLayout(perf_group)
+        perf_layout = _settings_form(perf_group)
 
         self.max_threads_spin = QSpinBox()
         self.max_threads_spin.setRange(1, 32)
@@ -823,7 +830,7 @@ class SettingsPanel(QWidget):
 
         # History settings
         history_group = QGroupBox("History")
-        history_layout = QFormLayout(history_group)
+        history_layout = _settings_form(history_group)
 
         self.recent_files_spin = QSpinBox()
         self.recent_files_spin.setRange(0, 50)
@@ -838,7 +845,7 @@ class SettingsPanel(QWidget):
 
         # Logging settings
         log_group = QGroupBox("Logging")
-        log_layout = QFormLayout(log_group)
+        log_layout = _settings_form(log_group)
 
         self.log_level_combo = QComboBox()
         self.log_level_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR"])

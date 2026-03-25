@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+VER="$(python3 -c "from app import __version__; print(__version__)")"
+echo "EncodeForge ${VER}"
+echo ""
+echo "1) Install build deps: pip install -r requirements.txt && pip install nuitka ordered-set zstandard"
+echo "2) Compile: python3 build_nuitka.py"
+echo "3) Platform installers (outputs under dist-packages/):"
+echo "   macOS:  ./packaging/macos/build-dmg.sh"
+echo "   Linux:  ./packaging/linux/build-deb-rpm.sh && ./packaging/linux/build-appimage.sh"
+echo "   Windows: powershell -File packaging/windows/package-zip.ps1"
+echo ""
+echo "Linux extras: gem install fpm (deb/rpm); appimagetool on PATH (AppImage)."

@@ -147,7 +147,7 @@ class SettingsManager:
             'ui': asdict(self.ui),
             'application': asdict(self.application),
             'conversion': asdict(self.conversion),
-            'version': '0.5.0',
+            'version': '0.5.0-alpha-1',
         }
     
     def from_dict(self, data: Dict[str, Any]):

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=EncodeForge
+GenericName=Video encoder
+Comment=Video encoding, subtitles, and media renaming
+Exec=/opt/EncodeForge/EncodeForge %F
+Icon=encodeforge
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;AudioVideoEditing;
+MimeType=video/mp4;video/x-matroska;video/quicktime;video/webm;video/x-msvideo;video/x-ms-wmv;

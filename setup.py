@@ -21,7 +21,7 @@ else:
 
 setup(
     name="encodeforge",
-    version="0.5.0",
+    version="0.5.0-alpha-1",
     author="Joshua Kac",
     author_email="",
     description="FFmpeg GUI for batch video encoding, AI subtitles, and media file renaming",

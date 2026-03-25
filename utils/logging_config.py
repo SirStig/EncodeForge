@@ -8,6 +8,7 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from app import __version__ as APP_VERSION
 from core import path_manager
 
 
@@ -167,7 +168,7 @@ def setup_logging(
     
     # Log startup message
     root_logger.info("=" * 80)
-    root_logger.info(f"EncodeForge v0.5.0 - Logging initialized at {log_level} level")
+    root_logger.info(f"EncodeForge v{APP_VERSION} - Logging initialized at {log_level} level")
     root_logger.info(f"Log file: {path_manager.get_logs_dir() / 'encodeforge.log'}")
     root_logger.info(f"Max lines per file: {max_lines} (line-based rotation)")
     root_logger.info("=" * 80)
