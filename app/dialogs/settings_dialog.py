@@ -110,6 +110,8 @@ class SettingsPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         self.tabs = QTabWidget()
+        self.tabs.tabBar().setElideMode(Qt.TextElideMode.ElideNone)
+        self.tabs.tabBar().setExpanding(True)
         self.tabs.addTab(self._wrap_in_scroll_area(self._create_general_tab()), "General")
         self.tabs.addTab(self._wrap_in_scroll_area(self._create_encoder_tab()), "Encoder")
         self.tabs.addTab(self._wrap_in_scroll_area(self._create_subtitle_tab()), "Subtitle")

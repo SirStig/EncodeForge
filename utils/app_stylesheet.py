@@ -18,6 +18,7 @@ def build_app_stylesheet(tokens: DesignTokens) -> str:
     with open(base_path, "r", encoding="utf-8") as f:
         base = f.read()
     t = tokens
+    check_svg = (_project_root() / "resources" / "icons" / "check.svg").as_posix()
     overlay = f"""
 /* token overlay — main chrome, dialogs, control density */
 QWidget#central_root {{
@@ -26,10 +27,10 @@ QWidget#central_root {{
 
 QLabel#sidebar_app_title {{
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
     color: {t.text_primary};
     padding: {t.space_xs} 2px {t.space_sm} 2px;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
 }}
 
 QFrame#app_title_bar {{
@@ -44,26 +45,54 @@ QToolButton#titlebar_control {{
     background: transparent;
     border: 1px solid transparent;
     border-radius: {t.radius_sm};
-    padding: {t.space_xs} {t.space_sm};
+    padding: 1px;
     color: {t.text_secondary};
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    icon-size: 12px;
 }}
 
 QToolButton#titlebar_control:hover {{
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: #37373d;
+    border: 1px solid transparent;
     color: {t.text_primary};
+}}
+
+QToolButton#titlebar_menu {{
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: {t.radius_sm};
+    padding: 0px;
+    color: {t.text_secondary};
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    icon-size: 12px;
+}}
+
+QToolButton#titlebar_menu:hover {{
+    background: #37373d;
+    color: {t.text_primary};
+}}
+
+QToolButton#titlebar_menu::menu-indicator {{
+    image: none;
+    width: 0px;
 }}
 
 QLabel#titlebar_title {{
     font-size: {t.font_compact};
-    font-weight: 600;
-    color: {t.text_primary};
+    font-weight: 500;
+    color: {t.text_secondary};
     padding: 0 {t.space_sm};
 }}
 
 QStatusBar#app_bottom_bar {{
     background: {t.bg_elevated2};
-    border-top: 1px solid rgba(255,255,255,0.07);
+    border-top: 1px solid {t.border_subtle};
     color: {t.text_muted};
     font-size: {t.font_small};
     padding: 2px {t.space_md};
@@ -72,19 +101,19 @@ QStatusBar#app_bottom_bar {{
 
 QDialog, QMessageBox {{
     background: {t.bg_elevated};
-    border: 1px solid {t.border_subtle};
-    border-radius: {t.radius_lg};
+    border: 1px solid {t.border_strong};
+    border-radius: {t.radius_md};
 }}
 
 QDialog QLabel#title_label {{
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: {t.text_primary};
     padding: {t.space_sm} {t.space_md};
 }}
 
 QDialog QLabel#subtitle_label {{
-    font-size: 13px;
+    font-size: 12px;
     color: {t.text_secondary};
     padding: {t.space_xs} {t.space_md};
 }}
@@ -92,13 +121,6 @@ QDialog QLabel#subtitle_label {{
 QPushButton {{
     min-height: {t.control_min_height};
     padding: 3px 12px;
-}}
-
-QPushButton:pressed {{
-    padding-top: 4px;
-    padding-bottom: 2px;
-    padding-left: 12px;
-    padding-right: 12px;
 }}
 
 QComboBox {{
@@ -111,7 +133,7 @@ QComboBox::drop-down {{
 }}
 
 QComboBox QAbstractItemView::item {{
-    padding: 5px 10px;
+    padding: 4px 10px;
     min-height: 20px;
     font-size: {t.font_compact};
 }}
@@ -128,7 +150,6 @@ QSpinBox {{
 
 QSpinBox::up-button, QSpinBox::down-button {{
     width: 16px;
-    margin: 1px;
 }}
 
 QWidget#encoder_toolbar QComboBox,
@@ -149,7 +170,7 @@ QFrame#sidebar QToolButton {{
 }}
 
 QTabBar::tab {{
-    padding: 4px 14px;
+    padding: 5px 14px;
     font-size: {t.font_compact};
 }}
 
@@ -166,6 +187,52 @@ QCheckBox {{
 QCheckBox::indicator {{
     width: 15px;
     height: 15px;
+    border-radius: 3px;
+    background: #252526;
+    border: 1.5px solid #4e4e52;
+}}
+
+QCheckBox::indicator:hover {{
+    border-color: #7577f3;
+}}
+
+QCheckBox::indicator:checked {{
+    background: #6366f1;
+    border-color: #6366f1;
+    image: url({check_svg});
+}}
+
+QCheckBox::indicator:disabled {{
+    background: #1e1e1e;
+    border-color: #2e2e2e;
+}}
+
+QToolButton#statusbar_indicator {{
+    background: transparent;
+    border: none;
+    border-radius: 2px;
+    padding: 0px 5px;
+    margin: 0px;
+    font-size: 10px;
+    font-weight: 400;
+    color: {t.text_muted};
+}}
+
+QToolButton#statusbar_indicator:hover {{
+    background: rgba(255, 255, 255, 0.05);
+    color: {t.text_secondary};
+}}
+
+QToolButton#statusbar_indicator[status="ok"] {{
+    color: #7a9e7a;
+}}
+
+QToolButton#statusbar_indicator[status="warn"] {{
+    color: #9e8a6a;
+}}
+
+QTabBar::tab {{
+    min-width: 70px;
 }}
 
 QHeaderView::section {{
@@ -175,7 +242,7 @@ QHeaderView::section {{
 
 QFrame#update_toast QLabel#update_toast_title {{
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
     color: {t.text_primary};
 }}
 

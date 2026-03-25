@@ -1,9 +1,13 @@
+from pathlib import Path
+
 import qtawesome as qta
-from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QMouseEvent
+from PySide6.QtCore import QEvent, QSize, Qt
+from PySide6.QtGui import QMouseEvent, QPixmap
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QSizePolicy, QToolButton, QWidget
 
 from utils.design_tokens import default_tokens
+
+_ICONS_DIR = Path(__file__).resolve().parent.parent.parent / "resources" / "icons"
 
 
 class AppTitleBar(QFrame):
@@ -14,11 +18,20 @@ class AppTitleBar(QFrame):
         self._state_hooked = False
 
         root = QHBoxLayout(self)
-        root.setContentsMargins(8, 0, 4, 0)
-        root.setSpacing(8)
+        root.setContentsMargins(6, 0, 4, 0)
+        root.setSpacing(6)
 
         icon = QLabel()
-        icon.setPixmap(qta.icon("fa5s.video").pixmap(14, 14))
+        app_icon_path = _ICONS_DIR / "app-icon.png"
+        if app_icon_path.exists():
+            pix = QPixmap(str(app_icon_path)).scaled(
+                14, 14,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            icon.setPixmap(pix)
+        else:
+            icon.setPixmap(qta.icon("fa5s.film").pixmap(12, 12))
         icon.setFixedSize(18, 18)
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(icon)
@@ -28,15 +41,15 @@ class AppTitleBar(QFrame):
         self._title.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         root.addWidget(self._title)
 
+        root.addStretch(1)
+
         self._menu_btn = QToolButton(self)
         self._menu_btn.setObjectName("titlebar_menu")
-        self._menu_btn.setIcon(qta.icon("fa5s.bars"))
+        self._menu_btn.setIcon(qta.icon("fa5s.ellipsis-v"))
         self._menu_btn.setAutoRaise(True)
         self._menu_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._menu_btn.setVisible(False)
         root.addWidget(self._menu_btn)
-
-        root.addStretch(1)
 
         self._btn_min = QToolButton(self)
         self._btn_min.setObjectName("titlebar_control")
@@ -57,6 +70,11 @@ class AppTitleBar(QFrame):
         self._btn_close.setAutoRaise(True)
         self._btn_close.clicked.connect(self._on_close)
         root.addWidget(self._btn_close)
+
+        _ib = QSize(12, 12)
+        for _b in (self._menu_btn, self._btn_min, self._btn_max, self._btn_close):
+            _b.setIconSize(_ib)
+            _b.setFixedSize(22, 22)
 
         _th = int(default_tokens().title_bar_height.replace("px", "").strip())
         self.setFixedHeight(_th)
@@ -95,7 +113,7 @@ class AppTitleBar(QFrame):
         child = self.childAt(pos)
         w = child
         while w is not None and w is not self:
-            if w.objectName() == "titlebar_control":
+            if w.objectName() in ("titlebar_control", "titlebar_menu"):
                 return False
             w = w.parentWidget()
         return True

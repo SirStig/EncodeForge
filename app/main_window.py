@@ -493,6 +493,79 @@ class MainWindow(GlassmorphicMainWindow):
         self.progress_label = StyledLabel("")
         self.statusbar.addPermanentWidget(self.progress_label)
 
+        # FFmpeg status indicator
+        self._ffmpeg_status_btn = QToolButton()
+        self._ffmpeg_status_btn.setObjectName("statusbar_indicator")
+        self._ffmpeg_status_btn.setAutoRaise(True)
+        self._ffmpeg_status_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self._ffmpeg_status_btn.clicked.connect(self._open_ffmpeg_setup)
+        self.statusbar.addPermanentWidget(self._ffmpeg_status_btn)
+
+        # Whisper AI status indicator (right-most)
+        self._whisper_status_btn = QToolButton()
+        self._whisper_status_btn.setObjectName("statusbar_indicator")
+        self._whisper_status_btn.setAutoRaise(True)
+        self._whisper_status_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self._whisper_status_btn.clicked.connect(self._open_whisper_setup)
+        self.statusbar.addPermanentWidget(self._whisper_status_btn)
+
+        QTimer.singleShot(500, self._refresh_tool_status)
+
+    def _refresh_tool_status(self):
+        """Update FFmpeg and Whisper status indicator buttons."""
+        try:
+            from utils.ffmpeg_manager import FFmpegManager
+            ffmpeg_ok = bool(FFmpegManager().get_ffmpeg_path())
+        except Exception:
+            ffmpeg_ok = False
+
+        if ffmpeg_ok:
+            self._ffmpeg_status_btn.setText("FFmpeg: Ready")
+            self._ffmpeg_status_btn.setProperty("status", "ok")
+            self._ffmpeg_status_btn.setToolTip("FFmpeg is available — click to reconfigure")
+        else:
+            self._ffmpeg_status_btn.setText("FFmpeg: Not Found")
+            self._ffmpeg_status_btn.setProperty("status", "warn")
+            self._ffmpeg_status_btn.setToolTip("FFmpeg not found — click to set up")
+        self._ffmpeg_status_btn.style().unpolish(self._ffmpeg_status_btn)
+        self._ffmpeg_status_btn.style().polish(self._ffmpeg_status_btn)
+
+        try:
+            from core.providers.subtitle.whisper_manager import WhisperManager
+            wm = WhisperManager()
+            whisper_installed = wm.whisper_available
+            whisper_has_models = bool(wm.installed_models)
+        except Exception:
+            whisper_installed = False
+            whisper_has_models = False
+
+        if not whisper_installed:
+            self._whisper_status_btn.setText("Whisper AI: Not Installed")
+            self._whisper_status_btn.setProperty("status", "warn")
+            self._whisper_status_btn.setToolTip("Whisper AI package not installed — click to set up")
+        elif not whisper_has_models:
+            self._whisper_status_btn.setText("Whisper AI: No Models")
+            self._whisper_status_btn.setProperty("status", "warn")
+            self._whisper_status_btn.setToolTip("No models downloaded yet — click to download a model")
+        else:
+            self._whisper_status_btn.setText("Whisper AI: Ready")
+            self._whisper_status_btn.setProperty("status", "ok")
+            self._whisper_status_btn.setToolTip("Whisper AI is ready — click to manage models")
+        self._whisper_status_btn.style().unpolish(self._whisper_status_btn)
+        self._whisper_status_btn.style().polish(self._whisper_status_btn)
+
+    def _open_ffmpeg_setup(self):
+        from app.dialogs.ffmpeg_setup_dialog import FFmpegSetupDialog
+        dlg = FFmpegSetupDialog(self)
+        dlg.exec()
+        self._refresh_tool_status()
+
+    def _open_whisper_setup(self):
+        from app.dialogs.whisper_setup_dialog import WhisperSetupDialog
+        dlg = WhisperSetupDialog(self)
+        dlg.exec()
+        self._refresh_tool_status()
+
     def _update_status(self, message: str):
         try:
             self.status_label.setText(message)

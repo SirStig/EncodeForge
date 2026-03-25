@@ -78,6 +78,7 @@ class SubtitleTab(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+        self._update_whisper_status()
         logger.debug("Subtitle tab initialized - using base glassmorphism theme")
 
     def showEvent(self, event):
@@ -158,12 +159,35 @@ class SubtitleTab(QWidget):
         quick_outer.addLayout(lists_grid)
 
         status_row = QHBoxLayout()
-        self.whisper_status = StyledLabel("Whisper: Ready")
-        self.opensubs_status = StyledLabel("OpenSubs: 0/5 downloads left")
+        self.whisper_status = StyledLabel("Whisper: checking…")
+        self.whisper_status.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.whisper_status.setToolTip("Click to open Whisper AI setup")
+        self.whisper_status.mousePressEvent = lambda _: self._open_whisper_setup()
+        self.opensubs_status = StyledLabel("")
         status_row.addWidget(self.whisper_status)
         status_row.addWidget(self.opensubs_status)
         status_row.addStretch()
         quick_outer.addLayout(status_row)
+
+        # Inline banner shown when Generate mode is selected but Whisper isn't ready
+        self._whisper_banner = QWidget()
+        self._whisper_banner.setVisible(False)
+        banner_layout = QHBoxLayout(self._whisper_banner)
+        banner_layout.setContentsMargins(10, 6, 10, 6)
+        banner_lbl = QLabel(
+            "faster-whisper is not installed or has no model downloaded. "
+            "Subtitle generation won't work until it's set up."
+        )
+        banner_lbl.setWordWrap(True)
+        banner_lbl.setStyleSheet("color: #e8a040;")
+        banner_layout.addWidget(banner_lbl, 1)
+        setup_link_btn = QPushButton("Set Up Whisper")
+        setup_link_btn.clicked.connect(self._open_whisper_setup)
+        banner_layout.addWidget(setup_link_btn)
+        self._whisper_banner.setStyleSheet(
+            "background: rgba(232,160,64,0.12); border-radius: 4px;"
+        )
+        quick_outer.addWidget(self._whisper_banner)
 
         main_layout.addWidget(quick_host)
 
@@ -678,9 +702,45 @@ class SubtitleTab(QWidget):
     def _on_mode_changed(self):
         """Handle processing mode change."""
         mode = self.mode_combo.currentText()
-        # Provider list only applies for Download/Auto mode
         show_providers = mode in ("Auto", "Download")
         self.provider_list.setEnabled(show_providers)
+        if mode == "Generate":
+            self._update_whisper_status()
+        else:
+            self._whisper_banner.setVisible(False)
+
+    def _update_whisper_status(self):
+        """Check faster-whisper availability and update the status label + banner."""
+        try:
+            from core.providers.subtitle.whisper_manager import WhisperManager
+            mgr = WhisperManager()
+            if mgr.whisper_available and mgr.installed_models:
+                model_list = ", ".join(mgr.installed_models)
+                self.whisper_status.setText(f"Whisper: ready ({model_list})")
+                self.whisper_status.setStyleSheet("color: #3fc66d;")
+                self._whisper_banner.setVisible(False)
+            elif mgr.whisper_available:
+                self.whisper_status.setText("Whisper: installed — no model downloaded")
+                self.whisper_status.setStyleSheet("color: #e8a040;")
+                self._whisper_banner.setVisible(
+                    self.mode_combo.currentText() == "Generate"
+                )
+            else:
+                self.whisper_status.setText("Whisper: not installed — click to set up")
+                self.whisper_status.setStyleSheet("color: #e05050;")
+                self._whisper_banner.setVisible(
+                    self.mode_combo.currentText() == "Generate"
+                )
+        except Exception:
+            self.whisper_status.setText("Whisper: unavailable")
+            self.whisper_status.setStyleSheet("color: #e05050;")
+
+    def _open_whisper_setup(self):
+        """Open the Whisper setup dialog and refresh status on close."""
+        from app.dialogs.whisper_setup_dialog import WhisperSetupDialog
+        dlg = WhisperSetupDialog(self)
+        dlg.exec()
+        self._update_whisper_status()
     
     def _on_subtitle_selected(self):
         """Show subtitle preview when user selects a subtitle in the results table."""

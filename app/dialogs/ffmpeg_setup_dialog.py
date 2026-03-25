@@ -48,6 +48,7 @@ class FFmpegSetupDialog(QDialog):
     
     # Custom signals
     setup_complete = Signal(str)  # Emits FFmpeg path when setup is complete
+    _log_to_ui = Signal(str)
     
     def __init__(self, parent=None, required: bool = True):
         """
@@ -70,6 +71,8 @@ class FFmpegSetupDialog(QDialog):
         self._apply_theme()
         self._connect_signals()
         self._check_existing_ffmpeg()
+        # Auto-run detection so users see a result immediately
+        self._auto_detect()
     
     def _apply_theme(self):
         """Apply glassmorphism theme to dialog."""
@@ -175,11 +178,10 @@ class FFmpegSetupDialog(QDialog):
         self.progress_bar.setVisible(False)
         progress_layout.addWidget(self.progress_bar)
         
-        # Log output
+        # Log output — visible by default for transparency
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
-        self.log_output.setMaximumHeight(150)
-        self.log_output.setVisible(False)
+        self.log_output.setMaximumHeight(120)
         progress_layout.addWidget(self.log_output)
         
         layout.addWidget(progress_group)
@@ -204,6 +206,7 @@ class FFmpegSetupDialog(QDialog):
     def _connect_signals(self):
         """Connect UI signals."""
         self.method_group.buttonClicked.connect(self._on_method_changed)
+        self._log_to_ui.connect(self._log)
     
     def _on_method_changed(self, button):
         """Handle setup method change."""
@@ -237,13 +240,19 @@ class FFmpegSetupDialog(QDialog):
         """Add message to log output."""
         logger.info(message)
         self.log_output.append(message)
-        if not self.log_output.isVisible():
-            self.log_output.setVisible(True)
+        self.log_output.verticalScrollBar().setValue(
+            self.log_output.verticalScrollBar().maximum()
+        )
     
     def _update_status(self, message: str):
         """Update status label."""
         self.status_label.setText(message)
         self._log(message)
+
+    def _on_download_worker_progress(self, current: int, total: int, message: str):
+        self.progress_bar.setValue(min(100, current))
+        if message:
+            self.status_label.setText(message)
     
     def _begin_setup(self):
         """Start the setup process based on selected method."""
@@ -265,10 +274,11 @@ class FFmpegSetupDialog(QDialog):
     
     def _auto_detect(self):
         """Auto-detect FFmpeg using centralized manager."""
-        self._update_status("Searching for FFmpeg on your system...")
+        self._update_status("Searching for FFmpeg on your system…")
+        self.setup_btn.setEnabled(False)
         
         # Create worker for detection using centralized manager
-        def detect_ffmpeg():
+        def detect_ffmpeg(progress_callback=None):
             ffmpeg_manager = get_ffmpeg_manager()
             
             if ffmpeg_manager.detect_ffmpeg(force_refresh=True):
@@ -295,18 +305,9 @@ class FFmpegSetupDialog(QDialog):
             self._update_status(f"✓ Found FFmpeg: {self.ffmpeg_path}")
             self._save_and_complete()
         else:
-            self._update_status("✗ FFmpeg not found in system or common locations")
-            QMessageBox.warning(
-                self,
-                "FFmpeg Not Found",
-                "Could not find FFmpeg in system PATH or common installation directories.\n\n"
-                "Searched locations include:\n"
-                "- System PATH\n"
-                "- Program Files\n"
-                "- AppData\\Local\n"
-                "- Downloads folder\n"
-                "- Documents folder\n\n"
-                "Please try downloading automatically or selecting the path manually."
+            self._update_status(
+                "✗ FFmpeg not found automatically. "
+                "Choose 'Download' to fetch it, or 'Manual' to browse to an existing install."
             )
             self._reset_ui()
     
@@ -317,27 +318,31 @@ class FFmpegSetupDialog(QDialog):
         self.progress_bar.setValue(0)
         
         system = platform.system().lower()
-        
-        # Determine download URL based on platform
+        machine = platform.machine().lower()
+        is_arm = "arm" in machine or machine == "arm64" or machine == "aarch64"
+
+        # eugeneware/ffmpeg-static: direct binary downloads, no archive extraction needed.
+        # evermeet.cx is Intel-only and uses version-pinned URLs that go stale.
+        # John Van Sickle provides archives for Linux static builds.
+        _STATIC_BASE = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1"
+
         if system == "windows":
-            # Use gyan.dev builds (reliable source for Windows)
             url = "https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip"
+            ffprobe_url = None
+            direct_binary = False
         elif system == "linux":
-            # Use static builds from John Van Sickle
-            import platform as plat
-            machine = plat.machine().lower()
-            if 'arm' in machine or 'aarch64' in machine:
+            if is_arm:
                 url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz"
             else:
                 url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+            ffprobe_url = None
+            direct_binary = False
         elif system == "darwin":
-            # For macOS, we'll use static builds
-            import platform as plat
-            machine = plat.machine().lower()
-            if 'arm' in machine or machine == 'arm64':
-                url = "https://evermeet.cx/ffmpeg/ffmpeg-7.0.2-arm64.zip"
-            else:
-                url = "https://evermeet.cx/ffmpeg/ffmpeg-7.0.2.zip"
+            # eugeneware/ffmpeg-static: bare executables, no archive
+            arch = "arm64" if is_arm else "x64"
+            url = f"{_STATIC_BASE}/ffmpeg-darwin-{arch}"
+            ffprobe_url = f"{_STATIC_BASE}/ffprobe-darwin-{arch}"
+            direct_binary = True
         else:
             QMessageBox.critical(
                 self,
@@ -347,76 +352,110 @@ class FFmpegSetupDialog(QDialog):
             )
             self._reset_ui()
             return
-        
-        # Start download in worker
-        def download_and_extract():
+
+        # Start download in worker (must not touch widgets here — QThreadPool worker thread)
+        def download_and_extract(progress_callback=None):
+            import stat as stat_mod
+
             bin_dir = get_bin_dir()
-            extract_dir = bin_dir / "ffmpeg"
-            
+            ffmpeg_dir = bin_dir / "ffmpeg"
+            ffmpeg_dir.mkdir(parents=True, exist_ok=True)
+
+            def _dl_progress(downloaded, total, percentage):
+                if not progress_callback:
+                    return
+                pct = min(99, int(percentage * 0.9))
+                mb_dl = downloaded / (1024 * 1024)
+                mb_tot = total / (1024 * 1024) if total else 0
+                msg = f"Downloading: {mb_dl:.1f} / {mb_tot:.1f} MB ({percentage:.0f}%)"
+                progress_callback({"progress": pct, "total": 100, "message": msg})
+
             try:
-                # Download
-                self._log(f"Downloading from: {url}")
-                
-                def progress_callback(downloaded, total, percentage):
-                    self.progress_bar.setValue(int(percentage))
-                    mb_downloaded = downloaded / (1024 * 1024)
-                    mb_total = total / (1024 * 1024)
-                    self.status_label.setText(
-                        f"Downloading: {mb_downloaded:.1f} MB / {mb_total:.1f} MB ({percentage:.1f}%)"
+                if direct_binary:
+                    # macOS: download bare executables directly
+                    ffmpeg_dest = ffmpeg_dir / "ffmpeg"
+                    self._log_to_ui.emit("Downloading ffmpeg binary…")
+                    self.download_manager.download(
+                        url=url,
+                        destination=str(ffmpeg_dest),
+                        progress_callback=_dl_progress,
+                        resume=False,
                     )
-                
-                archive_path = self.download_manager.download(
-                    url=url,
-                    destination=str(bin_dir / "ffmpeg_download.tmp"),
-                    progress_callback=progress_callback,
-                    resume=True
-                )
-                
-                # Extract
-                self._log("Extracting archive...")
-                self.status_label.setText("Extracting FFmpeg...")
-                
-                self.download_manager.extract_archive(archive_path, extract_dir)
-                
-                # Find ffmpeg executable in extracted files
-                ffmpeg_exe = "ffmpeg.exe" if system == "windows" else "ffmpeg"
-                ffprobe_exe = "ffprobe.exe" if system == "windows" else "ffprobe"
-                
-                found_ffmpeg = None
-                found_ffprobe = None
-                
-                for item in extract_dir.rglob(ffmpeg_exe):
-                    if item.is_file():
-                        found_ffmpeg = item
-                        break
-                
-                for item in extract_dir.rglob(ffprobe_exe):
-                    if item.is_file():
-                        found_ffprobe = item
-                        break
-                
-                # Cleanup archive
-                archive_path.unlink()
-                
-                if found_ffmpeg:
-                    # Make executable on Unix systems
-                    if system in ["linux", "darwin"]:
-                        import stat
-                        found_ffmpeg.chmod(found_ffmpeg.stat().st_mode | stat.S_IEXEC)
+                    ffmpeg_dest.chmod(ffmpeg_dest.stat().st_mode | stat_mod.S_IEXEC)
+
+                    ffprobe_dest = ffmpeg_dir / "ffprobe"
+                    if ffprobe_url:
+                        self._log_to_ui.emit("Downloading ffprobe binary…")
+                        if progress_callback:
+                            progress_callback(
+                                {
+                                    "progress": 90,
+                                    "total": 100,
+                                    "message": "Downloading ffprobe…",
+                                }
+                            )
+                        self.download_manager.download(
+                            url=ffprobe_url,
+                            destination=str(ffprobe_dest),
+                            resume=False,
+                        )
+                        ffprobe_dest.chmod(ffprobe_dest.stat().st_mode | stat_mod.S_IEXEC)
+
+                    return {
+                        "ffmpeg": str(ffmpeg_dest),
+                        "ffprobe": str(ffprobe_dest) if ffprobe_dest.exists() else str(ffmpeg_dest),
+                    }
+
+                else:
+                    # Windows / Linux: download archive and extract
+                    self._log_to_ui.emit(f"Downloading from: {url}")
+                    archive_path = self.download_manager.download(
+                        url=url,
+                        destination=str(bin_dir / "ffmpeg_download.tmp"),
+                        progress_callback=_dl_progress,
+                        resume=True,
+                    )
+
+                    self._log_to_ui.emit("Extracting archive…")
+                    if progress_callback:
+                        progress_callback(
+                            {
+                                "progress": 95,
+                                "total": 100,
+                                "message": "Extracting FFmpeg…",
+                            }
+                        )
+                    self.download_manager.extract_archive(archive_path, ffmpeg_dir)
+                    archive_path.unlink(missing_ok=True)
+
+                    ffmpeg_exe = "ffmpeg.exe" if system == "windows" else "ffmpeg"
+                    ffprobe_exe = "ffprobe.exe" if system == "windows" else "ffprobe"
+
+                    found_ffmpeg = next(
+                        (p for p in ffmpeg_dir.rglob(ffmpeg_exe) if p.is_file()), None
+                    )
+                    found_ffprobe = next(
+                        (p for p in ffmpeg_dir.rglob(ffprobe_exe) if p.is_file()), None
+                    )
+
+                    if not found_ffmpeg:
+                        raise DownloadError("Could not find ffmpeg executable in downloaded archive")
+
+                    if system == "linux":
+                        found_ffmpeg.chmod(found_ffmpeg.stat().st_mode | stat_mod.S_IEXEC)
                         if found_ffprobe:
-                            found_ffprobe.chmod(found_ffprobe.stat().st_mode | stat.S_IEXEC)
-                    
+                            found_ffprobe.chmod(found_ffprobe.stat().st_mode | stat_mod.S_IEXEC)
+
                     return {
                         "ffmpeg": str(found_ffmpeg),
-                        "ffprobe": str(found_ffprobe) if found_ffprobe else str(found_ffmpeg)
+                        "ffprobe": str(found_ffprobe) if found_ffprobe else str(found_ffmpeg),
                     }
-                else:
-                    raise DownloadError("Could not find ffmpeg executable in downloaded archive")
-            
+
             except Exception as e:
-                raise DownloadError(f"Download failed: {str(e)}")
+                raise DownloadError(f"Download failed: {e}")
         
         worker = Worker(download_and_extract)
+        worker.signals.progress.connect(self._on_download_worker_progress)
         worker.signals.result.connect(self._on_download_complete)
         worker.signals.error.connect(self._on_error)
         self.thread_pool.start(worker)
@@ -456,7 +495,7 @@ class FFmpegSetupDialog(QDialog):
         # Verify it's actually FFmpeg
         self._update_status("Verifying FFmpeg installation...")
         
-        def verify_ffmpeg():
+        def verify_ffmpeg(progress_callback=None):
             try:
                 result = subprocess.run(
                     [str(path), "-version"],
