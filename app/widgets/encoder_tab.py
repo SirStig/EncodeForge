@@ -4,6 +4,7 @@ File list, settings panel, and queue management for video encoding
 """
 
 import logging
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
 
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMenu,
     QProgressBar,
@@ -25,6 +27,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from core.handlers.models import ConversionSettings
+from core.profile_manager import ProfileManager
 
 from app.widgets.custom_widgets import (
     AutoResizeTable,
@@ -36,7 +41,8 @@ from app.widgets.custom_widgets import (
     StyledSpinBox,
 )
 from utils.notifications import get_notification_manager
-from utils.workers import EncoderWorker
+from utils.settings_manager import get_settings_manager
+from utils.workers import EncoderWorker, merge_encoder_ui_into_conversion_settings
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +74,7 @@ class EncoderTab(QWidget):
         super().__init__(parent)
         self.thread_pool = thread_pool
         self.notifier = get_notification_manager()
+        self._profile_mgr = ProfileManager()
         self.active_workers: Dict[str, EncoderWorker] = {}
         self._mp4_subtitle_warned = False
         self._splitter_initialized = False
@@ -78,7 +85,6 @@ class EncoderTab(QWidget):
 
     def _apply_saved_encoder_defaults(self):
         try:
-            from utils.settings_manager import get_settings_manager
             s = get_settings_manager().encoder
             self.format_combo.setCurrentText(s.container)
             self.codec_combo.setCurrentText(s.codec)
@@ -201,6 +207,26 @@ class EncoderTab(QWidget):
         enc_grid.setColumnStretch(3, 1)
         settings_main_layout.addLayout(enc_grid)
 
+        profile_row = QHBoxLayout()
+        profile_row.setSpacing(8)
+        profile_label = StyledLabel("Profile:")
+        profile_label.setAlignment(align_right)
+        self.profile_combo = StyledComboBox()
+        self.profile_combo.setMinimumContentsLength(20)
+        self.profile_combo.setMinimumWidth(160)
+        load_profile_btn = GlassmorphicButton("Load", qta.icon("fa5s.folder-open"))
+        load_profile_btn.setToolTip("Apply the selected profile to these encoder controls")
+        save_profile_btn = GlassmorphicButton("Save as…", qta.icon("fa5s.save"))
+        save_profile_btn.setToolTip("Save current encoder options as a custom profile (JSON)")
+        profile_row.addWidget(profile_label)
+        profile_row.addWidget(self.profile_combo, 1)
+        profile_row.addWidget(load_profile_btn)
+        profile_row.addWidget(save_profile_btn)
+        settings_main_layout.addLayout(profile_row)
+        load_profile_btn.clicked.connect(self._load_selected_profile)
+        save_profile_btn.clicked.connect(self._save_profile_as)
+        self._refresh_profile_combo()
+
         checks_row = QHBoxLayout()
         checks_row.setSpacing(12)
         self.hw_accel_check = StyledCheckBox("HW Accel")
@@ -251,7 +277,7 @@ class EncoderTab(QWidget):
         """Set up the single file table with all encoding states."""
         # Main table container
         table_group = GlassmorphicCard("Files")
-        table_layout = QVBoxLayout(table_group)
+        table_layout = table_group.content_layout()
         table_layout.setContentsMargins(0, 5, 0, 0)
         table_layout.setSpacing(8)
         
@@ -295,12 +321,24 @@ class EncoderTab(QWidget):
         self.clear_completed_btn = GlassmorphicButton("Clear Completed", qta.icon('fa5s.broom'))
         self.clear_completed_btn.clicked.connect(self._clear_completed_files)
         self.clear_completed_btn.setMinimumWidth(110)
+
+        self.queue_up_btn = GlassmorphicButton("Up", qta.icon("fa5s.arrow-up"))
+        self.queue_up_btn.setToolTip("Move selected queued row up")
+        self.queue_up_btn.clicked.connect(lambda: self._move_selected_queue(-1))
+        self.queue_up_btn.setMinimumWidth(52)
+        self.queue_down_btn = GlassmorphicButton("Down", qta.icon("fa5s.arrow-down"))
+        self.queue_down_btn.setToolTip("Move selected queued row down")
+        self.queue_down_btn.clicked.connect(lambda: self._move_selected_queue(1))
+        self.queue_down_btn.setMinimumWidth(68)
         
         buttons_layout.addWidget(self.add_files_btn)
         buttons_layout.addWidget(self.add_folder_btn)
         buttons_layout.addSpacing(10)
         buttons_layout.addWidget(self.remove_selected_btn)
         buttons_layout.addWidget(self.clear_completed_btn)
+        buttons_layout.addSpacing(8)
+        buttons_layout.addWidget(self.queue_up_btn)
+        buttons_layout.addWidget(self.queue_down_btn)
         buttons_layout.addStretch()
         
         table_layout.addLayout(buttons_layout, 0)  # No stretch for buttons
@@ -323,7 +361,7 @@ class EncoderTab(QWidget):
         
         # Preview area
         preview_group = GlassmorphicCard("Preview")
-        preview_layout = QVBoxLayout(preview_group)
+        preview_layout = preview_group.content_layout()
         self.preview_label = StyledLabel("No file selected")
         self.preview_label.setObjectName("preview_label")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -333,7 +371,7 @@ class EncoderTab(QWidget):
         
         # File Information Section
         file_group = GlassmorphicCard("File Details")
-        file_layout = QFormLayout(file_group)
+        file_layout = QFormLayout(file_group.body())
         file_layout.setSpacing(6)
         file_layout.setContentsMargins(8, 12, 8, 8)
         
@@ -353,7 +391,7 @@ class EncoderTab(QWidget):
         
         # Video Information Section
         video_group = GlassmorphicCard("Video Properties")
-        video_layout = QFormLayout(video_group)
+        video_layout = QFormLayout(video_group.body())
         video_layout.setSpacing(6)
         video_layout.setContentsMargins(8, 12, 8, 8)
         
@@ -371,7 +409,7 @@ class EncoderTab(QWidget):
         
         # Audio Information Section
         audio_group = GlassmorphicCard("Audio Properties")
-        audio_layout = QFormLayout(audio_group)
+        audio_layout = QFormLayout(audio_group.body())
         audio_layout.setSpacing(6)
         audio_layout.setContentsMargins(8, 12, 8, 8)
         
@@ -595,6 +633,155 @@ class EncoderTab(QWidget):
             'audio_codec': audio_codec_map.get(audio_text, 'copy'),
             'audio_bitrate': audio_bitrate_map.get(audio_text),
         }
+
+    def _refresh_profile_combo(self) -> None:
+        self.profile_combo.blockSignals(True)
+        self.profile_combo.clear()
+        self.profile_combo.addItem("(select profile)")
+        for name in self._profile_mgr.list_profiles():
+            self.profile_combo.addItem(name)
+        self.profile_combo.blockSignals(False)
+
+    def _load_selected_profile(self) -> None:
+        name = self.profile_combo.currentText()
+        if not name or name.startswith("("):
+            return
+        cs = self._profile_mgr.load_profile(name)
+        if cs is None:
+            return
+        self._apply_conversion_settings_to_ui(cs)
+
+    def _save_profile_as(self) -> None:
+        name, ok = QInputDialog.getText(self, "Save encoding profile", "Profile name:")
+        if not ok or not name.strip():
+            return
+        name = name.strip()
+        base = deepcopy(get_settings_manager().get_merged_conversion_settings())
+        merged = merge_encoder_ui_into_conversion_settings(
+            base, self._get_encoder_settings()
+        )
+        if self._profile_mgr.save_profile(name, merged):
+            self._refresh_profile_combo()
+            idx = self.profile_combo.findText(name)
+            if idx >= 0:
+                self.profile_combo.setCurrentIndex(idx)
+
+    def _apply_conversion_settings_to_ui(self, cs: ConversionSettings) -> None:
+        fmt_map = {"mp4": "MP4", "mkv": "MKV", "webm": "WebM", "avi": "AVI", "mov": "MOV"}
+        self.format_combo.setCurrentText(
+            fmt_map.get((cs.output_format or "mp4").lower(), "MP4")
+        )
+        if cs.use_nvenc:
+            if "hevc" in (cs.nvenc_codec or "").lower():
+                self.codec_combo.setCurrentText("H.265/HEVC")
+            else:
+                self.codec_combo.setCurrentText("H.264")
+        else:
+            rev = {
+                "libx264": "H.264",
+                "libx265": "H.265/HEVC",
+                "libaom-av1": "AV1",
+                "libvpx-vp9": "VP9",
+                "copy": "Copy",
+            }
+            self.codec_combo.setCurrentText(rev.get(cs.video_codec_fallback, "Auto"))
+        nv_map = {
+            "p1": "ultrafast",
+            "p2": "superfast",
+            "p3": "veryfast",
+            "p4": "faster",
+            "p5": "fast",
+            "p6": "medium",
+            "p7": "slow",
+        }
+        if cs.use_nvenc and cs.nvenc_preset:
+            preset = nv_map.get(str(cs.nvenc_preset).lower(), cs.video_preset)
+        else:
+            preset = cs.video_preset
+        pidx = self.preset_combo.findText(preset)
+        if pidx >= 0:
+            self.preset_combo.setCurrentIndex(pidx)
+        cq = cs.nvenc_cq if cs.use_nvenc else cs.video_crf
+        quality_options = [
+            (18, "High (CQ 18)"),
+            (23, "Medium (CQ 23)"),
+            (28, "Low (CQ 28)"),
+            (33, "Very Low (CQ 33)"),
+        ]
+        best = min(quality_options, key=lambda x: abs(x[0] - cq))
+        self.quality_combo.setCurrentText(best[1])
+        self.hw_accel_check.setChecked(
+            bool(cs.use_nvenc or cs.use_amf or cs.use_qsv or cs.use_videotoolbox)
+        )
+        sh_reverse = {
+            "keep": "Keep/Passthrough",
+            "convert_to_srt": "Convert to SRT",
+            "embed": "Embed",
+            "burn_in": "Burn-in",
+            "skip": "Skip",
+        }
+        if cs.convert_subtitles:
+            self.subtitle_handling_combo.setCurrentText(
+                sh_reverse.get(cs.subtitle_handling, "Keep/Passthrough")
+            )
+        else:
+            self.subtitle_handling_combo.setCurrentText("Skip")
+        ac = (cs.audio_codec or "copy").lower()
+        if ac == "copy":
+            self.audio_handling_combo.setCurrentText("Copy")
+        elif ac == "aac":
+            br = str(cs.audio_bitrate or "192k").lower().replace("k", "")
+            if br == "320":
+                self.audio_handling_combo.setCurrentText("AAC 320k")
+            else:
+                self.audio_handling_combo.setCurrentText("AAC 192k")
+        elif ac == "ac3":
+            self.audio_handling_combo.setCurrentText("AC3")
+        else:
+            self.audio_handling_combo.setCurrentText("Copy")
+        self.normalize_audio_check.setChecked(cs.normalize_audio)
+        self.delete_original_check.setChecked(cs.delete_original)
+
+    def _renumber_queue_indices(self) -> None:
+        for row in range(self.files_table.rowCount()):
+            cell = self.files_table.item(row, 0)
+            if cell:
+                cell.setText(str(row + 1))
+
+    def _swap_queue_rows(self, row_a: int, row_b: int) -> None:
+        for col in range(self.files_table.columnCount()):
+            a = self.files_table.takeItem(row_a, col)
+            b = self.files_table.takeItem(row_b, col)
+            self.files_table.setItem(row_a, col, b)
+            self.files_table.setItem(row_b, col, a)
+        wa = self.files_table.cellWidget(row_a, 5)
+        wb = self.files_table.cellWidget(row_b, 5)
+        self.files_table.removeCellWidget(row_a, 5)
+        self.files_table.removeCellWidget(row_b, 5)
+        if wb is not None:
+            self.files_table.setCellWidget(row_a, 5, wb)
+        if wa is not None:
+            self.files_table.setCellWidget(row_b, 5, wa)
+
+    def _row_queue_status(self, row: int) -> str:
+        it = self.files_table.item(row, 7)
+        return (it.text() if it else "") or ""
+
+    def _move_selected_queue(self, delta: int) -> None:
+        rows = sorted({ix.row() for ix in self.files_table.selectedIndexes()})
+        if len(rows) != 1:
+            return
+        row = rows[0]
+        if self._row_queue_status(row) != "Queued":
+            return
+        other = row + delta
+        if other < 0 or other >= self.files_table.rowCount():
+            return
+        if self._row_queue_status(other) != "Queued":
+            return
+        self._swap_queue_rows(row, other)
+        self._renumber_queue_indices()
+        self.files_table.selectRow(other)
     
     def _on_encode_started(self, row: int, file_path: str):
         """Handle encoding started event."""

@@ -366,34 +366,60 @@ QCheckBox:disabled {
 }
 
 
-/* ─── GROUP BOX (Glass Card) ─────────────── */
+/* ─── GLASS CARD (encoder / composite sections) ─────────────── */
+
+QFrame#glass_card {
+    background: transparent;
+    border: none;
+}
+
+QLabel#glass_card_title {
+    color: rgba(255,255,255,0.78);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.15px;
+    padding: 0 2px 0 2px;
+    background: transparent;
+    border: none;
+}
+
+QFrame#glass_card_body {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(255,255,255,0.055),
+        stop:1 rgba(255,255,255,0.028)
+    );
+    border: none;
+    border-radius: 10px;
+}
+
+/* ─── GROUP BOX (dialogs — flat header, no title chip) ─────────────── */
 
 QGroupBox {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 rgba(255,255,255,0.05),
-        stop:1 rgba(255,255,255,0.03)
+        stop:0 rgba(255,255,255,0.045),
+        stop:1 rgba(255,255,255,0.025)
     );
-    border: 1px solid rgba(255,255,255,0.09);
-    border-top-color: rgba(255,255,255,0.14);
-    border-radius: 12px;
-    padding: 22px 14px 12px 14px;
-    margin-top: 14px;
-    font-size: 11px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 20px 14px 12px 14px;
+    margin-top: 18px;
+    font-size: 12px;
     font-weight: 600;
-    color: rgba(255,255,255,0.80);
+    color: rgba(255,255,255,0.78);
 }
 
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
-    padding: 4px 12px;
     left: 12px;
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.11);
-    border-radius: 6px;
-    color: rgba(255,255,255,0.88);
-    font-size: 11px;
+    top: 2px;
+    padding: 0 4px 0 0;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.78);
+    font-size: 12px;
     font-weight: 600;
+    letter-spacing: 0.15px;
 }
 
 /* ─── TABLES ────────────────────────────── */

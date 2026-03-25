@@ -21,44 +21,56 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sirstig.github.io/EncodeForge/">
   <meta property="og:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta property="og:description" content="Hardware-accelerated video encoding, AI subtitle generation, and smart media renaming. Free and open source.">
+  <meta property="og:description" content="Hardware-accelerated video encoding, AI subtitle generation, and smart media renaming. Free and open source. Built by Joshua Kac.">
   <meta property="og:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:site_name" content="EncodeForge">
+  <meta property="og:locale" content="en_US">
+  <meta property="article:author" content="https://github.com/SirStig">
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta name="twitter:description" content="Hardware-accelerated video encoding, AI subtitle generation, and smart media renaming. Free and open source.">
+  <meta name="twitter:description" content="Hardware-accelerated video encoding, AI subtitle generation, and smart media renaming. Free and open source. Built by Joshua Kac.">
   <meta name="twitter:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
+  <meta name="twitter:creator" content="@SirStig">
 
   <!-- Structured data -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "EncodeForge",
-    "applicationCategory": "MultimediaApplication",
-    "operatingSystem": "Windows, macOS, Linux",
-    "programmingLanguage": "Python",
-    "softwareVersion": "0.5.0",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "url": "https://sirstig.github.io/EncodeForge/",
-    "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/latest",
-    "codeRepository": "https://github.com/SirStig/EncodeForge",
-    "license": "https://opensource.org/licenses/MIT",
-    "description": "Free open-source PySide6 FFmpeg GUI for hardware-accelerated video encoding, AI subtitle generation, and smart media renaming.",
-    "author": {
-      "@type": "Person",
-      "name": "Joshua Kac",
-      "url": "https://github.com/SirStig"
-    },
-    "maintainer": {
-      "@type": "Person",
-      "name": "Joshua Kac",
-      "url": "https://github.com/SirStig"
-    }
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://sirstig.github.io/EncodeForge/#app",
+        "name": "EncodeForge",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "programmingLanguage": "Python",
+        "softwareVersion": "0.5.0",
+        "datePublished": "2026-03-24",
+        "dateModified": "2026-03-24",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "url": "https://sirstig.github.io/EncodeForge/",
+        "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/latest",
+        "codeRepository": "https://github.com/SirStig/EncodeForge",
+        "license": "https://opensource.org/licenses/MIT",
+        "description": "Free open-source PySide6 FFmpeg GUI for hardware-accelerated video encoding, AI subtitle generation, and smart media renaming.",
+        "keywords": "ffmpeg gui, video encoding, hardware acceleration, nvenc, ai subtitles, whisper, media renaming, pyside6, python, open source",
+        "author": { "@id": "https://github.com/SirStig#person" },
+        "maintainer": { "@id": "https://github.com/SirStig#person" }
+      },
+      {
+        "@type": "Person",
+        "@id": "https://github.com/SirStig#person",
+        "name": "Joshua Kac",
+        "url": "https://github.com/SirStig",
+        "sameAs": [
+          "https://github.com/SirStig"
+        ]
+      }
+    ]
   }
   </script>
 
@@ -134,7 +146,7 @@
       <div class="feature-card">
         <div class="feature-icon">💻</div>
         <h3>CLI Interface</h3>
-        <p>Full CLI alongside the GUI — encode, subtitle, and rename from scripts or shell with the same core logic.</p>
+        <p>CLI architecture is built and ready — encode, subtitle, and rename from scripts or shell. Full commands shipping in a future release.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🔓</div>

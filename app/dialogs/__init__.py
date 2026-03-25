@@ -4,13 +4,14 @@ Standalone dialog windows for initial setup and configuration
 """
 
 from .ffmpeg_setup_dialog import FFmpegSetupDialog
-from .settings_dialog import SettingsDialog
+from .settings_dialog import SettingsDialog, SettingsPanel
 from .update_dialog import UpdateAvailableDialog
 from .whisper_setup_dialog import WhisperSetupDialog
 
 __all__ = [
     'FFmpegSetupDialog',
     'SettingsDialog',
+    'SettingsPanel',
     'UpdateAvailableDialog',
     'WhisperSetupDialog',
 ]

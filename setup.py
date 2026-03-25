@@ -22,7 +22,8 @@ else:
 setup(
     name="encodeforge",
     version="0.5.0",
-    author="SirStig",
+    author="Joshua Kac",
+    author_email="",
     description="FFmpeg GUI for batch video encoding, AI subtitles, and media file renaming",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -60,6 +61,6 @@ setup(
         "Operating System :: OS Independent",
         "Environment :: X11 Applications :: Qt",
     ],
-    keywords="ffmpeg video encoding subtitles pyside6 qt gui",
+    keywords="ffmpeg video encoding subtitles whisper ai pyside6 qt gui hardware acceleration nvenc batch processing",
     license="MIT",
 )

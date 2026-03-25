@@ -255,16 +255,17 @@ class MainWindow(GlassmorphicMainWindow):
         sidebar_layout.addWidget(logs_btn)
         self.sidebar_buttons["logs"] = logs_btn
 
-        # Settings button — opens SettingsDialog, not an inline tab
         settings_btn = QToolButton()
         settings_btn.setText("  Settings")
         settings_btn.setIcon(qta.icon('fa5s.cogs'))
         settings_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        settings_btn.setCheckable(True)
         settings_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         settings_btn.setMinimumHeight(28)
         settings_btn.setMaximumHeight(34)
-        settings_btn.clicked.connect(self._open_settings_dialog)
+        settings_btn.clicked.connect(lambda checked: self._switch_mode(4))
         sidebar_layout.addWidget(settings_btn)
+        self.sidebar_buttons["settings"] = settings_btn
 
         # Processes button with badge
         self.processes_btn = QToolButton()
@@ -274,7 +275,7 @@ class MainWindow(GlassmorphicMainWindow):
         self.processes_btn.setCheckable(True)
         self.processes_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.processes_btn.setObjectName("processes_btn")
-        self.processes_btn.clicked.connect(lambda checked: self._switch_mode(4))
+        self.processes_btn.clicked.connect(lambda checked: self._switch_mode(5))
         self.processes_btn.setMinimumHeight(24)
         self.processes_btn.setMaximumHeight(28)
         sidebar_layout.addWidget(self.processes_btn)
@@ -300,14 +301,22 @@ class MainWindow(GlassmorphicMainWindow):
         self.subtitle_tab = SubtitleTab(self.threadpool) if SubtitleTab is not None else None
         self.metadata_tab = MetadataTab(self.threadpool) if MetadataTab is not None else None
         self.logs_tab = LogsTab() if LogsTab is not None else None
+        try:
+            from app.dialogs.settings_dialog import SettingsPanel
+
+            self.settings_panel = SettingsPanel(self, show_action_bar=True)
+            self.settings_panel.settings_changed.connect(self._on_settings_changed)
+        except Exception:
+            self.settings_panel = None
         self.processes_tab = self._create_processes_tab()
 
         self.tabs = [
-            self.encoder_tab,   # 0
-            self.subtitle_tab,  # 1
-            self.metadata_tab,  # 2
-            self.logs_tab,      # 3
-            self.processes_tab  # 4
+            self.encoder_tab,
+            self.subtitle_tab,
+            self.metadata_tab,
+            self.logs_tab,
+            self.settings_panel,
+            self.processes_tab,
         ]
         for tab in self.tabs:
             self.stacked_layout.addWidget(tab if tab is not None else QWidget())
@@ -401,13 +410,6 @@ class MainWindow(GlassmorphicMainWindow):
         except Exception:
             logger.debug("Could not connect metadata signals")
 
-    def _open_settings_dialog(self):
-        """Open the full settings dialog."""
-        from app.dialogs.settings_dialog import SettingsDialog
-        dlg = SettingsDialog(self)
-        dlg.settings_changed.connect(self._on_settings_changed)
-        dlg.exec()
-
     def _on_settings_changed(self):
         """React to settings being saved from the dialog."""
         import logging
@@ -424,8 +426,7 @@ class MainWindow(GlassmorphicMainWindow):
         for btn in self.sidebar_buttons.values():
             btn.setChecked(False)
 
-        # Map index to button key (settings opens as dialog, not inline)
-        button_keys = ["encoder", "subtitles", "metadata", "logs", "processes"]
+        button_keys = ["encoder", "subtitles", "metadata", "logs", "settings", "processes"]
 
         # Check the appropriate button
         if 0 <= idx < len(button_keys):
@@ -448,6 +449,8 @@ class MainWindow(GlassmorphicMainWindow):
             return self.metadata_tab
         if idx == 3:
             return self.logs_tab
+        if idx == 4:
+            return self.settings_panel
         return None
 
     def _handle_add_files(self):

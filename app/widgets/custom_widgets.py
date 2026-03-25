@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
     QGraphicsDropShadowEffect,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -24,6 +23,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTextEdit,
     QToolBar,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -106,28 +106,55 @@ class AutoResizeTable(QTableWidget):
 # CONTAINER WIDGETS
 # ============================================================================
 
-class GlassmorphicCard(QGroupBox):
+class GlassmorphicCard(QFrame):
     """
-    Container styled as a glass card via CSS QGroupBox rules.
-    Only sets shadow effect — no inline stylesheet.
+    Section title above a single rounded surface (styled in theme_base.css).
+    Add children via content_layout() or QFormLayout(body()).
     """
 
     def __init__(self, title="", parent=None):
-        super().__init__(title, parent)
-        self._setup_constraints()
-        self.setGraphicsEffect(self._create_shadow())
-
-    def _setup_constraints(self):
+        super().__init__(parent)
+        self.setObjectName("glass_card")
+        self.setFrameShape(QFrame.Shape.NoFrame)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding
         )
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        if title:
+            tl = QLabel(title)
+            tl.setObjectName("glass_card_title")
+            tl.setSizePolicy(
+                QSizePolicy.Policy.Preferred,
+                QSizePolicy.Policy.Fixed,
+            )
+            root.addWidget(tl)
+            root.setSpacing(8)
+        self._body = QFrame()
+        self._body.setObjectName("glass_card_body")
+        self._body.setFrameShape(QFrame.Shape.NoFrame)
+        self._body.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
+        self._body_layout = QVBoxLayout(self._body)
+        self._body_layout.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(self._body, 1)
+        self.setGraphicsEffect(self._create_shadow())
+
+    def body(self) -> QFrame:
+        return self._body
+
+    def content_layout(self) -> QVBoxLayout:
+        return self._body_layout
 
     def _create_shadow(self):
         shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
+        shadow.setBlurRadius(18)
         shadow.setColor(Qt.GlobalColor.black)
-        shadow.setOffset(0, 4)
+        shadow.setOffset(0, 3)
         return shadow
 
 

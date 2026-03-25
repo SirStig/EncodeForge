@@ -35,7 +35,6 @@ from PySide6.QtWidgets import (
 from app.widgets.custom_widgets import (
     AutoResizeTable,
     GlassmorphicButton,
-    GlassmorphicCard,
     StyledCheckBox,
     StyledComboBox,
     StyledLabel,

@@ -13,6 +13,57 @@ from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 logger = logging.getLogger(__name__)
 
 
+def merge_encoder_ui_into_conversion_settings(settings, encoder_settings: Dict[str, Any]):
+    """
+    Apply encoder-tab UI settings dict onto a ConversionSettings instance (mutates in place).
+    """
+    if "codec" in encoder_settings:
+        codec_map = {
+            "H.264": "libx264",
+            "H.265/HEVC": "libx265",
+            "AV1": "libaom-av1",
+            "VP9": "libvpx-vp9",
+            "Copy": "copy",
+            "Auto": "libx264",
+        }
+        settings.video_codec_fallback = codec_map.get(encoder_settings["codec"], "libx264")
+    if "preset" in encoder_settings:
+        settings.video_preset = encoder_settings["preset"]
+    if "quality" in encoder_settings:
+        quality_str = encoder_settings["quality"]
+        if "CQ" in quality_str:
+            cq_value = int(quality_str.split("CQ")[1].strip().rstrip(")"))
+            settings.video_crf = cq_value
+    if "hw_accel" in encoder_settings:
+        settings.use_nvenc = encoder_settings["hw_accel"]
+    if encoder_settings.get("hw_accel") and "codec" in encoder_settings:
+        codec = encoder_settings["codec"]
+        if codec == "H.265/HEVC":
+            settings.nvenc_codec = "hevc_nvenc"
+        else:
+            settings.nvenc_codec = "h264_nvenc"
+    if "normalize_audio" in encoder_settings:
+        settings.normalize_audio = encoder_settings["normalize_audio"]
+    if "subtitle_handling" in encoder_settings:
+        settings.subtitle_handling = encoder_settings["subtitle_handling"]
+    if "delete_original" in encoder_settings:
+        settings.delete_original = encoder_settings["delete_original"]
+    if "audio_codec" in encoder_settings:
+        settings.audio_codec = encoder_settings["audio_codec"]
+    if "audio_bitrate" in encoder_settings and encoder_settings["audio_bitrate"]:
+        settings.audio_bitrate = encoder_settings["audio_bitrate"]
+    if "format" in encoder_settings:
+        format_map = {
+            "MP4": "mp4",
+            "MKV": "mkv",
+            "WebM": "webm",
+            "AVI": "avi",
+            "MOV": "mov",
+        }
+        settings.output_format = format_map.get(encoder_settings["format"], "mp4")
+    return settings
+
+
 def _renamer_preview_settings_from_ui(renaming_settings: Dict[str, Any]) -> Dict[str, Any]:
     d: Dict[str, Any] = {}
     prov = renaming_settings.get("provider")
@@ -252,55 +303,11 @@ class EncoderWorker(Worker):
         from utils.settings_manager import get_settings_manager
 
         sm = get_settings_manager()
-        settings = deepcopy(sm.get_merged_conversion_settings())
+        settings = merge_encoder_ui_into_conversion_settings(
+            deepcopy(sm.get_merged_conversion_settings()),
+            encoder_settings,
+        )
 
-        if 'codec' in encoder_settings:
-            codec_map = {
-                'H.264': 'libx264',
-                'H.265/HEVC': 'libx265', 
-                'AV1': 'libaom-av1',
-                'VP9': 'libvpx-vp9',
-                'Copy': 'copy',
-                'Auto': 'libx264'
-            }
-            settings.video_codec_fallback = codec_map.get(encoder_settings['codec'], 'libx264')
-        if 'preset' in encoder_settings:
-            settings.video_preset = encoder_settings['preset']
-        if 'quality' in encoder_settings:
-            # Parse quality string like "Medium (CQ 23)" to get CQ value
-            quality_str = encoder_settings['quality']
-            if 'CQ' in quality_str:
-                cq_value = int(quality_str.split('CQ')[1].strip().rstrip(')'))
-                settings.video_crf = cq_value
-        if 'hw_accel' in encoder_settings:
-            settings.use_nvenc = encoder_settings['hw_accel']
-        # Fix: select correct HW variant based on codec choice
-        if encoder_settings.get('hw_accel') and 'codec' in encoder_settings:
-            codec = encoder_settings['codec']
-            if codec == 'H.265/HEVC':
-                settings.nvenc_codec = 'hevc_nvenc'
-            else:
-                settings.nvenc_codec = 'h264_nvenc'
-        if 'normalize_audio' in encoder_settings:
-            settings.normalize_audio = encoder_settings['normalize_audio']
-        if 'subtitle_handling' in encoder_settings:
-            settings.subtitle_handling = encoder_settings['subtitle_handling']
-        if 'delete_original' in encoder_settings:
-            settings.delete_original = encoder_settings['delete_original']
-        if 'audio_codec' in encoder_settings:
-            settings.audio_codec = encoder_settings['audio_codec']
-        if 'audio_bitrate' in encoder_settings and encoder_settings['audio_bitrate']:
-            settings.audio_bitrate = encoder_settings['audio_bitrate']
-        if 'format' in encoder_settings:
-            format_map = {
-                'MP4': 'mp4',
-                'MKV': 'mkv', 
-                'WebM': 'webm',
-                'AVI': 'avi',
-                'MOV': 'mov'
-            }
-            settings.output_format = format_map.get(encoder_settings['format'], 'mp4')
-        
         core = EncodeForgeCore(settings=settings)
         self.conversion_handler = core.conversion_handler
         
