@@ -29,14 +29,12 @@ class UpdateToast(QFrame):
         root.setSpacing(10)
 
         title = StyledLabel("Update available")
-        title.setStyleSheet(
-            "font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.95);"
-        )
+        title.setObjectName("update_toast_title")
         root.addWidget(title)
 
         self._subtitle = StyledLabel("")
+        self._subtitle.setObjectName("update_toast_subtitle")
         self._subtitle.setWordWrap(True)
-        self._subtitle.setStyleSheet("color: rgba(255,255,255,0.65); font-size: 12px;")
         root.addWidget(self._subtitle)
 
         row = QHBoxLayout()

@@ -4,6 +4,7 @@ Glassmorphic UI components — styling delegated to theme_base.css
 """
 
 from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -33,9 +34,8 @@ from PySide6.QtWidgets import (
 class AutoResizeTable(QTableWidget):
     """
     Intelligent table with proper column sizing and constraints.
-    - Auto-fills width without horizontal scrollbars
-    - Manual column resizing (Interactive mode for first N-1 columns)
-    - Last column stretches to fill remaining space
+    - Non-last columns size to contents; last column stretches
+    - Horizontal scrollbar appears when content exceeds viewport
     - Proper vertical sizing with QSizePolicy
     """
 
@@ -50,7 +50,7 @@ class AutoResizeTable(QTableWidget):
             QSizePolicy.Policy.Expanding
         )
 
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -58,8 +58,8 @@ class AutoResizeTable(QTableWidget):
         self.setShowGrid(False)
 
         self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(26)
-        self.verticalHeader().setMinimumSectionSize(22)
+        self.verticalHeader().setDefaultSectionSize(22)
+        self.verticalHeader().setMinimumSectionSize(20)
 
         self.setMinimumHeight(100)
 
@@ -79,14 +79,17 @@ class AutoResizeTable(QTableWidget):
         header.setMinimumSectionSize(40)
         header.setDefaultSectionSize(80)
 
-        for i in range(len(headers)):
-            header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+        n = len(headers)
+        for i in range(n):
+            if i == n - 1:
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
+            else:
+                header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
 
         if initial_widths:
             for i, width in enumerate(initial_widths):
                 if i < len(headers):
                     header.resizeSection(i, width)
-                    header.setMaximumSectionSize(width + 50)
 
     def enableDragDrop(self, drag_enter_callback=None, drop_callback=None):
         """Enable drag and drop with custom handlers."""
@@ -164,7 +167,7 @@ class GlassmorphicButton(QPushButton):
         super().__init__(text, parent)
         if icon:
             self.setIcon(icon)
-            self.setIconSize(QSize(14, 14))
+            self.setIconSize(QSize(12, 12))
         self._setup_constraints()
 
     def _setup_constraints(self):
@@ -172,11 +175,18 @@ class GlassmorphicButton(QPushButton):
             QSizePolicy.Policy.Minimum,
             QSizePolicy.Policy.Fixed
         )
-        self.setMinimumHeight(28)
+        self.setMinimumHeight(24)
         text = self.text()
+        fm = QFontMetrics(self.font())
+        has_icon = self.icon() is not None and not self.icon().isNull()
         if text:
-            min_w = max(70, len(text) * 7 + 24)
-            self.setMinimumWidth(min_w)
+            text_w = fm.horizontalAdvance(text)
+            pad = 24
+            if has_icon:
+                pad = 28 + self.iconSize().width() + 6
+            self.setMinimumWidth(max(70, text_w + pad))
+        elif has_icon:
+            self.setMinimumWidth(max(28, self.iconSize().width() + 28))
         else:
             self.setMinimumWidth(28)
 
@@ -208,8 +218,11 @@ class StyledComboBox(QComboBox):
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Fixed
         )
-        self.setMinimumHeight(30)
-        self.setMinimumWidth(80)
+        self.setMinimumHeight(22)
+        self.setMinimumWidth(72)
+        self.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
 
 
 class StyledLineEdit(QLineEdit):
@@ -229,7 +242,7 @@ class StyledLineEdit(QLineEdit):
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Fixed
         )
-        self.setMinimumHeight(30)
+        self.setMinimumHeight(22)
 
 
 class StyledSpinBox(QSpinBox):
@@ -247,8 +260,8 @@ class StyledSpinBox(QSpinBox):
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Fixed
         )
-        self.setMinimumHeight(30)
-        self.setMinimumWidth(80)
+        self.setMinimumHeight(22)
+        self.setMinimumWidth(72)
 
 
 class StyledTextEdit(QTextEdit):
@@ -284,7 +297,7 @@ class StyledCheckBox(QCheckBox):
             QSizePolicy.Policy.Minimum,
             QSizePolicy.Policy.Fixed
         )
-        self.setMinimumHeight(24)
+        self.setMinimumHeight(22)
 
 
 # ============================================================================
@@ -331,7 +344,7 @@ class GlassmorphicToolBar(QToolBar):
         self._setup_constraints()
 
     def _setup_constraints(self):
-        self.setMinimumHeight(44)
+        self.setMinimumHeight(34)
         self.setIconSize(QSize(16, 16))
 
 
@@ -346,7 +359,7 @@ class GlassmorphicStatusBar(QStatusBar):
         self._setup_constraints()
 
     def _setup_constraints(self):
-        self.setMinimumHeight(28)
+        self.setMinimumHeight(24)
         self.setSizeGripEnabled(True)
 
 
@@ -362,6 +375,9 @@ class GlassmorphicMainWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowFlags(
+            Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint
+        )
 
 
 # ============================================================================
@@ -407,7 +423,6 @@ class FormRow(QWidget):
 
         label = StyledLabel(label_text)
         label.setMinimumWidth(100)
-        label.setMaximumWidth(150)
         label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         layout.addWidget(label)

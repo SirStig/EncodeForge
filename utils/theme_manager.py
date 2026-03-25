@@ -7,8 +7,10 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QFile, QTextStream
 from PySide6.QtWidgets import QApplication
+
+from utils.app_stylesheet import build_app_stylesheet
+from utils.design_tokens import default_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +45,18 @@ class ThemeManager:
             if not theme_file.exists():
                 logger.warning(f"Base theme file not found: {theme_file}")
                 return False
-            
-            css = self._read_css_file(theme_file)
-            if css:
-                app = QApplication.instance()
-                if app:
-                    app.setStyleSheet(css)
-                    self.loaded_styles['base'] = css
-                    ThemeManager._styles_loaded = True
-                    logger.info(f"Base glassmorphism theme loaded successfully")
-                    return True
-            
-            logger.error("Failed to read base theme CSS")
+
+            tokens = default_tokens()
+            css = build_app_stylesheet(tokens)
+            app = QApplication.instance()
+            if app:
+                app.setStyleSheet(css)
+                self.loaded_styles["base"] = css
+                ThemeManager._styles_loaded = True
+                logger.info("Base glassmorphism theme loaded successfully")
+                return True
+
+            logger.error("Failed to build base theme stylesheet")
             return False
             
         except Exception as e:
@@ -98,41 +100,8 @@ class ThemeManager:
             return None
     
     def apply_dialog_theme(self, dialog) -> None:
-        """
-        Apply glassmorphism theme to a dialog window.
-        
-        Args:
-            dialog: QDialog instance to style
-        """
-        try:
-            # Dialogs inherit from base theme, but we can add dialog-specific enhancements
-            dialog_css = """
-                QDialog {
-                    background-color: rgba(15, 15, 15, 0.95);
-                    border: 1px solid rgba(255, 255, 255, 0.15);
-                    border-radius: 12px;
-                }
-                
-                QDialog QLabel#title_label {
-                    font-size: 18px;
-                    font-weight: 600;
-                    color: #ffffff;
-                    padding: 12px;
-                }
-                
-                QDialog QLabel#subtitle_label {
-                    font-size: 13px;
-                    color: #cccccc;
-                    padding: 4px 12px;
-                }
-            """
-            
-            current_style = dialog.styleSheet()
-            dialog.setStyleSheet(current_style + "\n" + dialog_css)
-            logger.debug(f"Applied dialog theme to {dialog.__class__.__name__}")
-            
-        except Exception as e:
-            logger.error(f"Error applying dialog theme: {e}")
+        """No-op: QDialog / QMessageBox chrome lives in the global stylesheet (build_app_stylesheet)."""
+        _ = dialog
     
     def _read_css_file(self, file_path: Path) -> Optional[str]:
         """
@@ -168,23 +137,19 @@ class ThemeManager:
     
     @staticmethod
     def get_accent_color() -> str:
-        """Get the current accent color."""
-        return "#0a84ff"
-    
+        return default_tokens().accent
+
     @staticmethod
     def get_success_color() -> str:
-        """Get the success color."""
-        return "#30d158"
-    
+        return "#4ade80"
+
     @staticmethod
     def get_warning_color() -> str:
-        """Get the warning color."""
-        return "#ff9f0a"
-    
+        return "#fbbf24"
+
     @staticmethod
     def get_error_color() -> str:
-        """Get the error color."""
-        return "#ff453a"
+        return "#f87171"
     
     @staticmethod
     def configure_table_columns(table_widget) -> None:

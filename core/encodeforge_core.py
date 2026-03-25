@@ -298,10 +298,18 @@ class EncodeForgeCore:
         self._ensure_handlers_initialized()
         return self.renaming_handler.preview_rename(file_paths, settings_dict)
     
-    def rename_files(self, file_paths: List[str], dry_run: bool = False, create_backup: bool = False) -> Dict:
+    def rename_files(
+        self,
+        file_paths: List[str],
+        dry_run: bool = False,
+        create_backup: bool = False,
+        preview_settings: Optional[Dict] = None,
+    ) -> Dict:
         """Rename media files using metadata"""
         self._ensure_handlers_initialized()
-        return self.renaming_handler.rename_files(file_paths, dry_run, create_backup)
+        return self.renaming_handler.rename_files(
+            file_paths, dry_run, create_backup, preview_settings=preview_settings
+        )
     
     # =======================
     # Conversion Operations

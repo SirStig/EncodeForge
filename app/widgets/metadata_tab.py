@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -23,8 +25,10 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
+    QStyle,
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
@@ -76,26 +80,49 @@ class MetadataTab(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- Toolbar container ---
         toolbar_widget = QWidget()
         toolbar_widget.setObjectName("encoder_toolbar")
         toolbar_main = QVBoxLayout(toolbar_widget)
-        toolbar_main.setContentsMargins(12, 8, 12, 8)
+        toolbar_main.setContentsMargins(0, 0, 0, 0)
+        toolbar_main.setSpacing(0)
 
-        # Top bar: all controls and settings
-        top_bar = QHBoxLayout()
-        from PySide6.QtWidgets import QStyle
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
 
-        # File management buttons
+        inner = QWidget()
+        inner_layout = QVBoxLayout(inner)
+        inner_layout.setContentsMargins(10, 5, 10, 6)
+        inner_layout.setSpacing(8)
+
+        btn_row = QHBoxLayout()
         self.remove_btn = QPushButton("Remove")
         self.remove_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
         self.clear_btn = QPushButton("Clear All")
         self.clear_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
-        top_bar.addWidget(self.remove_btn)
-        top_bar.addWidget(self.clear_btn)
+        btn_row.addWidget(self.remove_btn)
+        btn_row.addWidget(self.clear_btn)
+        btn_row.addStretch()
+        self.fetch_metadata_btn = QPushButton("Fetch Metadata")
+        self.preview_btn = QPushButton("Preview")
+        self.preview_btn.setEnabled(False)
+        self.rename_btn = QPushButton("Apply Rename")
+        self.rename_btn.setEnabled(False)
+        self.undo_btn = QPushButton("Undo Rename")
+        self.undo_btn.setEnabled(False)
+        btn_row.addWidget(self.fetch_metadata_btn)
+        btn_row.addWidget(self.preview_btn)
+        btn_row.addWidget(self.rename_btn)
+        btn_row.addWidget(self.undo_btn)
+        inner_layout.addLayout(btn_row)
 
-        # Provider selection
-        top_bar.addWidget(StyledLabel("Provider:"))
+        align_right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(8)
+        grid.addWidget(StyledLabel("Provider:"), 0, 0, align_right)
         self.provider_combo = StyledComboBox()
         self.provider_combo.addItems([
             "TMDB (The Movie Database)",
@@ -107,53 +134,42 @@ class MetadataTab(QWidget):
             "Trakt",
             "OMDB"
         ])
-        top_bar.addWidget(self.provider_combo)
-
-        # Language selection
-        top_bar.addWidget(StyledLabel("Language:"))
+        self.provider_combo.setMinimumContentsLength(26)
+        grid.addWidget(self.provider_combo, 0, 1)
+        grid.addWidget(StyledLabel("Language:"), 0, 2, align_right)
         self.language_combo = StyledComboBox()
         self.language_combo.addItems(["English", "Japanese", "Spanish", "French", "German", "Other"])
-        top_bar.addWidget(self.language_combo)
-
-        # API Key input
-        top_bar.addWidget(StyledLabel("API Key:"))
+        self.language_combo.setMinimumContentsLength(10)
+        grid.addWidget(self.language_combo, 0, 3)
+        grid.addWidget(StyledLabel("API Key:"), 1, 0, align_right)
         self.api_key_input = StyledLineEdit()
         self.api_key_input.setPlaceholderText("API Key (if required)")
-        top_bar.addWidget(self.api_key_input)
-
-        # Pattern input
-        top_bar.addWidget(StyledLabel("Pattern:"))
+        grid.addWidget(self.api_key_input, 1, 1, 1, 3)
+        grid.addWidget(StyledLabel("Pattern:"), 2, 0, align_right)
         self.pattern_input = StyledLineEdit()
         self.pattern_input.setPlaceholderText("Naming pattern, e.g. {title} - {season}{episode}")
         self.pattern_input.setText("{title} - {season}{episode} - {quality}")
-        top_bar.addWidget(self.pattern_input)
+        grid.addWidget(self.pattern_input, 2, 1, 1, 3)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
+        inner_layout.addLayout(grid)
 
-        # Options checkboxes
         self.replace_spaces_check = StyledCheckBox("Dots for spaces")
         self.lowercase_check = StyledCheckBox("Lowercase")
         self.remove_special_check = StyledCheckBox("No special chars")
         self.preserve_extension_check = StyledCheckBox("Keep extension")
         self.preserve_extension_check.setChecked(True)
-        top_bar.addWidget(self.replace_spaces_check)
-        top_bar.addWidget(self.lowercase_check)
-        top_bar.addWidget(self.remove_special_check)
-        top_bar.addWidget(self.preserve_extension_check)
+        chk_row = QHBoxLayout()
+        chk_row.setSpacing(12)
+        chk_row.addWidget(self.replace_spaces_check)
+        chk_row.addWidget(self.lowercase_check)
+        chk_row.addWidget(self.remove_special_check)
+        chk_row.addWidget(self.preserve_extension_check)
+        chk_row.addStretch()
+        inner_layout.addLayout(chk_row)
 
-        # Action buttons
-        self.fetch_metadata_btn = QPushButton("Fetch Metadata")
-        self.preview_btn = QPushButton("Preview")
-        self.preview_btn.setEnabled(False)
-        self.rename_btn = QPushButton("Apply Rename")
-        self.rename_btn.setEnabled(False)
-        self.undo_btn = QPushButton("Undo Rename")
-        self.undo_btn.setEnabled(False)
-        top_bar.addWidget(self.fetch_metadata_btn)
-        top_bar.addWidget(self.preview_btn)
-        top_bar.addWidget(self.rename_btn)
-        top_bar.addWidget(self.undo_btn)
-        top_bar.addStretch()
-
-        toolbar_main.addLayout(top_bar)
+        scroll.setWidget(inner)
+        toolbar_main.addWidget(scroll)
         main_layout.addWidget(toolbar_widget)
 
         # --- Content area ---
@@ -432,7 +448,7 @@ class MetadataTab(QWidget):
             settings = {
                 'provider': provider,
                 'api_key': api_key,
-                'dry_run': True,  # Just fetch, don't rename yet
+                'preview_only': True,
                 'pattern': self.pattern_input.text() if hasattr(self, 'pattern_input') else '{title} - {season}{episode}'
             }
             
@@ -463,22 +479,37 @@ class MetadataTab(QWidget):
         meta_row = self.metadata_table.rowCount()
         self.metadata_table.insertRow(meta_row)
         
-        # Format metadata result
-        if isinstance(result, dict):
-            # Extract useful info
-            title = result.get('title', 'Unknown')
-            year = result.get('year', '')
-            season = result.get('season', '')
-            episode = result.get('episode', '')
+        meta_dict: Dict[str, Any] = {}
+        if isinstance(result, dict) and result.get("status") == "success":
+            md = result.get("metadata") or []
+            if md and isinstance(md[0], dict):
+                meta_dict = md[0]
+        
+        if isinstance(result, dict) and result.get("status") == "success" and not meta_dict:
+            meta_item = QTableWidgetItem("No metadata found")
+            self.metadata_table.setItem(meta_row, 0, meta_item)
+            return
+        
+        if isinstance(result, dict) and meta_dict:
+            title = meta_dict.get('title', 'Unknown')
+            year = meta_dict.get('year', '')
+            season = meta_dict.get('season', '')
+            episode = meta_dict.get('episode', '')
             
             meta_text = f"{title}"
             if year:
                 meta_text += f" ({year})"
-            if season and episode:
-                meta_text += f" - S{season:02d}E{episode:02d}"
+            try:
+                if season != '' and episode != '':
+                    meta_text += f" - S{int(season):02d}E{int(episode):02d}"
+            except (TypeError, ValueError):
+                if season and episode:
+                    meta_text += f" - S{season}E{episode}"
             
             meta_item = QTableWidgetItem(meta_text)
-            meta_item.setData(Qt.ItemDataRole.UserRole, result)
+            meta_item.setData(Qt.ItemDataRole.UserRole, meta_dict)
+        elif isinstance(result, dict) and result.get("status") == "error":
+            meta_item = QTableWidgetItem(f"Error: {result.get('message', 'unknown')}")
         else:
             meta_item = QTableWidgetItem(str(result))
         

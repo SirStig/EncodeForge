@@ -5,13 +5,21 @@ Persistent application settings with validation and defaults
 
 import json
 import logging
-from dataclasses import asdict, dataclass, field
+from copy import deepcopy
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from core import path_manager
+from core.handlers.models import ConversionSettings
 
 logger = logging.getLogger(__name__)
+
+
+def _conversion_from_dict(data: Dict[str, Any]) -> ConversionSettings:
+    valid = {f.name for f in fields(ConversionSettings)}
+    kwargs = {k: v for k, v in data.items() if k in valid}
+    return ConversionSettings(**kwargs)
 
 
 @dataclass
@@ -79,8 +87,8 @@ class ApplicationSettings:
     max_threads: int = 4
     recent_files_limit: int = 10
     language: str = "en"
-    ffmpeg_path: str = ""  # Path to FFmpeg executable
-    ffprobe_path: str = ""  # Path to FFprobe executable
+    ffmpeg_path: str = ""
+    ffprobe_path: str = ""
 
 
 class SettingsManager:
@@ -113,11 +121,22 @@ class SettingsManager:
         self.renamer = RenamerSettings()
         self.ui = UISettings()
         self.application = ApplicationSettings()
+        self.conversion = ConversionSettings()
         
         # Load settings from disk
         self.load()
         
         logger.info("Settings manager initialized")
+
+    def get_merged_conversion_settings(self) -> ConversionSettings:
+        c = deepcopy(self.conversion)
+        ff = (self.application.ffmpeg_path or "").strip()
+        if ff:
+            c.ffmpeg_path = ff
+        fp = (self.application.ffprobe_path or "").strip()
+        if fp:
+            c.ffprobe_path = fp
+        return c
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert all settings to dictionary."""
@@ -127,6 +146,7 @@ class SettingsManager:
             'renamer': asdict(self.renamer),
             'ui': asdict(self.ui),
             'application': asdict(self.application),
+            'conversion': asdict(self.conversion),
             'version': '0.5.0',
         }
     
@@ -143,6 +163,8 @@ class SettingsManager:
                 self.ui = UISettings(**data['ui'])
             if 'application' in data:
                 self.application = ApplicationSettings(**data['application'])
+            if 'conversion' in data and isinstance(data['conversion'], dict):
+                self.conversion = _conversion_from_dict(data['conversion'])
         except Exception as e:
             logger.error(f"Error loading settings from dict: {e}")
             logger.info("Using default settings")
@@ -201,6 +223,7 @@ class SettingsManager:
         self.renamer = RenamerSettings()
         self.ui = UISettings()
         self.application = ApplicationSettings()
+        self.conversion = ConversionSettings()
         
         self.save()
         logger.info("Reset all settings to defaults")
@@ -210,7 +233,7 @@ class SettingsManager:
         Reset specific settings section to defaults.
         
         Args:
-            section: Section name (encoder, subtitle, renamer, ui, application)
+            section: Section name (encoder, subtitle, renamer, ui, application, conversion)
         """
         if section == 'encoder':
             self.encoder = EncoderSettings()
@@ -222,6 +245,8 @@ class SettingsManager:
             self.ui = UISettings()
         elif section == 'application':
             self.application = ApplicationSettings()
+        elif section == 'conversion':
+            self.conversion = ConversionSettings()
         
         self.save()
         logger.info(f"Reset {section} settings to defaults")

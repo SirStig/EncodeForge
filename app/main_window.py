@@ -17,12 +17,14 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QSizePolicy,
     QStackedLayout,
+    QMenu,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from app import __version__ as APP_VERSION
+from app.widgets.app_title_bar import AppTitleBar
 from app.widgets.custom_widgets import (
     GlassmorphicButton,
     GlassmorphicMainWindow,
@@ -59,14 +61,15 @@ except Exception:
 class MainWindow(GlassmorphicMainWindow):
     def __init__(self):
         super().__init__()
+        self._title_bar = None
         self.setWindowTitle("EncodeForge")
         
         # Enable transparency for glassmorphism effect
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)  # Keep opaque for now
         
         # Set proper window sizing with responsive constraints
-        self.setMinimumSize(1250, 700)  # Reasonable minimum for toolbar and content
-        self.resize(1300, 750)  # Standard default size
+        self.setMinimumSize(1000, 640)
+        self.resize(1300, 750)
         
         # Initialize thread pool
         from PySide6.QtCore import QThreadPool
@@ -91,12 +94,71 @@ class MainWindow(GlassmorphicMainWindow):
         self._create_statusbar()
         QTimer.singleShot(2000, self._maybe_auto_check_updates)
         logger.debug("Main window initialized - theme loaded at startup")
+
+    def _install_title_bar_menu(self) -> None:
+        menu = QMenu(self)
+        menu.addAction("Check for Updates…", self._manual_check_updates)
+        menu.addSeparator()
+        act_docs = menu.addAction("Documentation")
+        act_docs.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://github.com/SirStig/EncodeForge#readme"))
+        )
+        act_issue = menu.addAction("Report an Issue…")
+        act_issue.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://github.com/SirStig/EncodeForge/issues"))
+        )
+        menu.addSeparator()
+        menu.addAction("Open Logs Folder", self._open_logs_folder)
+        menu.addAction("Open Settings Folder", self._open_settings_folder)
+        menu.addSeparator()
+        menu.addAction("About EncodeForge", self._show_about)
+        self._title_bar.set_menu(menu)
+
+    def _open_logs_folder(self) -> None:
+        from core.path_manager import get_logs_dir
+
+        p = get_logs_dir()
+        p.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(p.resolve())))
+
+    def _open_settings_folder(self) -> None:
+        from core.path_manager import get_settings_file
+
+        p = get_settings_file().parent.resolve()
+        p.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
+
+    def _show_about(self) -> None:
+        QMessageBox.about(
+            self,
+            "About EncodeForge",
+            f"<h3>EncodeForge</h3><p>Version {APP_VERSION}</p>"
+            "<p>Desktop media toolkit for encoding, subtitles, and renaming.</p>"
+            "<p><a href=\"https://github.com/SirStig/EncodeForge\">GitHub</a></p>",
+        )
     
+    def setWindowTitle(self, title: str) -> None:
+        super().setWindowTitle(title)
+        if self._title_bar is not None:
+            self._title_bar.set_title(title)
+
     def _setup_ui(self):
         central = QWidget()
-        central.setStyleSheet("background-color: #141416;")
+        central.setObjectName("central_root")
         self.setCentralWidget(central)
-        main_layout = QHBoxLayout(central)
+        outer = QVBoxLayout(central)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self._title_bar = AppTitleBar(self, title="EncodeForge")
+        outer.addWidget(self._title_bar)
+        self._install_title_bar_menu()
+
+        body = QWidget()
+        body.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        outer.addWidget(body, 1)
+
+        main_layout = QHBoxLayout(body)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
@@ -110,9 +172,9 @@ class MainWindow(GlassmorphicMainWindow):
 
         # App name / logo area
         app_name = StyledLabel("EncodeForge")
+        app_name.setObjectName("sidebar_app_title")
         app_name.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        app_name.setStyleSheet("font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.90); padding: 4px 2px 12px 2px; letter-spacing: 0.3px;")
-        app_name.setMinimumHeight(36)
+        app_name.setMinimumHeight(32)
         sidebar_layout.addWidget(app_name)
 
         # Modes section
@@ -136,8 +198,8 @@ class MainWindow(GlassmorphicMainWindow):
             btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
             btn.setCheckable(True)
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-            btn.setMinimumHeight(28)
-            btn.setMaximumHeight(34)
+            btn.setMinimumHeight(24)
+            btn.setMaximumHeight(28)
             btn.clicked.connect(lambda checked, i=idx: self._switch_mode(i))
             sidebar_layout.addWidget(btn)
             self.sidebar_buttons[key] = btn
@@ -155,8 +217,8 @@ class MainWindow(GlassmorphicMainWindow):
         add_files_btn.setIcon(qta.icon('fa5s.file'))
         add_files_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         add_files_btn.clicked.connect(self._handle_add_files)
-        add_files_btn.setMinimumHeight(28)
-        add_files_btn.setMaximumHeight(34)
+        add_files_btn.setMinimumHeight(24)
+        add_files_btn.setMaximumHeight(28)
         sidebar_layout.addWidget(add_files_btn)
 
         add_folder_btn = QToolButton()
@@ -164,8 +226,8 @@ class MainWindow(GlassmorphicMainWindow):
         add_folder_btn.setIcon(qta.icon('fa5s.folder'))
         add_folder_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         add_folder_btn.clicked.connect(self._handle_add_folder)
-        add_folder_btn.setMinimumHeight(28)
-        add_folder_btn.setMaximumHeight(34)
+        add_folder_btn.setMinimumHeight(24)
+        add_folder_btn.setMaximumHeight(28)
         sidebar_layout.addWidget(add_folder_btn)
 
         sidebar_layout.addSpacing(4)
@@ -187,8 +249,8 @@ class MainWindow(GlassmorphicMainWindow):
         logs_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         logs_btn.setCheckable(True)
         logs_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        logs_btn.setMinimumHeight(28)
-        logs_btn.setMaximumHeight(34)
+        logs_btn.setMinimumHeight(24)
+        logs_btn.setMaximumHeight(28)
         logs_btn.clicked.connect(lambda checked: self._switch_mode(3))
         sidebar_layout.addWidget(logs_btn)
         self.sidebar_buttons["logs"] = logs_btn
@@ -213,8 +275,8 @@ class MainWindow(GlassmorphicMainWindow):
         self.processes_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.processes_btn.setObjectName("processes_btn")
         self.processes_btn.clicked.connect(lambda checked: self._switch_mode(4))
-        self.processes_btn.setMinimumHeight(28)
-        self.processes_btn.setMaximumHeight(34)
+        self.processes_btn.setMinimumHeight(24)
+        self.processes_btn.setMaximumHeight(28)
         sidebar_layout.addWidget(self.processes_btn)
         self.sidebar_buttons["processes"] = self.processes_btn
 
@@ -421,6 +483,7 @@ class MainWindow(GlassmorphicMainWindow):
     # -------------------- Status & callbacks --------------------
     def _create_statusbar(self):
         self.statusbar = GlassmorphicStatusBar()
+        self.statusbar.setObjectName("app_bottom_bar")
         self.setStatusBar(self.statusbar)
         self.status_label = StyledLabel("Ready")
         self.statusbar.addWidget(self.status_label)
@@ -580,10 +643,16 @@ class MainWindow(GlassmorphicMainWindow):
         if parent is None:
             return
         m = 24
+        sb = self.statusBar()
+        if sb is not None and sb.isVisible():
+            sb_h = sb.height()
+        else:
+            sb_h = 24
+        bottom_reserve = sb_h + 40
         self._update_toast.adjustSize()
         self._update_toast.move(
             max(0, parent.width() - self._update_toast.width() - m),
-            max(0, parent.height() - self._update_toast.height() - m),
+            max(0, parent.height() - self._update_toast.height() - bottom_reserve),
         )
 
     def resizeEvent(self, event):

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 EncodeForge CLI
-Command-line interface for batch video processing
-Keeping CLI support while removing WebUI
+
+v0.5.0 ships the desktop app only. Commands other than ``gui`` are placeholders
+and exit with a notice; full CLI may return in a later release.
 """
 
 import sys
@@ -14,7 +15,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app import __version__ as APP_VERSION
-from core import ffmpeg_manager, subtitle_manager, metadata_grabber
 
 # Setup logging
 try:
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 @click.group()
 @click.version_option(version=APP_VERSION)
 def cli():
-    """EncodeForge - FFmpeg GUI and CLI for video encoding, subtitles, and renaming"""
+    """EncodeForge — desktop app (v0.5.0); CLI encode/subtitle/rename not implemented yet."""
     pass
 
 
@@ -44,18 +44,12 @@ def cli():
 @click.option('--use-qsv', is_flag=True, help='Use Intel Quick Sync hardware acceleration')
 @click.option('--crf', type=int, default=23, help='Quality (CRF) value (0-51, lower is better)')
 def encode(input_path, output, codec, preset, use_nvenc, use_qsv, crf):
-    """Encode video files with FFmpeg"""
-    logger.info(f"Encoding {input_path} with {codec} codec")
-    click.echo(f"Starting encoding: {input_path}")
-    click.echo(f"Codec: {codec}, Preset: {preset}, CRF: {crf}")
-    
-    if use_nvenc:
-        click.echo("Using NVIDIA NVENC hardware acceleration")
-    elif use_qsv:
-        click.echo("Using Intel Quick Sync hardware acceleration")
-    
-    # TODO: Integrate with existing core.ffmpeg_manager
-    click.echo("Encoding complete!")
+    """Encode video files with FFmpeg (not available in v0.5.0 — use the GUI)."""
+    click.echo(
+        click.style("The encode command is not implemented in v0.5.0.", fg="yellow", bold=True)
+    )
+    click.echo("Use the desktop application: python main.py   or   python cli.py gui")
+    raise SystemExit(2)
 
 
 @cli.command()
@@ -65,18 +59,12 @@ def encode(input_path, output, codec, preset, use_nvenc, use_qsv, crf):
 @click.option('--model', default='base', help='Whisper model (tiny, base, small, medium, large)')
 @click.option('--provider', help='Subtitle provider (opensubtitles, addic7ed, etc.)')
 def subtitle(input_path, language, generate, model, provider):
-    """Download or generate subtitles for video files"""
-    logger.info(f"Processing subtitles for {input_path}")
-    click.echo(f"Processing: {input_path}")
-    
-    if generate:
-        click.echo(f"Generating subtitles with Whisper ({model} model)")
-        # TODO: Integrate with core.subtitle_manager.whisper_manager
-    else:
-        click.echo(f"Searching for {language} subtitles using {provider or 'all providers'}")
-        # TODO: Integrate with core.subtitle_manager
-    
-    click.echo("Subtitle processing complete!")
+    """Download or generate subtitles (not available in v0.5.0 — use the GUI)."""
+    click.echo(
+        click.style("The subtitle command is not implemented in v0.5.0.", fg="yellow", bold=True)
+    )
+    click.echo("Use the desktop application: python main.py   or   python cli.py gui")
+    raise SystemExit(2)
 
 
 @cli.command()
@@ -87,16 +75,12 @@ def subtitle(input_path, language, generate, model, provider):
 @click.option('--preview', is_flag=True, help='Preview changes without renaming')
 @click.option('--type', type=click.Choice(['movie', 'tv', 'anime', 'auto']), default='auto')
 def rename(input_path, tmdb_key, tvdb_key, pattern, preview, type):
-    """Rename media files using metadata providers"""
-    logger.info(f"Renaming files in {input_path}")
-    click.echo(f"Processing: {input_path}")
-    click.echo(f"Content type: {type}")
-    
-    if preview:
-        click.echo("Preview mode - no files will be renamed")
-    
-    # TODO: Integrate with core.metadata_grabber
-    click.echo("Renaming complete!")
+    """Rename media files using metadata (not available in v0.5.0 — use the GUI)."""
+    click.echo(
+        click.style("The rename command is not implemented in v0.5.0.", fg="yellow", bold=True)
+    )
+    click.echo("Use the desktop application: python main.py   or   python cli.py gui")
+    raise SystemExit(2)
 
 
 @cli.command()

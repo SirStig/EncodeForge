@@ -12,10 +12,9 @@ from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QCheckBox,
-    QComboBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMenu,
@@ -71,15 +70,48 @@ class EncoderTab(QWidget):
         self.notifier = get_notification_manager()
         self.active_workers: Dict[str, EncoderWorker] = {}
         self._mp4_subtitle_warned = False
+        self._splitter_initialized = False
 
         self._setup_ui()
         self._connect_signals()
+        self._apply_saved_encoder_defaults()
+
+    def _apply_saved_encoder_defaults(self):
+        try:
+            from utils.settings_manager import get_settings_manager
+            s = get_settings_manager().encoder
+            self.format_combo.setCurrentText(s.container)
+            self.codec_combo.setCurrentText(s.codec)
+            self.preset_combo.setCurrentText(s.preset)
+            for i in range(self.quality_combo.count()):
+                t = self.quality_combo.itemText(i)
+                if f"CQ {s.crf}" in t:
+                    self.quality_combo.setCurrentText(t)
+                    break
+            self.hw_accel_check.setChecked(s.hw_accel != "None")
+            ac = s.audio_codec
+            br = s.audio_bitrate
+            if ac == "AAC" and br == 192:
+                self.audio_handling_combo.setCurrentText("AAC 192k")
+            elif ac == "AAC" and br == 320:
+                self.audio_handling_combo.setCurrentText("AAC 320k")
+            elif ac == "AC3":
+                self.audio_handling_combo.setCurrentText("AC3")
+            elif ac == "Copy":
+                self.audio_handling_combo.setCurrentText("Copy")
+            else:
+                self.audio_handling_combo.setCurrentText("Copy")
+        except Exception as e:
+            logger.debug("Encoder defaults not applied: %s", e)
 
     def showEvent(self, event):
         super().showEvent(event)
+        if self._splitter_initialized:
+            return
         total = self.width()
-        if total > 0 and hasattr(self, '_main_splitter'):
+        if total > 0 and hasattr(self, "_main_splitter"):
             self._main_splitter.setSizes([int(total * 0.70), int(total * 0.30)])
+            self._splitter_initialized = True
 
     def _setup_ui(self):
         """Set up the user interface."""
@@ -104,145 +136,115 @@ class EncoderTab(QWidget):
 
         # Right side: File Info sidebar
         self._setup_file_info_sidebar(self._main_splitter)
+        self._main_splitter.setStretchFactor(0, 3)
+        self._main_splitter.setStretchFactor(1, 1)
 
         layout.addWidget(self._main_splitter)
         
         logger.debug("Encoder tab initialized - using base glassmorphism theme")
     
     def _setup_video_settings(self, parent_layout):
-        """Set up the top video settings panel with two-row layout."""
-        # Settings container
+        """Set up the top video settings panel with grid + compact control rows."""
         settings_widget = QWidget()
         settings_widget.setObjectName("encoder_toolbar")
         settings_main_layout = QVBoxLayout(settings_widget)
-        settings_main_layout.setContentsMargins(12, 8, 12, 8)
+        settings_main_layout.setContentsMargins(10, 5, 10, 5)
         settings_main_layout.setSpacing(6)
-        
-        # Row 1: Format, Codec, Quality, Preset
-        row1_layout = QHBoxLayout()
-        row1_layout.setSpacing(8)
-        
-        # Format dropdown
+
+        enc_grid = QGridLayout()
+        enc_grid.setHorizontalSpacing(12)
+        enc_grid.setVerticalSpacing(4)
+        enc_grid.setContentsMargins(0, 0, 0, 0)
+
+        align_right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+
         format_label = StyledLabel("Format:")
-        format_label.setFixedWidth(52)
-        format_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        format_label.setAlignment(align_right)
         self.format_combo = StyledComboBox()
         self.format_combo.addItems(["MP4", "MKV", "WebM", "AVI", "MOV"])
+        self.format_combo.setMinimumContentsLength(5)
         self.format_combo.setMinimumWidth(72)
-        self.format_combo.setMaximumWidth(110)
-        row1_layout.addWidget(format_label)
-        row1_layout.addWidget(self.format_combo)
-        row1_layout.addSpacing(12)
 
-        # Codec dropdown
         codec_label = StyledLabel("Codec:")
-        codec_label.setFixedWidth(50)
-        codec_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        codec_label.setAlignment(align_right)
         self.codec_combo = StyledComboBox()
         self.codec_combo.addItems(["H.264", "H.265/HEVC", "AV1", "VP9", "Copy", "Auto"])
         self.codec_combo.setCurrentText("Auto")
+        self.codec_combo.setMinimumContentsLength(12)
         self.codec_combo.setMinimumWidth(100)
-        self.codec_combo.setMaximumWidth(145)
-        row1_layout.addWidget(codec_label)
-        row1_layout.addWidget(self.codec_combo)
-        row1_layout.addSpacing(12)
 
-        # Quality dropdown
         quality_label = StyledLabel("Quality:")
-        quality_label.setFixedWidth(50)
-        quality_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        quality_label.setAlignment(align_right)
         self.quality_combo = StyledComboBox()
         self.quality_combo.addItems(["High (CQ 18)", "Medium (CQ 23)", "Low (CQ 28)", "Very Low (CQ 33)"])
         self.quality_combo.setCurrentText("Medium (CQ 23)")
+        self.quality_combo.setMinimumContentsLength(18)
         self.quality_combo.setMinimumWidth(115)
-        self.quality_combo.setMaximumWidth(155)
-        row1_layout.addWidget(quality_label)
-        row1_layout.addWidget(self.quality_combo)
-        row1_layout.addSpacing(12)
 
-        # Preset dropdown
         preset_label = StyledLabel("Preset:")
-        preset_label.setFixedWidth(50)
-        preset_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        preset_label.setAlignment(align_right)
         self.preset_combo = StyledComboBox()
         self.preset_combo.addItems(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"])
         self.preset_combo.setCurrentText("medium")
+        self.preset_combo.setMinimumContentsLength(10)
         self.preset_combo.setMinimumWidth(85)
-        self.preset_combo.setMaximumWidth(120)
-        row1_layout.addWidget(preset_label)
-        row1_layout.addWidget(self.preset_combo)
-        
-        row1_layout.addStretch()
-        settings_main_layout.addLayout(row1_layout)
-        
-        # Add minimal spacing between rows
-        settings_main_layout.addSpacing(5)
-        
-        # Row 2: Checkboxes and Action Buttons
-        row2_layout = QHBoxLayout()
-        row2_layout.setSpacing(8)
-        
-        # Hardware acceleration checkbox
+
+        enc_grid.addWidget(format_label, 0, 0)
+        enc_grid.addWidget(self.format_combo, 0, 1)
+        enc_grid.addWidget(codec_label, 0, 2)
+        enc_grid.addWidget(self.codec_combo, 0, 3)
+        enc_grid.addWidget(quality_label, 1, 0)
+        enc_grid.addWidget(self.quality_combo, 1, 1)
+        enc_grid.addWidget(preset_label, 1, 2)
+        enc_grid.addWidget(self.preset_combo, 1, 3)
+        enc_grid.setColumnStretch(1, 1)
+        enc_grid.setColumnStretch(3, 1)
+        settings_main_layout.addLayout(enc_grid)
+
+        checks_row = QHBoxLayout()
+        checks_row.setSpacing(12)
         self.hw_accel_check = StyledCheckBox("HW Accel")
         self.hw_accel_check.setChecked(True)
-        row2_layout.addWidget(self.hw_accel_check)
-        row2_layout.addSpacing(8)
-
-        # Normalize audio checkbox
         self.normalize_audio_check = StyledCheckBox("Normalize")
-        row2_layout.addWidget(self.normalize_audio_check)
+        self.delete_original_check = StyledCheckBox("Delete Source")
+        self.delete_original_check.setChecked(False)
+        checks_row.addWidget(self.hw_accel_check)
+        checks_row.addWidget(self.normalize_audio_check)
+        checks_row.addWidget(self.delete_original_check)
+        checks_row.addStretch()
+        settings_main_layout.addLayout(checks_row)
 
-        # Subtitle handling
+        io_row = QHBoxLayout()
+        io_row.setSpacing(12)
         subtitle_label = StyledLabel("Subtitles:")
-        subtitle_label.setFixedWidth(65)
-        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        subtitle_label.setAlignment(align_right)
         self.subtitle_handling_combo = StyledComboBox()
         self.subtitle_handling_combo.addItems(["Keep/Passthrough", "Convert to SRT", "Embed", "Burn-in", "Skip"])
+        self.subtitle_handling_combo.setMinimumContentsLength(18)
         self.subtitle_handling_combo.setMinimumWidth(115)
-        self.subtitle_handling_combo.setMaximumWidth(155)
-        row2_layout.addSpacing(8)
-        row2_layout.addWidget(subtitle_label)
-        row2_layout.addWidget(self.subtitle_handling_combo)
-        row2_layout.addSpacing(8)
-
-        # Audio handling
         audio_label = StyledLabel("Audio:")
-        audio_label.setFixedWidth(45)
-        audio_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        audio_label.setAlignment(align_right)
         self.audio_handling_combo = StyledComboBox()
         self.audio_handling_combo.addItems(["Copy", "AAC 192k", "AAC 320k", "AC3", "Normalize+Copy"])
+        self.audio_handling_combo.setMinimumContentsLength(14)
         self.audio_handling_combo.setMinimumWidth(100)
-        self.audio_handling_combo.setMaximumWidth(140)
-        row2_layout.addSpacing(8)
-        row2_layout.addWidget(audio_label)
-        row2_layout.addWidget(self.audio_handling_combo)
-        row2_layout.addSpacing(8)
-
-        # Delete original checkbox - UNCHECKED by default
-        self.delete_original_check = StyledCheckBox("Delete Source")
-        self.delete_original_check.setChecked(False)  # SAFE DEFAULT
-        row2_layout.addWidget(self.delete_original_check)
-
-        # Spacer
-        row2_layout.addStretch()
-
-        # Stop button
+        io_row.addWidget(subtitle_label)
+        io_row.addWidget(self.subtitle_handling_combo, 1)
+        io_row.addWidget(audio_label)
+        io_row.addWidget(self.audio_handling_combo, 1)
         self.stop_btn = QPushButton("Stop")
-        self.stop_btn.setIcon(qta.icon('fa5s.stop'))
+        self.stop_btn.setIcon(qta.icon("fa5s.stop"))
         self.stop_btn.setEnabled(False)
         self.stop_btn.setMinimumWidth(65)
         self.stop_btn.setProperty("danger", True)
-        row2_layout.addWidget(self.stop_btn)
-        row2_layout.addSpacing(6)
-
-        # Start button
         self.start_btn = QPushButton("Start Encoding")
-        self.start_btn.setIcon(qta.icon('fa5s.play'))
+        self.start_btn.setIcon(qta.icon("fa5s.play"))
         self.start_btn.setMinimumWidth(120)
         self.start_btn.setProperty("primary", True)
-        row2_layout.addWidget(self.start_btn)
-        
-        settings_main_layout.addLayout(row2_layout)
+        io_row.addWidget(self.stop_btn)
+        io_row.addWidget(self.start_btn)
+        settings_main_layout.addLayout(io_row)
+
         parent_layout.addWidget(settings_widget)
     
     def _setup_tables_area(self, parent_layout):
@@ -265,7 +267,7 @@ class EncoderTab(QWidget):
         self.files_table.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         
         # Set compact row height
-        self.files_table.verticalHeader().setDefaultSectionSize(24)
+        self.files_table.verticalHeader().setDefaultSectionSize(22)
         
         # Enable context menu
         self.files_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -308,8 +310,7 @@ class EncoderTab(QWidget):
     def _setup_file_info_sidebar(self, splitter):
         """Set up the file info sidebar on the right."""
         sidebar = QWidget()
-        sidebar.setMinimumWidth(260)
-        sidebar.setMaximumWidth(380)
+        sidebar.setMinimumWidth(220)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(10, 10, 10, 10)
         sidebar_layout.setSpacing(10)

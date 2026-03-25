@@ -4,12 +4,45 @@ QRunnable-based workers for parallel processing with progress signals
 """
 
 import logging
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
 logger = logging.getLogger(__name__)
+
+
+def _renamer_preview_settings_from_ui(renaming_settings: Dict[str, Any]) -> Dict[str, Any]:
+    d: Dict[str, Any] = {}
+    prov = renaming_settings.get("provider")
+    if prov:
+        d["selected_provider"] = prov
+    api = (renaming_settings.get("api_key") or "").strip()
+    key_field = {
+        "tmdb": "tmdb_api_key",
+        "tvdb": "tvdb_api_key",
+        "omdb": "omdb_api_key",
+        "trakt": "trakt_api_key",
+    }.get(prov or "", "")
+    if key_field and api:
+        d[key_field] = api
+    return d
+
+
+def _subtitle_core_from_settings(subtitle_settings: Dict[str, Any]):
+    from core.encodeforge_core import EncodeForgeCore
+    from utils.settings_manager import get_settings_manager
+
+    sm = get_settings_manager()
+    cs = sm.get_merged_conversion_settings()
+    langs = subtitle_settings.get("languages") or ["eng"]
+    cs.subtitle_languages = list(langs)
+    wm = subtitle_settings.get("whisper_model", "medium")
+    if isinstance(wm, str):
+        cs.whisper_model = wm.split()[0].strip().lower() if wm else "medium"
+    core = EncodeForgeCore(settings=cs)
+    return core
 
 
 class WorkerSignals(QObject):
@@ -216,15 +249,11 @@ class EncoderWorker(Worker):
             **kwargs: Additional arguments passed to parent Worker
         """
         from core.encodeforge_core import EncodeForgeCore
-        
-        # Create core instance
-        core = EncodeForgeCore()
-        
-        # Prepare conversion settings from encoder settings
-        from core.handlers import ConversionSettings
-        settings = ConversionSettings()
-        
-        # Map encoder settings to conversion settings
+        from utils.settings_manager import get_settings_manager
+
+        sm = get_settings_manager()
+        settings = deepcopy(sm.get_merged_conversion_settings())
+
         if 'codec' in encoder_settings:
             codec_map = {
                 'H.264': 'libx264',
@@ -272,10 +301,7 @@ class EncoderWorker(Worker):
             }
             settings.output_format = format_map.get(encoder_settings['format'], 'mp4')
         
-        # Update core with settings
-        core.settings = settings
-        
-        # Store reference to conversion handler for cancellation
+        core = EncodeForgeCore(settings=settings)
         self.conversion_handler = core.conversion_handler
         
         super().__init__(
@@ -347,11 +373,8 @@ class SubtitleWorker(Worker):
                 - whisper_model: str (e.g., 'base', 'small', 'medium')
             **kwargs: Additional arguments passed to parent Worker
         """
-        from core.encodeforge_core import EncodeForgeCore
-        
-        # Create core instance
-        core = EncodeForgeCore()
-        
+        core = _subtitle_core_from_settings(subtitle_settings)
+
         super().__init__(
             core.download_subtitles,
             file_path=str(file_path),
@@ -404,16 +427,31 @@ class RenamerWorker(Worker):
             **kwargs: Additional arguments passed to parent Worker
         """
         from core.encodeforge_core import EncodeForgeCore
-        
-        # Create core instance
-        core = EncodeForgeCore()
-        
-        super().__init__(
-            core.rename_files,
-            file_paths=[str(file_path)],
-            dry_run=renaming_settings.get('dry_run', False),
-            create_backup=renaming_settings.get('create_backup', False),
-            **kwargs
-        )
+        from utils.settings_manager import get_settings_manager
+
+        sm = get_settings_manager()
+        cs = sm.get_merged_conversion_settings()
+        pat = renaming_settings.get("pattern")
+        if pat:
+            cs.renaming_pattern_tv = pat
+            cs.renaming_pattern_movie = pat
+        preview_settings = _renamer_preview_settings_from_ui(renaming_settings)
+        core = EncodeForgeCore(settings=cs)
+        preview_only = renaming_settings.get("preview_only", False)
+        dry_run = renaming_settings.get("dry_run", False)
+        create_backup = renaming_settings.get("create_backup", False)
+        fp = file_path
+
+        def _job(progress_callback: Optional[Callable] = None, **_kw: Any):
+            if preview_only:
+                return core.preview_rename([str(fp)], settings_dict=preview_settings or None)
+            return core.rename_files(
+                [str(fp)],
+                dry_run=dry_run,
+                create_backup=create_backup,
+                preview_settings=preview_settings or None,
+            )
+
+        super().__init__(_job, **kwargs)
         self.file_path = file_path
         self.renaming_settings = renaming_settings

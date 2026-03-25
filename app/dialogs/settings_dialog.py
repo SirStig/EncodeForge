@@ -6,26 +6,31 @@ Comprehensive application settings interface
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from app import __version__ as APP_VERSION
 from core.path_manager import get_base_dir
+from core.handlers.models import ConversionSettings
 from utils.settings_manager import SettingsManager
 from utils.theme_manager import get_theme_manager
 
@@ -65,7 +70,7 @@ class SettingsDialog(QDialog):
     def _setup_ui(self):
         """Setup the dialog UI."""
         self.setWindowTitle("Settings - EncodeForge")
-        self.setMinimumSize(700, 600)
+        self.setMinimumSize(560, 520)
         
         layout = QVBoxLayout(self)
         
@@ -73,12 +78,14 @@ class SettingsDialog(QDialog):
         self.tabs = QTabWidget()
         
         # Create tabs
-        self.tabs.addTab(self._create_general_tab(), "General")
-        self.tabs.addTab(self._create_encoder_tab(), "Encoder")
-        self.tabs.addTab(self._create_subtitle_tab(), "Subtitle")
-        self.tabs.addTab(self._create_renamer_tab(), "Renamer")
-        self.tabs.addTab(self._create_paths_tab(), "Paths")
-        self.tabs.addTab(self._create_advanced_tab(), "Advanced")
+        self.tabs.addTab(self._wrap_in_scroll_area(self._create_general_tab()), "General")
+        self.tabs.addTab(self._wrap_in_scroll_area(self._create_encoder_tab()), "Encoder")
+        self.tabs.addTab(self._wrap_in_scroll_area(self._create_subtitle_tab()), "Subtitle")
+        self.tabs.addTab(self._wrap_in_scroll_area(self._create_renamer_tab()), "Renamer")
+        self.tabs.addTab(self._wrap_in_scroll_area(self._create_accounts_tab()), "Accounts")
+        self.tabs.addTab(self._wrap_in_scroll_area(self._create_paths_tab()), "Paths")
+        self.tabs.addTab(self._wrap_in_scroll_area(self._create_advanced_tab()), "Advanced")
+        self.tabs.addTab(self._wrap_in_scroll_area(self._create_about_tab()), "About")
         
         layout.addWidget(self.tabs)
         
@@ -104,6 +111,15 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(self.ok_btn)
         
         layout.addLayout(button_layout)
+    
+    def _wrap_in_scroll_area(self, content: QWidget) -> QScrollArea:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(content)
+        return scroll
     
     def _create_general_tab(self) -> QWidget:
         """Create general settings tab."""
@@ -274,7 +290,11 @@ class SettingsDialog(QDialog):
             "TMDB (The Movie Database)",
             "TVDB (TheTVDB)",
             "OMDb",
-            "AniDB (Anime)"
+            "Trakt",
+            "TVmaze",
+            "AniDB (Anime)",
+            "Kitsu (Anime)",
+            "Jikan (MyAnimeList)",
         ])
         renamer_layout.addRow("Metadata Provider:", self.metadata_provider_combo)
         
@@ -301,6 +321,55 @@ class SettingsDialog(QDialog):
         layout.addWidget(renamer_group)
         layout.addStretch()
         return widget
+
+    def _create_accounts_tab(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        meta = QGroupBox("Metadata providers (optional API keys)")
+        meta_form = QFormLayout(meta)
+        self.tmdb_key_edit = QLineEdit()
+        self.tmdb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        meta_form.addRow("TMDB API key:", self.tmdb_key_edit)
+        self.tvdb_key_edit = QLineEdit()
+        self.tvdb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        meta_form.addRow("TVDB API key:", self.tvdb_key_edit)
+        self.omdb_key_edit = QLineEdit()
+        self.omdb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        meta_form.addRow("OMDb API key:", self.omdb_key_edit)
+        self.trakt_key_edit = QLineEdit()
+        self.trakt_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        meta_form.addRow("Trakt API key:", self.trakt_key_edit)
+        self.fanart_key_edit = QLineEdit()
+        self.fanart_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        meta_form.addRow("Fanart API key:", self.fanart_key_edit)
+        self.anidb_key_edit = QLineEdit()
+        self.anidb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        meta_form.addRow("AniDB API key:", self.anidb_key_edit)
+        layout.addWidget(meta)
+        subs = QGroupBox("OpenSubtitles (optional — higher quotas)")
+        subs_form = QFormLayout(subs)
+        self.os_user_edit = QLineEdit()
+        subs_form.addRow("Username:", self.os_user_edit)
+        self.os_pass_edit = QLineEdit()
+        self.os_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        subs_form.addRow("Password:", self.os_pass_edit)
+        layout.addWidget(subs)
+        layout.addStretch()
+        return widget
+
+    def _create_about_tab(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        body = QLabel(
+            f"<h2>EncodeForge</h2><p><b>Version {APP_VERSION}</b></p>"
+            "<p>Video encoding, subtitles, and metadata-based renaming.</p>"
+            '<p><a href="https://github.com/SirStig/EncodeForge">github.com/SirStig/EncodeForge</a></p>'
+        )
+        body.setOpenExternalLinks(True)
+        body.setWordWrap(True)
+        layout.addWidget(body)
+        layout.addStretch()
+        return widget
     
     def _create_paths_tab(self) -> QWidget:
         """Create paths settings tab."""
@@ -311,22 +380,33 @@ class SettingsDialog(QDialog):
         ffmpeg_group = QGroupBox("FFmpeg")
         ffmpeg_layout = QVBoxLayout(ffmpeg_group)
         
-        ffmpeg_path_layout = QHBoxLayout()
+        ffmpeg_layout.addWidget(QLabel("FFmpeg:"))
         self.ffmpeg_path_edit = QLineEdit()
         self.ffmpeg_path_edit.setPlaceholderText("Path to ffmpeg executable...")
-        ffmpeg_path_layout.addWidget(QLabel("FFmpeg:"))
-        ffmpeg_path_layout.addWidget(self.ffmpeg_path_edit)
-        
+        ffmpeg_edit_row = QHBoxLayout()
+        ffmpeg_edit_row.addWidget(self.ffmpeg_path_edit, 1)
         ffmpeg_browse_btn = QPushButton("Browse...")
         ffmpeg_browse_btn.clicked.connect(self._browse_ffmpeg)
-        ffmpeg_path_layout.addWidget(ffmpeg_browse_btn)
+        ffmpeg_edit_row.addWidget(ffmpeg_browse_btn)
+        ffmpeg_layout.addLayout(ffmpeg_edit_row)
         
         ffmpeg_setup_btn = QPushButton("Setup...")
         ffmpeg_setup_btn.clicked.connect(self._run_ffmpeg_setup)
-        ffmpeg_path_layout.addWidget(ffmpeg_setup_btn)
-        
-        ffmpeg_layout.addLayout(ffmpeg_path_layout)
+        ffmpeg_btn_row = QHBoxLayout()
+        ffmpeg_btn_row.addWidget(ffmpeg_setup_btn)
+        ffmpeg_btn_row.addStretch()
+        ffmpeg_layout.addLayout(ffmpeg_btn_row)
         layout.addWidget(ffmpeg_group)
+
+        ffmpeg_layout.addWidget(QLabel("FFprobe:"))
+        self.ffprobe_path_edit = QLineEdit()
+        self.ffprobe_path_edit.setPlaceholderText("Path to ffprobe executable...")
+        ffprobe_row = QHBoxLayout()
+        ffprobe_row.addWidget(self.ffprobe_path_edit, 1)
+        ffprobe_browse = QPushButton("Browse...")
+        ffprobe_browse.clicked.connect(self._browse_ffprobe)
+        ffprobe_row.addWidget(ffprobe_browse)
+        ffmpeg_layout.addLayout(ffprobe_row)
         
         # Whisper paths
         whisper_group = QGroupBox("Whisper AI")
@@ -335,31 +415,37 @@ class SettingsDialog(QDialog):
         whisper_info = QLabel("Whisper models will be downloaded to:")
         whisper_layout.addWidget(whisper_info)
         
-        whisper_path_layout = QHBoxLayout()
         self.whisper_path_edit = QLineEdit()
         self.whisper_path_edit.setReadOnly(True)
         self.whisper_path_edit.setText(str(get_base_dir() / "models"))
-        whisper_path_layout.addWidget(self.whisper_path_edit)
+        whisper_edit_row = QHBoxLayout()
+        whisper_edit_row.addWidget(self.whisper_path_edit, 1)
+        whisper_layout.addLayout(whisper_edit_row)
         
         whisper_setup_btn = QPushButton("Setup Whisper...")
         whisper_setup_btn.clicked.connect(self._run_whisper_setup)
-        whisper_path_layout.addWidget(whisper_setup_btn)
-        
-        whisper_layout.addLayout(whisper_path_layout)
+        whisper_btn_row = QHBoxLayout()
+        whisper_btn_row.addWidget(whisper_setup_btn)
+        whisper_btn_row.addStretch()
+        whisper_layout.addLayout(whisper_btn_row)
         layout.addWidget(whisper_group)
         
         # Data directories
         dirs_group = QGroupBox("Data Directories")
-        dirs_layout = QFormLayout(dirs_group)
+        dirs_layout = QVBoxLayout(dirs_group)
         
+        dirs_layout.addWidget(QLabel("Base Directory:"))
         base_dir_edit = QLineEdit()
         base_dir_edit.setReadOnly(True)
         base_dir_edit.setText(str(get_base_dir()))
-        dirs_layout.addRow("Base Directory:", base_dir_edit)
+        dirs_layout.addWidget(base_dir_edit)
         
         open_base_btn = QPushButton("Open in Explorer")
         open_base_btn.clicked.connect(lambda: self._open_directory(get_base_dir()))
-        dirs_layout.addRow("", open_base_btn)
+        dirs_btn_row = QHBoxLayout()
+        dirs_btn_row.addWidget(open_base_btn)
+        dirs_btn_row.addStretch()
+        dirs_layout.addLayout(dirs_btn_row)
         
         layout.addWidget(dirs_group)
         layout.addStretch()
@@ -395,6 +481,14 @@ class SettingsDialog(QDialog):
         log_layout.addRow("Recent Files Limit:", self.recent_files_spin)
         
         layout.addWidget(log_group)
+
+        ff_extra = QGroupBox("Extra FFmpeg arguments")
+        ff_extra_layout = QVBoxLayout(ff_extra)
+        self.ffmpeg_extra_edit = QTextEdit()
+        self.ffmpeg_extra_edit.setPlaceholderText("Additional arguments appended to FFmpeg (expert users)")
+        self.ffmpeg_extra_edit.setMaximumHeight(100)
+        ff_extra_layout.addWidget(self.ffmpeg_extra_edit)
+        layout.addWidget(ff_extra)
         
         layout.addStretch()
         return widget
@@ -445,11 +539,23 @@ class SettingsDialog(QDialog):
         
         # Paths
         self.ffmpeg_path_edit.setText(self.settings.application.ffmpeg_path)
+        self.ffprobe_path_edit.setText(self.settings.application.ffprobe_path)
         
         # Advanced
         self.max_threads_spin.setValue(self.settings.application.max_threads)
         self.log_level_combo.setCurrentText(self.settings.application.log_level)
         self.recent_files_spin.setValue(self.settings.application.recent_files_limit)
+        c = self.settings.conversion
+        self.ffmpeg_extra_edit.setPlainText(c.additional_ffmpeg_args)
+
+        self.tmdb_key_edit.setText(c.tmdb_api_key)
+        self.tvdb_key_edit.setText(c.tvdb_api_key)
+        self.omdb_key_edit.setText(c.omdb_api_key)
+        self.trakt_key_edit.setText(c.trakt_api_key)
+        self.fanart_key_edit.setText(c.fanart_api_key)
+        self.anidb_key_edit.setText(c.anidb_api_key)
+        self.os_user_edit.setText(c.opensubtitles_username)
+        self.os_pass_edit.setText(c.opensubtitles_password)
     
     def _save_settings(self):
         """Save UI values to settings."""
@@ -497,6 +603,18 @@ class SettingsDialog(QDialog):
         
         # Paths
         self.settings.application.ffmpeg_path = self.ffmpeg_path_edit.text()
+        self.settings.application.ffprobe_path = self.ffprobe_path_edit.text()
+
+        c = self.settings.conversion
+        c.tmdb_api_key = self.tmdb_key_edit.text().strip()
+        c.tvdb_api_key = self.tvdb_key_edit.text().strip()
+        c.omdb_api_key = self.omdb_key_edit.text().strip()
+        c.trakt_api_key = self.trakt_key_edit.text().strip()
+        c.fanart_api_key = self.fanart_key_edit.text().strip()
+        c.anidb_api_key = self.anidb_key_edit.text().strip()
+        c.opensubtitles_username = self.os_user_edit.text().strip()
+        c.opensubtitles_password = self.os_pass_edit.text().strip()
+        c.additional_ffmpeg_args = self.ffmpeg_extra_edit.toPlainText().strip()
         
         # Advanced
         self.settings.application.max_threads = self.max_threads_spin.value()
@@ -545,6 +663,7 @@ class SettingsDialog(QDialog):
             self.settings.renamer = RenamerSettings()
             self.settings.ui = UISettings()
             self.settings.application = ApplicationSettings()
+            self.settings.conversion = ConversionSettings()
             
             self._load_settings()
             logger.info("Settings restored to defaults")
@@ -561,6 +680,16 @@ class SettingsDialog(QDialog):
         
         if path:
             self.ffmpeg_path_edit.setText(path)
+
+    def _browse_ffprobe(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select FFprobe Executable",
+            "",
+            "FFprobe (ffprobe ffprobe.exe);;All Files (*)",
+        )
+        if path:
+            self.ffprobe_path_edit.setText(path)
     
     def _run_ffmpeg_setup(self):
         """Run FFmpeg setup dialog."""

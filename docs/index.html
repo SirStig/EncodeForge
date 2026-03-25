@@ -1,772 +1,319 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- SEO Meta Tags -->
-    <title>EncodeForge - Free PySide6 FFmpeg GUI for Video Encoding, AI Subtitles & Media Renaming</title>
-    <meta name="description" content="Transform your media library with EncodeForge - the powerful PySide6 FFmpeg GUI for Windows, macOS and Linux. Hardware-accelerated batch video encoding (NVENC, QuickSync, AMF, VideoToolbox), AI subtitle generation with Whisper, and smart file organization. Free and open source Python application.">
-    <meta name="keywords" content="pyside6, qt6, ffmpeg gui, video converter, batch video encoding, hardware acceleration, nvenc, quicksync, amd amf, videotoolbox, ai subtitles, whisper, opensubtitles, media file renaming, tmdb, tvdb, plex, jellyfin, handbrake alternative, video transcoding, free video converter, python gui">
-    <meta name="author" content="SirStig">
-    <meta name="robots" content="index, follow">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sirstig.github.io/EncodeForge/">
-    <meta property="og:title" content="EncodeForge - Modern PySide6 FFmpeg GUI">
-    <meta property="og:description" content="Beautiful, modern Python application for video encoding, AI subtitles, and smart organization - all free and open source.">
-    <meta property="og:image" content="https://sirstig.github.io/EncodeForge/assets/logo.png">
-    
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://sirstig.github.io/EncodeForge/">
-    <meta property="twitter:title" content="EncodeForge - Modern PySide6 FFmpeg GUI">
-    <meta property="twitter:description" content="Beautiful Python application for video encoding, AI subtitles, and smart organization.">
-    <meta property="twitter:image" content="https://sirstig.github.io/EncodeForge/assets/logo.png">
-    
-    <!-- Canonical URL -->
-    <link rel="canonical" href="https://sirstig.github.io/EncodeForge/">
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="assets/logo.png">
-    
-    <!-- Schema.org structured data -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "EncodeForge",
-      "applicationCategory": "MultimediaApplication",
-      "operatingSystem": "Windows, macOS, Linux",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "description": "Free open-source PySide6 FFmpeg GUI for hardware-accelerated video transcoding, AI subtitle generation, and media file organization. Built with Python and Qt6.",
-      "url": "https://sirstig.github.io/EncodeForge/",
-      "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/latest",
-      "softwareVersion": "0.5.0",
-      "license": "https://opensource.org/licenses/MIT",
-      "programmingLanguage": "Python",
-      "author": {
-        "@type": "Person",
-        "name": "SirStig"
-      }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- SEO -->
+  <title>EncodeForge — FFmpeg GUI for Video Encoding, AI Subtitles &amp; Media Renaming</title>
+  <meta name="description" content="EncodeForge is a free, open-source PySide6 desktop application for hardware-accelerated video encoding, AI subtitle generation with Whisper, and smart media renaming. Built for Windows, macOS, and Linux by Joshua Kac.">
+  <meta name="keywords" content="encodeforge, ffmpeg gui, pyside6, qt6, video encoding, hardware acceleration, nvenc, quicksync, amd amf, videotoolbox, ai subtitles, whisper, opensubtitles, media renaming, tmdb, tvdb, batch encoding, python desktop app, joshua kac">
+  <meta name="author" content="Joshua Kac">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://sirstig.github.io/EncodeForge/">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sirstig.github.io/EncodeForge/">
+  <meta property="og:title" content="EncodeForge — Professional FFmpeg GUI">
+  <meta property="og:description" content="Hardware-accelerated video encoding, AI subtitle generation, and smart media renaming. Free and open source.">
+  <meta property="og:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="EncodeForge">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="EncodeForge — Professional FFmpeg GUI">
+  <meta name="twitter:description" content="Hardware-accelerated video encoding, AI subtitle generation, and smart media renaming. Free and open source.">
+  <meta name="twitter:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "EncodeForge",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "programmingLanguage": "Python",
+    "softwareVersion": "0.5.0",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "url": "https://sirstig.github.io/EncodeForge/",
+    "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/latest",
+    "codeRepository": "https://github.com/SirStig/EncodeForge",
+    "license": "https://opensource.org/licenses/MIT",
+    "description": "Free open-source PySide6 FFmpeg GUI for hardware-accelerated video encoding, AI subtitle generation, and smart media renaming.",
+    "author": {
+      "@type": "Person",
+      "name": "Joshua Kac",
+      "url": "https://github.com/SirStig"
+    },
+    "maintainer": {
+      "@type": "Person",
+      "name": "Joshua Kac",
+      "url": "https://github.com/SirStig"
     }
-    </script>
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        :root {
-            --bg-dark: #1a1a1a;
-            --bg-darker: #0d0d0d;
-            --bg-card: #1e1e1e;
-            --text-primary: #e6e6e6;
-            --text-secondary: #999999;
-            --accent: #ff4d4d;
-            --accent-hover: #ff6b6b;
-            --accent-dark: #cc3333;
-            --forge-glow: rgba(255, 77, 77, 0.3);
-            --border: #2a2a2a;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-            background: var(--bg-darker);
-            color: var(--text-primary);
-            line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-        
-        /* Header */
-        header {
-            background: var(--bg-dark);
-            padding: 2rem 0;
-            border-bottom: 1px solid var(--border);
-            text-align: center;
-        }
-        
-        .logo {
-            width: 128px;
-            height: 128px;
-            margin: 0 auto 1rem;
-        }
-        
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-weight: 700;
-        }
-        
-        .tagline {
-            font-size: 1.2rem;
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-        }
-        
-        /* Download Buttons */
-        .download-section {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 2rem;
-        }
-        
-        .download-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 1rem 2rem;
-            background: var(--accent);
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            border: 2px solid var(--accent);
-        }
-        
-        .download-btn:hover {
-            background: var(--accent-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px var(--forge-glow);
-        }
-        
-        .download-btn.secondary {
-            background: transparent;
-            color: var(--accent);
-        }
-        
-        .download-btn.secondary:hover {
-            background: var(--accent);
-            color: white;
-        }
-        
-        .version-note {
-            margin-top: 1rem;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-        
-        /* Features Grid */
-        .features {
-            padding: 4rem 0;
-            background: var(--bg-dark);
-        }
-        
-        .section-title {
-            text-align: center;
-            font-size: 2rem;
-            margin-bottom: 3rem;
-            color: var(--text-primary);
-        }
-        
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-bottom: 3rem;
-        }
-        
-        .feature-card {
-            background: var(--bg-card);
-            padding: 2rem;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 30px var(--forge-glow);
-            border-color: var(--accent);
-        }
-        
-        .feature-card h3 {
-            color: var(--accent);
-            margin-bottom: 1rem;
-            font-size: 1.5rem;
-        }
-        
-        .feature-card ul {
-            list-style: none;
-            padding: 0;
-        }
-        
-        .feature-card li {
-            padding: 0.5rem 0;
-            padding-left: 1.5rem;
-            position: relative;
-        }
-        
-        .feature-card li:before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: var(--accent);
-            font-weight: bold;
-        }
-        
-        /* Screenshots */
-        .screenshots {
-            padding: 4rem 0;
-            background: var(--bg-darker);
-        }
-        
-        .screenshot-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 4rem;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        .screenshot-item {
-            display: grid;
-            grid-template-columns: 1.5fr 1fr;
-            gap: 3rem;
-            align-items: center;
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 2rem;
-            border: 2px solid var(--border);
-            transition: all 0.3s ease;
-        }
-        
-        .screenshot-item:nth-child(even) {
-            grid-template-columns: 1fr 1.5fr;
-        }
-        
-        .screenshot-item:nth-child(even) .screenshot-image {
-            order: 2;
-        }
-        
-        .screenshot-item:nth-child(even) .screenshot-content {
-            order: 1;
-        }
-        
-        .screenshot-item:hover {
-            border-color: var(--accent);
-            box-shadow: 0 12px 48px var(--forge-glow);
-            transform: translateY(-4px);
-        }
-        
-        .screenshot-image {
-            position: relative;
-            cursor: pointer;
-            overflow: hidden;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
-        
-        .screenshot-image img {
-            width: 100%;
-            height: auto;
-            display: block;
-            transition: transform 0.3s ease;
-        }
-        
-        .screenshot-image:hover img {
-            transform: scale(1.05);
-        }
-        
-        .screenshot-image::after {
-            content: "Click to enlarge";
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
-            color: white;
-            padding: 1rem;
-            text-align: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            font-size: 0.9rem;
-        }
-        
-        .screenshot-image:hover::after {
-            opacity: 1;
-        }
-        
-        .screenshot-content {
-            padding: 1rem;
-        }
-        
-        .screenshot-content h3 {
-            color: var(--accent);
-            font-size: 1.8rem;
-            margin-bottom: 1rem;
-            font-weight: 700;
-        }
-        
-        .screenshot-content p {
-            color: var(--text-secondary);
-            margin-bottom: 1.5rem;
-            line-height: 1.8;
-            font-size: 1.1rem;
-        }
-        
-        .screenshot-content ul {
-            list-style: none;
-            padding: 0;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 0.75rem;
-        }
-        
-        .screenshot-content li {
-            padding: 0.75rem 1rem;
-            background: var(--bg-darker);
-            border-radius: 6px;
-            border-left: 3px solid var(--accent);
-            color: var(--text-primary);
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-        }
-        
-        .screenshot-content li:hover {
-            background: var(--bg-dark);
-            border-left-color: var(--accent-hover);
-            transform: translateX(4px);
-        }
-        
-        /* Modal for full-screen images */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.95);
-            cursor: pointer;
-        }
-        
-        .modal-content {
-            position: relative;
-            margin: auto;
-            display: block;
-            max-width: 95%;
-            max-height: 95%;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-        
-        .modal-close {
-            position: absolute;
-            top: 20px;
-            right: 40px;
-            color: white;
-            font-size: 40px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 1001;
-        }
-        
-        .modal-close:hover {
-            color: var(--accent);
-        }
-        
-        /* Keywords Section */
-        .keywords {
-            padding: 4rem 0;
-            text-align: center;
-            background: var(--bg-darker);
-        }
-        
-        .keyword-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            justify-content: center;
-            margin-top: 2rem;
-        }
-        
-        .keyword-tag {
-            background: var(--bg-card);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-        }
-        
-        .keyword-tag:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-            box-shadow: 0 0 15px var(--forge-glow);
-        }
-        
-        /* Footer */
-        footer {
-            background: var(--bg-dark);
-            padding: 3rem 0;
-            text-align: center;
-            border-top: 1px solid var(--border);
-        }
-        
-        .footer-links {
-            display: flex;
-            gap: 2rem;
-            justify-content: center;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-        
-        .footer-links a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: color 0.3s ease;
-        }
-        
-        .footer-links a:hover {
-            color: var(--accent);
-        }
-        
-        .copyright {
-            color: var(--text-secondary);
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2rem;
-            }
-            
-            .tagline {
-                font-size: 1rem;
-            }
-            
-            .download-btn {
-                width: 100%;
-                justify-content: center;
-            }
-            
-            .feature-grid, .screenshot-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .screenshot-item {
-                grid-template-columns: 1fr !important;
-                padding: 1rem;
-            }
-            
-            .screenshot-item:nth-child(even) .screenshot-image,
-            .screenshot-item:nth-child(even) .screenshot-content {
-                order: 0;
-            }
-            
-            .screenshot-content h3 {
-                font-size: 1.5rem;
-            }
-            
-            .screenshot-content ul {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+  }
+  </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <img src="assets/logo.png" alt="EncodeForge Logo" class="logo" onerror="this.style.display='none'">
-            <h1>EncodeForge</h1>
-            <p class="tagline">The Modern FFmpeg Forge - Transform Your Media with Fire and Precision</p>
-            
-            <div class="download-section">
-                <a href="#" id="primary-download" class="download-btn">
-                    <span id="download-text">Download for Windows</span>
-                </a>
-                <a href="https://github.com/SirStig/EncodeForge/releases/latest" class="download-btn secondary">
-                    All Releases
-                </a>
-            </div>
-            <p class="version-note">
-                Version 0.4.1 • Free & Open Source (MIT License)<br>
-                <strong>Note:</strong> macOS builds not currently available - Windows and Linux only
-            </p>
-        </div>
-    </header>
-    
-    <section class="screenshots">
-        <div class="container">
-            <h2 class="section-title">See It In Action</h2>
-            <div class="screenshot-grid">
-                <div class="screenshot-item">
-                    <div class="screenshot-image" onclick="openModal('modal1')">
-                        <img id="img1" src="screenshots/encoding.png" alt="Video Encoding Interface - Hardware acceleration with NVENC, QuickSync, AMF" onerror="this.parentElement.parentElement.style.display='none'">
-                    </div>
-                    <div class="screenshot-content">
-                        <h3>Hardware-Accelerated Encoding</h3>
-                        <p>Transform your entire video library with blazing-fast hardware acceleration. Process hours of footage in minutes using your GPU's dedicated encoding hardware.</p>
-                        <ul>
-                            <li>NVIDIA NVENC - 10x faster than CPU</li>
-                            <li>Intel QuickSync Video</li>
-                            <li>AMD AMF Acceleration</li>
-                            <li>Batch Processing Queue</li>
-                            <li>Real-time Progress Tracking</li>
-                            <li>Smart Codec Detection</li>
-                            <li>Audio Normalization</li>
-                            <li>Stream Copy Support</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="screenshot-item">
-                    <div class="screenshot-image" onclick="openModal('modal2')">
-                        <img id="img2" src="screenshots/subtitles.png" alt="AI Subtitle Generation with OpenAI Whisper" onerror="this.parentElement.parentElement.style.display='none'">
-                    </div>
-                    <div class="screenshot-content">
-                        <h3>AI-Powered Subtitle Generation</h3>
-                        <p>Generate accurate subtitles in 90+ languages using OpenAI Whisper running locally on your machine. No cloud services, no subscriptions.</p>
-                        <ul>
-                            <li>OpenAI Whisper Integration</li>
-                            <li>GPU-Accelerated Transcription</li>
-                            <li>90+ Language Support</li>
-                            <li>Multi-Provider Downloads</li>
-                            <li>OpenSubtitles API</li>
-                            <li>Anime Subtitle Providers</li>
-                            <li>Automatic Sync Detection</li>
-                            <li>Multi-Track Support</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="screenshot-item">
-                    <div class="screenshot-image" onclick="openModal('modal3')">
-                        <img id="img3" src="screenshots/metadata.png" alt="Smart File Renaming with TMDB and TVDB" onerror="this.parentElement.parentElement.style.display='none'">
-                    </div>
-                    <div class="screenshot-content">
-                        <h3>Smart Media Organization</h3>
-                        <p>Automatically detect and rename your media files using comprehensive metadata from 10+ providers. Perfect for Plex and Jellyfin libraries.</p>
-                        <ul>
-                            <li>TMDB Movie Database</li>
-                            <li>TVDB TV Show Info</li>
-                            <li>AniDB Anime Support</li>
-                            <li>10+ Metadata Providers</li>
-                            <li>Custom Naming Patterns</li>
-                            <li>Preview Before Applying</li>
-                            <li>Batch Rename Support</li>
-                            <li>Plex/Jellyfin Compatible</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+
+  <header class="site-header">
+    <a class="header-logo" href="./">Encode<span>Forge</span></a>
+    <div class="header-spacer"></div>
+    <nav class="header-nav">
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="https://github.com/SirStig/EncodeForge/releases" target="_blank" rel="noopener">Releases</a>
+      <a class="header-badge" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
+      <button class="theme-btn" type="button" id="themeBtn" aria-label="Toggle theme">☀ Light</button>
+    </nav>
+  </header>
+
+  <div class="landing">
+
+    <!-- ===== HERO ===== -->
+    <section class="hero">
+      <div class="hero-eyebrow">Open source · MIT License · v0.5.0</div>
+      <h1>Encode, subtitle,<br>and organize your media</h1>
+      <p class="hero-sub">
+        EncodeForge is a professional FFmpeg GUI built with PySide6. Hardware-accelerated batch encoding,
+        AI subtitle generation via Whisper, and smart media renaming — all in one cross-platform desktop app.
+      </p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" id="download-btn" href="https://github.com/SirStig/EncodeForge/releases/latest">Download for Windows</a>
+        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases">All Releases</a>
+        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
     </section>
-    
-    <!-- Modal for full-screen images -->
-    <div id="modal1" class="modal" onclick="closeModal('modal1')">
-        <span class="modal-close">&times;</span>
-        <img class="modal-content" src="screenshots/encoding.png" alt="Video Encoding Interface">
+
+    <!-- ===== FEATURES ===== -->
+    <div id="features" class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Hardware Acceleration</h3>
+        <p>NVIDIA NVENC, AMD AMF, Intel Quick Sync, and Apple VideoToolbox — up to 10x faster than CPU encoding.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>AI Subtitle Generation</h3>
+        <p>Generate subtitles in 90+ languages locally using OpenAI Whisper with GPU acceleration. No cloud required.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🗂</div>
+        <h3>Smart Media Renaming</h3>
+        <p>Auto-detect and rename files using 10+ metadata providers including TMDB, TVDB, AniDB, and Trakt.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📦</div>
+        <h3>Batch Processing</h3>
+        <p>Queue entire libraries and process them overnight. Real-time progress tracking per file and overall.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌐</div>
+        <h3>9 Subtitle Providers</h3>
+        <p>Download from OpenSubtitles, Addic7ed, Jimaku, SubDL, and more — with anime-specific sources built in.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎬</div>
+        <h3>Plex &amp; Jellyfin Ready</h3>
+        <p>Custom naming patterns compatible with Plex and Jellyfin. Preview all changes before applying.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💻</div>
+        <h3>CLI Interface</h3>
+        <p>Full CLI alongside the GUI — encode, subtitle, and rename from scripts or shell with the same core logic.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔓</div>
+        <h3>Free &amp; Open Source</h3>
+        <p>MIT licensed. No telemetry, no subscriptions, no ads. Compiled with Nuitka for self-contained installs.</p>
+      </div>
     </div>
-    <div id="modal2" class="modal" onclick="closeModal('modal2')">
-        <span class="modal-close">&times;</span>
-        <img class="modal-content" src="screenshots/subtitles.png" alt="AI Subtitle Generation">
-    </div>
-    <div id="modal3" class="modal" onclick="closeModal('modal3')">
-        <span class="modal-close">&times;</span>
-        <img class="modal-content" src="screenshots/metadata.png" alt="Smart File Renaming">
-    </div>
-    
-    <section class="features">
-        <div class="container">
-            <h2 class="section-title">Forged For Power Users</h2>
-            
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <h3>Hardware-Accelerated Encoding</h3>
-                    <ul>
-                        <li>NVIDIA NVENC (10x faster)</li>
-                        <li>Intel QuickSync Video</li>
-                        <li>AMD AMF acceleration</li>
-                        <li>Apple VideoToolbox (macOS)</li>
-                        <li>Batch process entire libraries</li>
-                        <li>Smart codec detection</li>
-                        <li>Audio normalization</li>
-                    </ul>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>AI-Powered Subtitles</h3>
-                    <ul>
-                        <li>OpenAI Whisper integration (90+ languages)</li>
-                        <li>GPU-accelerated transcription</li>
-                        <li>10-20x speed with GPU support</li>
-                        <li>Multi-provider subtitle download</li>
-                        <li>OpenSubtitles integration</li>
-                        <li>Anime subtitle providers</li>
-                        <li>Automatic language detection</li>
-                    </ul>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>Smart Media Organization</h3>
-                    <ul>
-                        <li>TMDB movie metadata</li>
-                        <li>TVDB TV show database</li>
-                        <li>AniDB anime support</li>
-                        <li>10+ metadata providers</li>
-                        <li>Custom naming patterns</li>
-                        <li>Preview before renaming</li>
-                        <li>Plex/Jellyfin compatible</li>
-                    </ul>
-                </div>
+
+    <!-- ===== SCREENSHOTS ===== -->
+    <section id="screenshots" class="screenshots-section">
+      <h2>See it in action</h2>
+      <div class="screenshot-list">
+
+        <div class="screenshot-item">
+          <div class="screenshot-img" onclick="openModal('m1')">
+            <img src="screenshots/encoding.png" alt="Hardware-accelerated encoding interface showing NVENC, AMF, and QuickSync options" onerror="this.closest('.screenshot-item').style.display='none'">
+          </div>
+          <div class="screenshot-info">
+            <h3>Hardware-Accelerated Encoding</h3>
+            <p>Transform entire video libraries with your GPU's dedicated encoding hardware. Configure codec, quality, audio normalization, and stream handling — then queue and walk away.</p>
+            <div class="screenshot-tags">
+              <span class="screenshot-tag">NVENC</span>
+              <span class="screenshot-tag">AMF</span>
+              <span class="screenshot-tag">QuickSync</span>
+              <span class="screenshot-tag">VideoToolbox</span>
+              <span class="screenshot-tag">Audio Normalization</span>
+              <span class="screenshot-tag">Stream Copy</span>
             </div>
-            
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <h3>Modern Interface</h3>
-                    <ul>
-                        <li>Dark theme optimized</li>
-                        <li>Real-time progress tracking</li>
-                        <li>Queue management</li>
-                        <li>Drag & drop support</li>
-                        <li>Comprehensive logging</li>
-                        <li>Export logs for debugging</li>
-                    </ul>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>Cross-Platform</h3>
-                    <ul>
-                        <li>Windows (10/11)</li>
-                        <li>Linux (Ubuntu/Debian/Fedora)</li>
-                        <li>Standalone installers</li>
-                        <li>No dependencies to install</li>
-                        <li>Auto-download FFmpeg</li>
-                    </ul>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>100% Free & Open Source</h3>
-                    <ul>
-                        <li>MIT License</li>
-                        <li>No telemetry or tracking</li>
-                        <li>No ads or subscriptions</li>
-                        <li>Community-driven development</li>
-                        <li>Active GitHub repository</li>
-                        <li>Regular updates</li>
-                    </ul>
-                </div>
-            </div>
+          </div>
         </div>
+
+        <div class="screenshot-item">
+          <div class="screenshot-img" onclick="openModal('m2')">
+            <img src="screenshots/subtitles.png" alt="AI subtitle generation with Whisper and multi-provider download interface" onerror="this.closest('.screenshot-item').style.display='none'">
+          </div>
+          <div class="screenshot-info">
+            <h3>AI-Powered Subtitles</h3>
+            <p>Run OpenAI Whisper locally with GPU acceleration for 10–20x faster transcription. Supports 90+ languages, multi-track output, and downloads from 9 subtitle providers as fallback.</p>
+            <div class="screenshot-tags">
+              <span class="screenshot-tag">Whisper AI</span>
+              <span class="screenshot-tag">GPU Accelerated</span>
+              <span class="screenshot-tag">90+ Languages</span>
+              <span class="screenshot-tag">SRT / ASS / VTT</span>
+              <span class="screenshot-tag">Multi-track</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="screenshot-item">
+          <div class="screenshot-img" onclick="openModal('m3')">
+            <img src="screenshots/metadata.png" alt="Smart media renaming interface with TMDB and TVDB metadata providers" onerror="this.closest('.screenshot-item').style.display='none'">
+          </div>
+          <div class="screenshot-info">
+            <h3>Smart Media Organization</h3>
+            <p>Automatically identify and rename movies, TV episodes, and anime using metadata from TMDB, TVDB, AniDB, Kitsu, Jikan, TVmaze, and more. Preview every change before it's applied.</p>
+            <div class="screenshot-tags">
+              <span class="screenshot-tag">TMDB</span>
+              <span class="screenshot-tag">TVDB</span>
+              <span class="screenshot-tag">AniDB</span>
+              <span class="screenshot-tag">Preview Mode</span>
+              <span class="screenshot-tag">Custom Patterns</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </section>
-    
-    <section class="keywords">
-        <div class="container">
-            <h2 class="section-title">Built For</h2>
-            <div class="keyword-tags">
-                <span class="keyword-tag">Media Servers</span>
-                <span class="keyword-tag">Plex Libraries</span>
-                <span class="keyword-tag">Jellyfin Collections</span>
-                <span class="keyword-tag">Video Archives</span>
-                <span class="keyword-tag">Batch Processing</span>
-                <span class="keyword-tag">Hardware Encoding</span>
-                <span class="keyword-tag">NVENC</span>
-                <span class="keyword-tag">QuickSync</span>
-                <span class="keyword-tag">AI Transcription</span>
-                <span class="keyword-tag">Subtitle Management</span>
-                <span class="keyword-tag">File Organization</span>
-                <span class="keyword-tag">FFmpeg Automation</span>
-            </div>
-        </div>
+
+    <!-- ===== MODALS ===== -->
+    <div id="m1" class="modal" onclick="closeModal('m1')">
+      <span class="modal-close" aria-label="Close">&times;</span>
+      <img class="modal-img" src="screenshots/encoding.png" alt="Encoding interface">
+    </div>
+    <div id="m2" class="modal" onclick="closeModal('m2')">
+      <span class="modal-close" aria-label="Close">&times;</span>
+      <img class="modal-img" src="screenshots/subtitles.png" alt="Subtitle generation interface">
+    </div>
+    <div id="m3" class="modal" onclick="closeModal('m3')">
+      <span class="modal-close" aria-label="Close">&times;</span>
+      <img class="modal-img" src="screenshots/metadata.png" alt="Media renaming interface">
+    </div>
+
+    <!-- ===== DOWNLOADS / DOCS ===== -->
+    <section class="landing-section">
+      <h2>Download &amp; Resources</h2>
+      <div class="docs-card">
+        <table>
+          <thead>
+            <tr><th>Platform / Resource</th><th>Link</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Windows (exe)</strong></td>
+              <td><a href="https://github.com/SirStig/EncodeForge/releases/latest">GitHub Releases →</a></td>
+            </tr>
+            <tr>
+              <td><strong>Linux (deb / AppImage)</strong></td>
+              <td><a href="https://github.com/SirStig/EncodeForge/releases/latest">GitHub Releases →</a></td>
+            </tr>
+            <tr>
+              <td>Install from source (Python 3.10+)</td>
+              <td><a href="https://github.com/SirStig/EncodeForge#installation">README →</a></td>
+            </tr>
+            <tr>
+              <td>CLI reference</td>
+              <td><a href="https://github.com/SirStig/EncodeForge#cli-usage">README →</a></td>
+            </tr>
+            <tr>
+              <td>Changelog</td>
+              <td><a href="https://github.com/SirStig/EncodeForge/blob/main/CHANGELOG.md">CHANGELOG.md →</a></td>
+            </tr>
+            <tr>
+              <td>Bug reports &amp; feature requests</td>
+              <td><a href="https://github.com/SirStig/EncodeForge/issues">GitHub Issues →</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
-    
-    <footer>
-        <div class="container">
-            <div class="footer-links">
-                <a href="https://github.com/SirStig/EncodeForge">GitHub Repository</a>
-                <a href="https://github.com/SirStig/EncodeForge/releases">Downloads</a>
-                <a href="https://github.com/SirStig/EncodeForge/issues">Report Bug</a>
-                <a href="https://github.com/SirStig/EncodeForge/discussions">Discussions</a>
-                <a href="https://github.com/SirStig/EncodeForge/wiki">Documentation</a>
-            </div>
-            <p class="copyright">
-                © 2025 EncodeForge • MIT License • Made by SirStig
-            </p>
-        </div>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="site-footer">
+      <span>MIT License · Personal open-source project by <a href="https://github.com/SirStig" target="_blank" rel="noopener">Joshua Kac</a></span>
+      <span>
+        <a href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/SirStig/EncodeForge/releases">Releases</a> ·
+        <a href="https://github.com/SirStig/EncodeForge/blob/main/CHANGELOG.md">Changelog</a>
+      </span>
     </footer>
-    
-    <script>
-        // Platform detection for download button
-        function detectPlatform() {
-            const userAgent = window.navigator.userAgent.toLowerCase();
-            const platform = window.navigator.platform.toLowerCase();
-            
-            if (platform.includes('win') || userAgent.includes('windows')) {
-                return { 
-                    name: 'Windows', 
-                    url: 'https://github.com/SirStig/EncodeForge/releases/download/v0.4.1/encodeforge-0.4.1-windows.exe',
-                    altUrl: 'https://github.com/SirStig/EncodeForge/releases/latest'
-                };
-            } else if (platform.includes('linux') || userAgent.includes('linux')) {
-                // Default to .deb for Debian/Ubuntu, link to releases for RPM option
-                return { 
-                    name: 'Linux', 
-                    url: 'https://github.com/SirStig/EncodeForge/releases/download/v0.4.1/encodeforge_0.4.1-1_amd64.deb',
-                    altUrl: 'https://github.com/SirStig/EncodeForge/releases/latest'
-                };
-            }
-            // Default to Windows
-            return { 
-                name: 'Windows', 
-                url: 'https://github.com/SirStig/EncodeForge/releases/download/v0.4.1/encodeforge-0.4.1-windows.exe',
-                altUrl: 'https://github.com/SirStig/EncodeForge/releases/latest'
-            };
-        }
-        
-        // Update download button based on platform
-        window.addEventListener('DOMContentLoaded', function() {
-            const platform = detectPlatform();
-            const downloadBtn = document.getElementById('primary-download');
-            const downloadText = document.getElementById('download-text');
-            
-            downloadText.textContent = `Download for ${platform.name}`;
-            downloadBtn.href = platform.url;
-        });
-        
-        // Modal functions for full-screen images
-        function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'block';
-            document.body.style.overflow = 'hidden';
-        }
-        
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-        
-        // Close modal on Escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                document.querySelectorAll('.modal').forEach(modal => {
-                    modal.style.display = 'none';
-                });
-                document.body.style.overflow = 'auto';
-            }
-        });
-    </script>
+
+  </div><!-- /.landing -->
+
+  <script>
+    // ===== Theme toggle =====
+    const btn = document.getElementById('themeBtn');
+    const root = document.documentElement;
+    const saved = localStorage.getItem('ef-theme') || 'dark';
+    root.dataset.theme = saved;
+    btn.textContent = saved === 'dark' ? '☀ Light' : '🌙 Dark';
+
+    btn.addEventListener('click', () => {
+      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
+      localStorage.setItem('ef-theme', next);
+      btn.textContent = next === 'dark' ? '☀ Light' : '🌙 Dark';
+    });
+
+    // ===== Platform download button =====
+    (function () {
+      const ua = navigator.userAgent.toLowerCase();
+      const btn = document.getElementById('download-btn');
+      if (!btn) return;
+      const base = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0/';
+      if (/linux/.test(ua)) {
+        btn.textContent = 'Download for Linux';
+        btn.href = base + 'encodeforge_0.5.0-1_amd64.deb';
+      } else if (/mac|darwin/.test(ua)) {
+        btn.textContent = 'Download for macOS';
+        btn.href = 'https://github.com/SirStig/EncodeForge/releases/latest';
+      } else {
+        btn.textContent = 'Download for Windows';
+        btn.href = base + 'encodeforge-0.5.0-windows.exe';
+      }
+    })();
+
+    // ===== Modal =====
+    function openModal(id) {
+      const m = document.getElementById(id);
+      if (m) { m.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    }
+    function closeModal(id) {
+      const m = document.getElementById(id);
+      if (m) { m.classList.remove('open'); document.body.style.overflow = ''; }
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.querySelectorAll('.modal.open').forEach(m => {
+        m.classList.remove('open'); document.body.style.overflow = '';
+      });
+    });
+  </script>
 </body>
 </html>

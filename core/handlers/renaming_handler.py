@@ -723,30 +723,36 @@ class RenamingHandler:
                 "errors": []
             }
     
-    def rename_files(self, file_paths: List[str], dry_run: bool = False, create_backup: bool = False) -> Dict:
+    def rename_files(
+        self,
+        file_paths: List[str],
+        dry_run: bool = False,
+        create_backup: bool = False,
+        preview_settings: Optional[Dict] = None,
+    ) -> Dict:
         """
         Rename media files using metadata
-        
+
         Args:
             file_paths: List of file paths to rename
             dry_run: If True, don't actually rename files
             create_backup: If True, create a backup list of original filenames
-        
+            preview_settings: Optional dict passed to preview_rename (API keys, selected_provider)
+
         Returns:
             Dict with status, renamed count, total count, and results
         """
         import json
         import os
         from datetime import datetime
-        
+
         logger.info(f"=== Starting file renaming for {len(file_paths)} files ===")
         logger.info(f"Dry run: {dry_run}, Create backup: {create_backup}")
-        
+
         results = []
         backup_data = []
-        
-        # First, get metadata for all files (reuse preview logic)
-        preview_result = self.preview_rename(file_paths)
+
+        preview_result = self.preview_rename(file_paths, settings_dict=preview_settings)
         if preview_result["status"] != "success":
             return {
                 "status": "error",
