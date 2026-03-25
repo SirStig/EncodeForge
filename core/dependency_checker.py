@@ -34,11 +34,9 @@ def check_required_packages() -> Dict[str, bool]:
 
 
 def check_optional_packages() -> Dict[str, bool]:
-    """Check all optional AI packages"""
+    """Check optional AI subtitle stack (faster-whisper / CTranslate2, not PyTorch)."""
     return {
-        "whisper": check_package("whisper"),
-        "torch": check_package("torch"),
-        "numba": check_package("numba")
+        "faster_whisper": check_package("faster_whisper"),
     }
 
 

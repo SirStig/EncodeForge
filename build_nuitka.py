@@ -16,6 +16,16 @@ PROJECT_NAME = "EncodeForge"
 MAIN_SCRIPT = "main.py"
 ICON_PATH = "resources/icons/app-icon.png"
 
+# Do not follow legacy / unused ML stacks (faster-whisper uses CTranslate2, not PyTorch).
+NOFOLLOW_IMPORT_TO = (
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "transformers",
+    "tensorflow",
+    "tensorboard",
+)
+
 
 def _windows_pe_version(app_ver: str) -> str:
     """Win32 VERSIONINFO requires a numeric a.b.c.d quad."""
@@ -88,6 +98,9 @@ def build():
         "--include-package=app",
         "--include-package=utils",
     ])
+
+    for mod in NOFOLLOW_IMPORT_TO:
+        cmd.append(f"--nofollow-import-to={mod}")
 
     cmd.extend([
         "--lto=yes",

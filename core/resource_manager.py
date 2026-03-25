@@ -169,14 +169,12 @@ class ResourceManager:
     def should_use_gpu(self) -> bool:
         """Check if GPU acceleration should be used (if available)"""
         try:
-            import torch
-            if torch.cuda.is_available():
-                gpu_count = torch.cuda.device_count()
-                logger.info(f"CUDA available: {gpu_count} GPU(s) detected")
+            from utils.gpu_detector import has_cuda
+            if has_cuda():
+                logger.info("NVIDIA CUDA-capable GPU detected")
                 return True
-        except ImportError:
+        except Exception:
             pass
-        
         logger.info("No GPU acceleration available, using CPU")
         return False
     
