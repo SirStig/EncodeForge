@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Subtitle Providers
 
 - OpenSubtitles, Addic7ed, Jimaku, SubDL, Subscene, BSPlayer, Yify, Podnapisi, Opensubtitles.org
-- `WhisperManager` for local AI subtitle generation with GPU device selection (CUDA, ROCm, MPS, CPU).
+- `WhisperManager` — Local AI subtitle generation via **faster-whisper** (CTranslate2) with GPU device selection (CUDA, ROCm, MPS, CPU).
 - `SubtitleManager` tries providers in configured order; returns first successful result.
 
 #### Build
@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Whisper stack** — Replaced OpenAI Whisper with PyTorch by **faster-whisper**, which uses CTranslate2 for inference: faster transcription, lower memory use, and a lighter dependency footprint than the previous PyTorch-based pipeline.
 - Application rebranded from a Java desktop app to a Python/PySide6 desktop app.
 - All version references updated to `0.5.0`.
 - `setup.py` classifiers updated to reflect PySide6/Qt6 environment.
