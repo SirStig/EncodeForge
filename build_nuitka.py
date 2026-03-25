@@ -4,6 +4,7 @@ Nuitka Build Script for EncodeForge
 Cross-platform compilation script
 """
 
+import os
 import re
 import sys
 import subprocess
@@ -98,15 +99,25 @@ def build():
     for mod in NOFOLLOW_IMPORT_TO:
         cmd.append(f"--nofollow-import-to={mod}")
 
+    override = os.environ.get("NUITKA_LTO", "").lower()
+    if override in ("1", "true", "yes"):
+        lto = "yes"
+    elif override in ("0", "false", "no"):
+        lto = "no"
+    else:
+        ci = os.environ.get("CI", "").lower() in ("1", "true", "yes")
+        lto = "no" if ci else "yes"
+
     cmd.extend([
-        "--lto=yes",
+        f"--lto={lto}",
         "--jobs=4",
     ])
 
     cmd.append(MAIN_SCRIPT)
 
     print(f"\nRunning command:\n{' '.join(cmd)}\n")
-    result = subprocess.run(cmd)
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    result = subprocess.run(cmd, env=env)
 
     if result.returncode == 0:
         print("\nBuild successful. Output in dist/ directory")

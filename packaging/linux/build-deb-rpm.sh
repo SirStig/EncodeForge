@@ -47,14 +47,14 @@ COMMON=(
   --url "https://github.com/SirStig/EncodeForge"
   --description "Desktop video encoding, subtitles, and media tools (PySide6)."
   -C "${STAGE}"
-  opt
-  usr
 )
 
 fpm "${COMMON[@]}" -t deb -v "${DEB_VER}" -a "${FPM_ARCH}" \
-  -p "${ROOT}/dist-packages/encodeforge_${DEB_VER}-1_${FPM_ARCH}.deb"
+  -p "${ROOT}/dist-packages/encodeforge_${DEB_VER}-1_${FPM_ARCH}.deb" \
+  opt usr
 
 fpm "${COMMON[@]}" -t rpm -v "${RPM_VER}" -a native \
-  -p "${ROOT}/dist-packages/encodeforge-${RPM_VER}-1.${ARCH}.rpm"
+  -p "${ROOT}/dist-packages/encodeforge-${RPM_VER}-1.${ARCH}.rpm" \
+  opt usr
 
 echo "Wrote packages under dist-packages/"
