@@ -77,6 +77,7 @@ class ConversionSettings:
     overwrite_existing: bool = False
     dry_run: bool = False
     output_format: str = "mp4"
+    audio_track_selection: str = "all"  # "all" or "first"
 
 
 @dataclass

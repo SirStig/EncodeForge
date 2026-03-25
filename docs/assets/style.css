@@ -148,6 +148,7 @@ code {
   background: var(--glass-md);
   text-decoration: none;
 }
+.header-nav a.active { color: var(--text); font-weight: 600; }
 
 .header-badge {
   display: inline-flex;
@@ -442,6 +443,60 @@ code {
 }
 .site-footer a { color: var(--muted); }
 .site-footer a:hover { color: var(--text); text-decoration: none; }
+
+.doc-footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--faint);
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.doc-footer a { color: var(--muted); }
+.doc-footer a:hover { color: var(--text); text-decoration: none; }
+
+.changelog-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.page-title { font-size: 1.75rem; margin-bottom: 0.4rem; }
+.page-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+
+#changelog-body h1 { font-size: 1.6rem; margin: 0 0 0.5rem; }
+#changelog-body h2 {
+  font-size: 1.15rem;
+  margin: 2.5rem 0 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+#changelog-body h3 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 1.25rem 0 0.45rem;
+}
+#changelog-body p { margin: 0.55rem 0; color: var(--muted); font-size: 0.9rem; }
+#changelog-body ul { padding-left: 1.25rem; color: var(--muted); font-size: 0.9rem; }
+#changelog-body li { margin: 0.28rem 0; }
+#changelog-body code { font-size: 0.8em; }
+#changelog-body a { word-break: break-word; }
+
+#changelog-status.banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--r);
+  border: 1px solid var(--border-md);
+  background: var(--glass);
+  color: var(--muted);
+}
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {

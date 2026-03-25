@@ -52,24 +52,22 @@ class SubDLProvider(BaseSubtitleProvider):
             if not search_term:
                 return results
             
-            # Convert language codes to 2-letter format for SubDL
+            # Convert 3-letter ISO 639-2 codes to 2-letter ISO 639-1 for SubDL
+            _lang3_to_2 = {
+                'eng': 'en', 'spa': 'es', 'fre': 'fr', 'fra': 'fr', 'ger': 'de', 'deu': 'de',
+                'ita': 'it', 'por': 'pt', 'pob': 'pt', 'rus': 'ru', 'ara': 'ar',
+                'chi': 'zh', 'zho': 'zh', 'zht': 'zh', 'jpn': 'ja', 'kor': 'ko',
+                'hin': 'hi', 'tha': 'th', 'vie': 'vi', 'tur': 'tr', 'pol': 'pl',
+                'dut': 'nl', 'nld': 'nl', 'swe': 'sv', 'nor': 'no', 'dan': 'da',
+                'fin': 'fi', 'cze': 'cs', 'ces': 'cs', 'gre': 'el', 'ell': 'el',
+                'heb': 'he', 'hun': 'hu', 'rum': 'ro', 'ron': 'ro', 'ind': 'id',
+                'may': 'ms', 'per': 'fa', 'fas': 'fa', 'ukr': 'uk', 'bul': 'bg',
+                'hrv': 'hr', 'srp': 'sr', 'slv': 'sl', 'lit': 'lt', 'lav': 'lv',
+            }
             subdl_languages = []
             for lang in languages:
                 if len(lang) == 3:
-                    if lang.lower() == 'eng':
-                        subdl_languages.append('en')
-                    elif lang.lower() == 'spa':
-                        subdl_languages.append('es')
-                    elif lang.lower() == 'fre':
-                        subdl_languages.append('fr')
-                    elif lang.lower() == 'ger':
-                        subdl_languages.append('de')
-                    elif lang.lower() == 'por':
-                        subdl_languages.append('pt')
-                    elif lang.lower() == 'ita':
-                        subdl_languages.append('it')
-                    else:
-                        subdl_languages.append(lang[:2].lower())
+                    subdl_languages.append(_lang3_to_2.get(lang.lower(), lang[:2].lower()))
                 else:
                     subdl_languages.append(lang.lower())
             

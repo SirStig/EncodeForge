@@ -87,7 +87,7 @@ class FFmpegManager:
             ffmpeg_path = Path(ffmpeg_in_path)
             if self._validate_ffmpeg(ffmpeg_path):
                 self._ffmpeg_path = ffmpeg_path
-                
+
                 # Try to find ffprobe
                 ffprobe_in_path = shutil.which(ffprobe_exe)
                 if ffprobe_in_path:
@@ -97,10 +97,12 @@ class FFmpegManager:
                     potential_ffprobe = ffmpeg_path.parent / ffprobe_exe
                     if potential_ffprobe.exists():
                         self._ffprobe_path = potential_ffprobe
-                
+
                 logger.info(f"FFmpeg found in PATH: {self._ffmpeg_path}")
                 return True
-        
+            else:
+                logger.warning(f"FFmpeg on PATH ({ffmpeg_path}) failed validation, continuing search")
+
         # Try common installation directories
         search_paths = self._get_common_paths()
         
@@ -239,17 +241,21 @@ class FFmpegManager:
     def get_ffprobe_path(self) -> Optional[Path]:
         """
         Get the FFprobe executable path.
-        
+
         Returns:
             Path to FFprobe or None if not found
         """
-        if not self._ffprobe_path and self._ffmpeg_path:
-            # Try to find ffprobe near ffmpeg
-            ffprobe_exe = "ffprobe.exe" if platform.system() == "Windows" else "ffprobe"
-            potential_ffprobe = self._ffmpeg_path.parent / ffprobe_exe
-            if potential_ffprobe.exists():
-                self._ffprobe_path = potential_ffprobe
-        
+        if not self._ffprobe_path:
+            if not self._ffmpeg_path:
+                # Detection not yet run — trigger it now
+                self.detect_ffmpeg()
+            if self._ffmpeg_path:
+                # Try to find ffprobe near ffmpeg
+                ffprobe_exe = "ffprobe.exe" if platform.system() == "Windows" else "ffprobe"
+                potential_ffprobe = self._ffmpeg_path.parent / ffprobe_exe
+                if potential_ffprobe.exists():
+                    self._ffprobe_path = potential_ffprobe
+
         return self._ffprobe_path
     
     def set_ffmpeg_path(self, ffmpeg_path: Path, ffprobe_path: Optional[Path] = None):

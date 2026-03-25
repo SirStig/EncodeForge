@@ -221,18 +221,19 @@ def _detect_amd() -> List[GPUInfo]:
             )
             
             if result.returncode == 0:
-                # Parse rocm-smi output
+                # Parse rocm-smi output — lines look like:
+                # "GPU[0]    : Card Series    : Radeon RX 6800 XT"
                 for line in result.stdout.split('\n'):
-                    if 'GPU' in line and 'Card series' in line:
-                        # Extract GPU model name
+                    line_lower = line.lower()
+                    if 'gpu' in line_lower and 'card series' in line_lower:
                         parts = line.split(':')
-                        if len(parts) > 1:
-                            model = parts[1].strip()
+                        if len(parts) >= 3:
+                            model = parts[2].strip()
                             gpus.append(GPUInfo(
                                 vendor="amd",
                                 model=model
                             ))
-                
+
                 logger.info(f"Detected {len(gpus)} AMD GPU(s) via rocm-smi")
         
         except FileNotFoundError:
@@ -272,7 +273,8 @@ def _detect_amd() -> List[GPUInfo]:
                 logger.debug(f"DRM detection error: {e}")
     
     elif system == "windows":
-        # Try wmic on Windows
+        # Try wmic first (deprecated on Windows 11 — fallback to PowerShell below)
+        _amd_gpu_names = []
         try:
             result = subprocess.run(
                 ["wmic", "path", "win32_VideoController", "get", "name"],
@@ -280,22 +282,40 @@ def _detect_amd() -> List[GPUInfo]:
                 text=True,
                 timeout=5
             )
-            
+
             if result.returncode == 0:
-                for line in result.stdout.split('\n')[1:]:  # Skip header
-                    line = line.strip()
-                    if line and ('AMD' in line.upper() or 'Radeon' in line):
-                        gpus.append(GPUInfo(
-                            vendor="amd",
-                            model=line
-                        ))
-                
-                if gpus:
-                    logger.info(f"Detected {len(gpus)} AMD GPU(s) via wmic")
-        
+                _amd_gpu_names = [
+                    line.strip() for line in result.stdout.split('\n')[1:]
+                    if line.strip() and ('AMD' in line.upper() or 'Radeon' in line)
+                ]
+                if _amd_gpu_names:
+                    logger.info(f"Detected {len(_amd_gpu_names)} AMD GPU(s) via wmic")
+
         except Exception as e:
-            logger.debug(f"wmic error: {e}")
-    
+            logger.debug(f"wmic unavailable: {e}, trying PowerShell fallback")
+            try:
+                ps_result = subprocess.run(
+                    [
+                        "powershell", "-NoProfile", "-Command",
+                        "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if ps_result.returncode == 0:
+                    _amd_gpu_names = [
+                        line.strip() for line in ps_result.stdout.split('\n')
+                        if line.strip() and ('AMD' in line.upper() or 'Radeon' in line)
+                    ]
+                    if _amd_gpu_names:
+                        logger.info(f"Detected {len(_amd_gpu_names)} AMD GPU(s) via PowerShell")
+            except Exception as ps_err:
+                logger.debug(f"PowerShell fallback also failed: {ps_err}")
+
+        for name in _amd_gpu_names:
+            gpus.append(GPUInfo(vendor="amd", model=name))
+
     return gpus
 
 
@@ -355,6 +375,7 @@ def _detect_intel() -> List[GPUInfo]:
     system = platform.system().lower()
     
     if system == "windows":
+        _intel_gpu_names = []
         try:
             result = subprocess.run(
                 ["wmic", "path", "win32_VideoController", "get", "name"],
@@ -362,19 +383,36 @@ def _detect_intel() -> List[GPUInfo]:
                 text=True,
                 timeout=5
             )
-            
+
             if result.returncode == 0:
-                for line in result.stdout.split('\n')[1:]:  # Skip header
-                    line = line.strip()
-                    if line and 'Intel' in line:
-                        gpus.append(GPUInfo(
-                            vendor="intel",
-                            model=line
-                        ))
-        
+                _intel_gpu_names = [
+                    line.strip() for line in result.stdout.split('\n')[1:]
+                    if line.strip() and 'Intel' in line
+                ]
+
         except Exception as e:
-            logger.debug(f"Intel detection error: {e}")
-    
+            logger.debug(f"wmic unavailable for Intel detection: {e}, trying PowerShell")
+            try:
+                ps_result = subprocess.run(
+                    [
+                        "powershell", "-NoProfile", "-Command",
+                        "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if ps_result.returncode == 0:
+                    _intel_gpu_names = [
+                        line.strip() for line in ps_result.stdout.split('\n')
+                        if line.strip() and 'Intel' in line
+                    ]
+            except Exception as ps_err:
+                logger.debug(f"PowerShell Intel detection failed: {ps_err}")
+
+        for name in _intel_gpu_names:
+            gpus.append(GPUInfo(vendor="intel", model=name))
+
     return gpus
 
 

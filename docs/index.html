@@ -6,8 +6,8 @@
 
   <!-- SEO -->
   <title>EncodeForge — FFmpeg GUI for Video Encoding, AI Subtitles &amp; Media Renaming</title>
-  <meta name="description" content="EncodeForge is a free, open-source PySide6 desktop application for hardware-accelerated video encoding, AI subtitle generation with Whisper, and smart media renaming. Built for Windows, macOS, and Linux by Joshua Kac.">
-  <meta name="keywords" content="encodeforge, ffmpeg gui, pyside6, qt6, video encoding, hardware acceleration, nvenc, quicksync, amd amf, videotoolbox, ai subtitles, whisper, opensubtitles, media renaming, tmdb, tvdb, batch encoding, python desktop app, joshua kac">
+  <meta name="description" content="EncodeForge is a free, open-source PySide6 desktop application for hardware-accelerated video encoding, AI subtitles with faster-whisper (v0.5.0 — much faster than v0.4.x), and smart media renaming. Windows, macOS, and Linux.">
+  <meta name="keywords" content="encodeforge, ffmpeg gui, pyside6, qt6, video encoding, hardware acceleration, nvenc, quicksync, amd amf, videotoolbox, ai subtitles, faster-whisper, whisper, ctranslate2, opensubtitles, media renaming, tmdb, tvdb, batch encoding, python desktop app, joshua kac">
   <meta name="author" content="Joshua Kac">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://sirstig.github.io/EncodeForge/">
@@ -21,7 +21,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sirstig.github.io/EncodeForge/">
   <meta property="og:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta property="og:description" content="Hardware-accelerated video encoding, AI subtitle generation, and smart media renaming. Free and open source. Built by Joshua Kac.">
+  <meta property="og:description" content="Hardware-accelerated encoding and smart renaming. v0.5.0 uses faster-whisper for AI subtitles — much faster than the v0.4.x stack. Free and open source.">
   <meta property="og:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -32,7 +32,7 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta name="twitter:description" content="Hardware-accelerated video encoding, AI subtitle generation, and smart media renaming. Free and open source. Built by Joshua Kac.">
+  <meta name="twitter:description" content="Hardware-accelerated encoding and smart renaming. v0.5.0: faster-whisper for AI subtitles — much faster than v0.4.x. Free and open source.">
   <meta name="twitter:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta name="twitter:creator" content="@SirStig">
 
@@ -48,16 +48,16 @@
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Windows, macOS, Linux",
         "programmingLanguage": "Python",
-        "softwareVersion": "0.5.0",
+        "softwareVersion": "0.5.0-alpha-1",
         "datePublished": "2026-03-24",
-        "dateModified": "2026-03-24",
+        "dateModified": "2026-03-25",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "url": "https://sirstig.github.io/EncodeForge/",
         "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/latest",
         "codeRepository": "https://github.com/SirStig/EncodeForge",
         "license": "https://opensource.org/licenses/MIT",
-        "description": "Free open-source PySide6 FFmpeg GUI for hardware-accelerated video encoding, AI subtitle generation, and smart media renaming.",
-        "keywords": "ffmpeg gui, video encoding, hardware acceleration, nvenc, ai subtitles, whisper, media renaming, pyside6, python, open source",
+        "description": "Free open-source PySide6 FFmpeg GUI for hardware-accelerated video encoding, AI subtitles via faster-whisper (v0.5.0), and smart media renaming.",
+        "keywords": "ffmpeg gui, video encoding, hardware acceleration, nvenc, ai subtitles, faster-whisper, whisper, media renaming, pyside6, python, open source",
         "author": { "@id": "https://github.com/SirStig#person" },
         "maintainer": { "@id": "https://github.com/SirStig#person" }
       },
@@ -88,6 +88,7 @@
     <nav class="header-nav">
       <a href="#features">Features</a>
       <a href="#screenshots">Screenshots</a>
+      <a href="changelog.html">Changelog</a>
       <a href="https://github.com/SirStig/EncodeForge/releases" target="_blank" rel="noopener">Releases</a>
       <a class="header-badge" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
       <button class="theme-btn" type="button" id="themeBtn" aria-label="Toggle theme">☀ Light</button>
@@ -98,11 +99,12 @@
 
     <!-- ===== HERO ===== -->
     <section class="hero">
-      <div class="hero-eyebrow">Open source · MIT License · v0.5.0</div>
+      <div class="hero-eyebrow">Open source · MIT License · v0.5.0-alpha-1 (PySide6, unreleased)</div>
       <h1>Encode, subtitle,<br>and organize your media</h1>
       <p class="hero-sub">
         EncodeForge is a professional FFmpeg GUI built with PySide6. Hardware-accelerated batch encoding,
-        AI subtitle generation via Whisper, and smart media renaming — all in one cross-platform desktop app.
+        <strong>v0.5.0</strong> AI subtitles via <strong>faster-whisper</strong> (CTranslate2) — <strong>much faster</strong> and lighter than the OpenAI Whisper + PyTorch path in v0.4.x — plus smart media renaming, all in one app.
+        Installable releases are still <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">v0.4.1</a> (JavaFX; deprecated) until this line ships.
       </p>
       <div class="hero-ctas">
         <a class="btn btn-primary" id="download-btn" href="https://github.com/SirStig/EncodeForge/releases/latest">Download for Windows</a>
@@ -121,7 +123,7 @@
       <div class="feature-card">
         <div class="feature-icon">🤖</div>
         <h3>AI Subtitle Generation</h3>
-        <p>Generate subtitles in 90+ languages locally using OpenAI Whisper with GPU acceleration. No cloud required.</p>
+        <p><strong>v0.5.0:</strong> Local subtitles in 90+ languages with <strong>faster-whisper</strong> and GPU acceleration — dramatically faster than the v0.4.x Whisper stack. No cloud required.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🗂</div>
@@ -135,7 +137,7 @@
       </div>
       <div class="feature-card">
         <div class="feature-icon">🌐</div>
-        <h3>9 Subtitle Providers</h3>
+        <h3>8 Subtitle Providers</h3>
         <p>Download from OpenSubtitles, Addic7ed, Jimaku, SubDL, and more — with anime-specific sources built in.</p>
       </div>
       <div class="feature-card">
@@ -180,13 +182,13 @@
 
         <div class="screenshot-item">
           <div class="screenshot-img" onclick="openModal('m2')">
-            <img src="screenshots/subtitles.png" alt="AI subtitle generation with Whisper and multi-provider download interface" onerror="this.closest('.screenshot-item').style.display='none'">
+            <img src="screenshots/subtitles.png" alt="AI subtitle generation with faster-whisper and multi-provider download interface" onerror="this.closest('.screenshot-item').style.display='none'">
           </div>
           <div class="screenshot-info">
             <h3>AI-Powered Subtitles</h3>
-            <p>Run OpenAI Whisper locally with GPU acceleration for 10–20x faster transcription. Supports 90+ languages, multi-track output, and downloads from 9 subtitle providers as fallback.</p>
+            <p><strong>v0.5.0</strong> runs <strong>faster-whisper</strong> (CTranslate2) locally with GPU acceleration — far quicker and more memory-efficient than the JavaFX OpenAI Whisper pipeline. Supports 90+ languages, multi-track output, and downloads from 8 subtitle providers as fallback.</p>
             <div class="screenshot-tags">
-              <span class="screenshot-tag">Whisper AI</span>
+              <span class="screenshot-tag">faster-whisper</span>
               <span class="screenshot-tag">GPU Accelerated</span>
               <span class="screenshot-tag">90+ Languages</span>
               <span class="screenshot-tag">SRT / ASS / VTT</span>
@@ -222,7 +224,7 @@
     </div>
     <div id="m2" class="modal" onclick="closeModal('m2')">
       <span class="modal-close" aria-label="Close">&times;</span>
-      <img class="modal-img" src="screenshots/subtitles.png" alt="Subtitle generation interface">
+      <img class="modal-img" src="screenshots/subtitles.png" alt="AI subtitle generation with faster-whisper">
     </div>
     <div id="m3" class="modal" onclick="closeModal('m3')">
       <span class="modal-close" aria-label="Close">&times;</span>
@@ -256,7 +258,7 @@
             </tr>
             <tr>
               <td>Changelog</td>
-              <td><a href="https://github.com/SirStig/EncodeForge/blob/main/CHANGELOG.md">CHANGELOG.md →</a></td>
+              <td><a href="changelog.html">Changelog (web) →</a> · <a href="https://github.com/SirStig/EncodeForge/blob/HEAD/CHANGELOG.md" target="_blank" rel="noopener">GitHub ↗</a></td>
             </tr>
             <tr>
               <td>Bug reports &amp; feature requests</td>
@@ -273,7 +275,7 @@
       <span>
         <a href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub</a> ·
         <a href="https://github.com/SirStig/EncodeForge/releases">Releases</a> ·
-        <a href="https://github.com/SirStig/EncodeForge/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="changelog.html">Changelog</a>
       </span>
     </footer>
 
@@ -299,16 +301,16 @@
       const ua = navigator.userAgent.toLowerCase();
       const btn = document.getElementById('download-btn');
       if (!btn) return;
-      const base = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0/';
+      const latest = 'https://github.com/SirStig/EncodeForge/releases/latest';
       if (/linux/.test(ua)) {
         btn.textContent = 'Download for Linux';
-        btn.href = base + 'encodeforge_0.5.0-1_amd64.deb';
+        btn.href = latest;
       } else if (/mac|darwin/.test(ua)) {
         btn.textContent = 'Download for macOS';
-        btn.href = 'https://github.com/SirStig/EncodeForge/releases/latest';
+        btn.href = latest;
       } else {
         btn.textContent = 'Download for Windows';
-        btn.href = base + 'encodeforge-0.5.0-windows.exe';
+        btn.href = latest;
       }
     })();
 

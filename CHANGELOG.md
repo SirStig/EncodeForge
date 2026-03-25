@@ -7,11 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.5.0] — 2026-03-24
+## [0.5.0-alpha-1] — *Unreleased*
+
+> **PySide6 line (this version) is not published on GitHub Releases yet.** The latest installable release is **[v0.4.1](https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1)** (JavaFX; deprecated).
 
 ### Highlights
 
 **Complete rewrite from JavaFX to PySide6.** EncodeForge has been rebuilt from the ground up using Python and PySide6 with Fluent Design components. The legacy JavaFX/Java codebase has been retired entirely. The GUI and CLI now share a single core (`EncodeForgeCore`) with no logic duplication.
+
+---
+
+### Fixed
+
+#### FFmpeg & Conversion Pipeline
+
+- **FFmpeg path resolution** — All FFmpeg/FFprobe subprocess calls now route through `FFmpegManager` instead of falling back to bare `"ffmpeg"`/`"ffprobe"` strings. On systems where FFmpeg is installed outside of `PATH` (e.g. Homebrew-only macOS, custom Windows installs), conversions previously failed silently. They now raise a clear error if FFmpeg is not detected.
+- **FFmpeg detection fallthrough** — If `shutil.which()` resolves FFmpeg to a broken binary (e.g. a dead Homebrew symlink), detection no longer stops there. It now logs a warning and continues searching common installation paths on all platforms.
+- **FFprobe auto-detection** — `get_ffprobe_path()` now triggers the full FFmpeg detection routine when called before detection has run, instead of silently returning `None`.
+- **Audio normalization with stream copy** — Enabling audio normalization (`loudnorm` filter) while the audio codec was set to `copy` caused a hard FFmpeg error, because filters cannot be applied to a copy stream. The codec is now automatically switched to `aac` in this case, with a log warning explaining the override.
+- **10-bit video H.264 hardware fallback** — The fallback path that re-encodes 10-bit sources to 8-bit H.264 using hardware encoders (NVENC, AMF, QSV, VideoToolbox) was structurally unreachable — it shared the same conditions as the HEVC block above it, so if HEVC hardware was available it returned early, and if it wasn't, the H.264 block couldn't match either. The fallback now correctly activates only when no HEVC hardware encoder is found.
+- **Unsafe FPS parsing** — Frame rate values from FFprobe were parsed using `eval()`, which could crash on malformed input (e.g. `0/0` raises `ZeroDivisionError`) and is generally unsafe. Replaced with `fractions.Fraction` for safe, stdlib-only parsing.
+- **Partial output file cleanup** — When a conversion fails or produces an empty output file, the partial file is now deleted automatically. Previously it was left on disk, blocking re-runs unless `overwrite_existing` was enabled.
+- **Output path deduplication loop** — The loop that generates unique output filenames (e.g. `video_1.mp4`, `video_2.mp4`) had no upper bound. Added a 9,999-attempt cap that returns a clear error instead of looping indefinitely.
+- **`audio_track_selection` not persisted** — The audio track selection (`all` / `first audio only`) was read via `getattr` with a default because the field was missing from `ConversionSettings`. It is now a proper dataclass field and will round-trip correctly through settings serialization.
+
+#### GPU Detection
+
+- **AMD GPU detection via rocm-smi** — The rocm-smi output parser checked for `'Card series'` (lowercase `s`) but the actual output uses `'Card Series'` (capital `S`), causing AMD GPUs to never be detected on ROCm Linux systems. Fixed with a case-insensitive match and corrected column extraction.
+- **GPU detection on Windows 11** — `wmic`, used to detect AMD and Intel GPUs, has been removed from some Windows 11 builds. Both `_detect_amd` and `_detect_intel` now fall back to `Get-CimInstance Win32_VideoController` via PowerShell when `wmic` is unavailable.
+
+#### Subtitle Providers
+
+- **OpenSubtitles.com** — Fixed a circular import crash (`from subtitle_manager import SubtitleProviders`) that caused a `ModuleNotFoundError` at runtime whenever a search was attempted. `OpenSubtitlesManager` now properly extends `BaseSubtitleProvider` and calls `self.extract_media_metadata()` directly.
+- **Addic7ed** — Fixed the episode subtitle search navigating to the show overview page (`/show/{id}`) instead of the season page (`/show/{id}/{season}`), which caused the provider to never return episode-specific results. Download method now uses the stored `download_url` directly instead of re-searching with a garbled file ID.
+- **SubDL** — Expanded language code conversion from 5 languages to the full set of 30+ supported ISO 639-2 codes. Previously, uncommon languages silently fell back to wrong 2-letter prefixes.
+- **`subtitle_manager.py`** — Removed stale `self.providers` list referencing non-existent internal names. Replaced 4-language hardcoded language normalization with a complete 2-letter → 3-letter mapping (30+ languages). Removed phantom provider names (`Subscene`, `AnimeSubtitles`) from the scoring table.
 
 ---
 
@@ -21,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`EncodeForgeCore`** — New single entry point for all GUI and CLI operations. Lazily initializes handlers on first use via a thread lock, keeping startup fast even with heavy dependencies like Whisper.
 - **Handler layer** — `ConversionHandler`, `FileHandler`, `SubtitleHandler`, `RenamingHandler` contain all business logic; no UI code in core.
-- **Provider layer** — Abstract-base + concrete-implementation pattern for both metadata (8+ providers) and subtitle (9+ providers) subsystems.
+- **Provider layer** — Abstract-base + concrete-implementation pattern for both metadata (8+ providers) and subtitle (8+ providers) subsystems.
 - **`SettingsManager`** — JSON-backed nested dataclass settings (`EncoderSettings`, `SubtitleSettings`, `RenamerSettings`, `UISettings`).
 - **`DownloadManager`** — Resumable downloads with SHA256 hash verification and progress callbacks.
 - **`ThemeManager`** — Glassmorphism CSS theming with dark/light mode support.
@@ -49,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Subtitle Providers
 
-- OpenSubtitles, Addic7ed, Jimaku, SubDL, Subscene, BSPlayer, Yify, Podnapisi, Opensubtitles.org
+- OpenSubtitles.com (API), Addic7ed, SubDL (API), Subf2m, YIFY, Podnapisi, SubDivX, Jimaku (Kitsunekko was removed — see **Removed**)
 - `WhisperManager` — Local AI subtitle generation via **faster-whisper** (CTranslate2) with GPU device selection (CUDA, ROCm, MPS, CPU).
 - `SubtitleManager` tries providers in configured order; returns first successful result.
 
@@ -62,6 +92,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+#### Subtitle Providers
+
+- **Kitsunekko** — Removed. The provider was a non-functional placeholder: `search()` never made any network requests and instead fabricated fake result objects, logging "prepared N placeholder result(s)". Downloads would fail for every result it produced. The file `core/providers/subtitle/kitsunekko_provider.py` has been deleted.
+
+#### Platform / distribution
+
 - **JavaFX / Java codebase** — Fully retired. The previous JavaFX implementation is no longer maintained or distributed.
 - Maven build system — replaced by Python packaging (`setup.py`) and Nuitka.
 - JAR packaging — replaced by Nuitka-compiled native executables.
@@ -72,21 +108,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Whisper stack** — Replaced OpenAI Whisper with PyTorch by **faster-whisper**, which uses CTranslate2 for inference: faster transcription, lower memory use, and a lighter dependency footprint than the previous PyTorch-based pipeline.
 - Application rebranded from a Java desktop app to a Python/PySide6 desktop app.
-- All version references updated to `0.5.0`.
+- All version references updated to `0.5.0-alpha-1` for the PySide6 line.
 - `setup.py` classifiers updated to reflect PySide6/Qt6 environment.
 
 ---
 
 ### Release Links
 
-- **Tag**: [v0.5.0](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0)
-- **Full Changelog**: [v0.4.1...v0.5.0](https://github.com/SirStig/EncodeForge/compare/v0.4.1...v0.5.0)
+- **Status** — Pre-release; no GitHub Release tag for `0.5.0-alpha-1` yet.
+- **Compare (development)** — [v0.4.1...HEAD](https://github.com/SirStig/EncodeForge/compare/v0.4.1...HEAD)
 
 ---
 
 ## [0.4.1] — 2025-10-24
 
-> **Note:** This was the final JavaFX release. JavaFX has since been replaced by PySide6 in v0.5.0.
+> **Note:** This was the final JavaFX release and remains the latest **published** binary. The PySide6 rewrite is in development as **0.5.0-alpha-1** (unreleased).
 
 ### Highlights
 

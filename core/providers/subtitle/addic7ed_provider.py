@@ -147,8 +147,9 @@ class Addic7edProvider(BaseSubtitleProvider):
             # Step 2: Get subtitles for specific episode (if TV show)
             if season and episode and show_id:
                 try:
-                    # Navigate to season/episode page
-                    episode_url = f"https://www.addic7ed.com/show/{show_id}"
+                    # Navigate to the season page - lists all episodes for that season
+                    # URL format: /show/{show_id}/{season_number}
+                    episode_url = f"https://www.addic7ed.com/show/{show_id}/{season}"
                     time.sleep(1)
                     req2 = urllib.request.Request(episode_url, headers=headers)
                     
@@ -243,17 +244,13 @@ class Addic7edProvider(BaseSubtitleProvider):
         return results
     
     def download(self, file_id: str, download_url: str, output_path: str) -> tuple:
-        """Download from Addic7ed (web scraping with anti-bot handling)"""
+        """Download from Addic7ed using the stored download URL."""
         try:
             logger.info(f"Attempting to download from Addic7ed: {file_id}")
-            
-            parts = file_id.replace("addic7ed_", "").rsplit("_", 1)
-            if len(parts) != 2:
-                return False, "Invalid Addic7ed file_id format"
-            
-            show_episode = parts[0]
-            language = parts[1]
-            
+
+            if not download_url:
+                return False, "No Addic7ed download URL provided"
+
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -262,62 +259,39 @@ class Addic7edProvider(BaseSubtitleProvider):
                 'DNT': '1',
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
+                'Referer': 'https://www.addic7ed.com/',
                 'Pragma': 'no-cache',
                 'Cache-Control': 'no-cache'
             }
-            
-            search_url = f"https://www.addic7ed.com/search.php?search={urllib.parse.quote(show_episode)}"
+
             time.sleep(0.5)
-            req = urllib.request.Request(search_url, headers=headers)
-            
-            with urllib.request.urlopen(req, timeout=15) as response:
-                html = response.read()
-                if html[:2] == b'\x1f\x8b':
-                    html = gzip.decompress(html)
-                html = html.decode('utf-8', errors='ignore')
-            
-            download_patterns = [
-                r'href="(/original/[^"]+)"',
-                r'href="(/updated/[^"]+)"',
-                r'href="(\/downloadexport\.php\?[^"]+)"'
-            ]
-            
-            for pattern in download_patterns:
-                matches = re.findall(pattern, html)
-                if matches:
-                    download_path = matches[0]
-                    download_link = f"https://www.addic7ed.com{download_path}"
-                    
-                    time.sleep(0.5)
-                    req2 = urllib.request.Request(download_link, headers=headers)
-                    with urllib.request.urlopen(req2, timeout=15) as dl_response:
-                        content = dl_response.read()
-                        if content[:2] == b'\x1f\x8b':
-                            content = gzip.decompress(content)
-                        
-                        with open(output_path, 'wb') as f:
-                            f.write(content)
-                        
-                        logger.info(f"✅ Downloaded from Addic7ed: {output_path}")
-                        return True, output_path
-            
-            # Manual download fallback
-            message = (
-                f"Addic7ed automatic download failed (anti-bot protection).\n\n"
-                f"Manual download steps:\n"
-                f"1. Visit: {search_url}\n"
-                f"2. Find your episode: {show_episode}\n"
-                f"3. Select language: {language}\n"
-                f"4. Click download button\n"
-                f"5. Use 'External File' option to apply\n\n"
-                f"💡 Tip: Addic7ed has excellent TV show subtitles!"
-            )
-            logger.warning("⚠️ Addic7ed requires manual download")
-            return False, message
-            
+            req = urllib.request.Request(download_url, headers=headers)
+
+            with urllib.request.urlopen(req, timeout=30) as dl_response:
+                content = dl_response.read()
+                if content[:2] == b'\x1f\x8b':
+                    content = gzip.decompress(content)
+
+                with open(output_path, 'wb') as f:
+                    f.write(content)
+
+                logger.info(f"✅ Downloaded from Addic7ed: {output_path}")
+                return True, output_path
+
+        except urllib.error.HTTPError as e:
+            if e.code == 403:
+                message = (
+                    f"Addic7ed blocked the download request (HTTP 403 — anti-bot protection).\n\n"
+                    f"Manual download steps:\n"
+                    f"1. Visit: {download_url}\n"
+                    f"2. Click the download button\n"
+                    f"3. Use 'External File' option to apply\n\n"
+                    f"💡 Tip: Addic7ed has excellent TV show subtitles!"
+                )
+                logger.warning("⚠️ Addic7ed download blocked (403)")
+                return False, message
+            logger.error(f"Addic7ed HTTP {e.code} on download: {e.reason}")
+            return False, f"Addic7ed HTTP {e.code}: {e.reason}"
         except Exception as e:
             logger.error(f"Addic7ed download error: {e}", exc_info=True)
             return False, f"Addic7ed error: {str(e)}"

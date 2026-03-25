@@ -23,24 +23,27 @@
 
 **EncodeForge** is a free, open-source FFmpeg GUI built with Python and PySide6. It brings professional video encoding, AI subtitle generation, and media file management into a single, clean desktop application — no command-line experience required.
 
-**v0.5.0** is a full rewrite from JavaFX to PySide6 with a modern Fluent-style UI, improved performance, and a unified settings layer for the **desktop app**. Command-line and web interfaces are planned for a later release.
+**v0.5.0-alpha-1** is the in-development PySide6 rewrite: modern Fluent-style UI, improved performance, and a unified settings layer for the **desktop app**. It is **not** on GitHub Releases yet. **v0.4.1** remains the latest published binary (JavaFX; deprecated). Command-line and web interfaces are planned for a later release.
+
+**AI subtitles in v0.5.0** use **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** (Whisper models via **CTranslate2**) instead of the OpenAI Whisper + PyTorch path from the JavaFX era. Expect **much faster** transcription, **lower RAM use**, and the same GPU backends (CUDA, ROCm, Apple Silicon, CPU) — a clear upgrade over **v0.4.x**.
 
 ### Why EncodeForge?
 
 - **Batch Processing** — Convert entire video libraries while you sleep
 - **Hardware Accelerated** — Leverage your GPU for lightning-fast encoding via NVENC, AMF, Quick Sync, or VideoToolbox
-- **AI-Powered** — Generate high-quality subtitles in 90+ languages locally with OpenAI Whisper
+- **AI-Powered** — **v0.5.0:** faster-whisper (CTranslate2) for local subtitles in 90+ languages — far faster than the v0.4.x Whisper stack
 - **Modern UI** — Clean PySide6 interface with Fluent Design and dark/light theme support
 - **Cross-Platform** — Windows, macOS, and Linux
 - **Self-Contained builds** — Nuitka targets bundled Python dependencies; FFmpeg is still required (Whisper models download in-app)
-- **CLI** — Not implemented in v0.5.0; use `python main.py` or `python cli.py gui`
+- **CLI** — Not implemented in v0.5.0-alpha-1; use `python main.py` or `python cli.py gui`
 
 ### Built With
 
 - [PySide6](https://doc.qt.io/qtforpython/) — Qt 6 for Python
 - [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) — Modern Fluent Design UI components
 - [FFmpeg](https://ffmpeg.org/) — Industry-standard multimedia processing
-- [OpenAI Whisper](https://github.com/openai/whisper) — State-of-the-art local speech recognition
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — Fast Whisper inference (CTranslate2); used for AI subtitles in **v0.5.0+**
+- [OpenAI Whisper](https://github.com/openai/whisper) — Model architecture and weights (recognition quality)
 - [Nuitka](https://nuitka.net/) — Python compiler for standalone distribution
 
 ---
@@ -57,10 +60,10 @@
 
 ### Subtitle Generation
 
-- **AI-Powered** — OpenAI Whisper with GPU acceleration (10–20x faster on supported hardware)
+- **AI-Powered (v0.5.0+)** — **faster-whisper** with GPU acceleration; substantially faster and lighter than the OpenAI Whisper + PyTorch pipeline in **v0.4.x**
 - **90+ Languages** — Full multilingual transcription support
-- **9 Download Providers** — OpenSubtitles, Addic7ed, Jimaku, SubDL, and more
-- **Anime Providers** — Dedicated sources for anime subtitles
+- **8 Download Providers** — OpenSubtitles.com (API), Addic7ed, SubDL (API), Subf2m, YIFY, Podnapisi, SubDivX (Spanish), Jimaku (anime)
+- **Anime Providers** — Jimaku for anime subtitles (English/Japanese)
 - **Format Support** — SRT, ASS, SSA, VTT, and more
 
 ### Smart File Renaming
@@ -132,7 +135,7 @@ python build_nuitka.py
 4. Add files via drag-and-drop or the file browser
 5. Configure settings and click **Start**
 
-### CLI (v0.5.0)
+### CLI (v0.5.0-alpha-1)
 
 Only the GUI launcher is supported:
 
@@ -192,7 +195,7 @@ EncodeForge auto-detects available GPU encoders on startup:
 - ✅ Modern Fluent Design UI
 - ✅ Shared `EncodeForgeCore` backend for the GUI (CLI planned later)
 - ✅ Nuitka compilation for all platforms
-- ✅ GPU-accelerated Whisper AI
+- ✅ GPU-accelerated **faster-whisper** (v0.5.0+; much faster than v0.4.x)
 - ⏳ Enhanced concurrent task processing
 - ⏳ Plugin system architecture
 - ⏳ Jellyfin &amp; Plex direct integration
@@ -236,7 +239,8 @@ Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.
 
 - [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) — Fluent Design widget library
 - [FFmpeg](https://ffmpeg.org/) — Multimedia processing framework
-- [OpenAI Whisper](https://github.com/openai/whisper) — Speech recognition model
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — Fast Whisper inference (v0.5.0+)
+- [OpenAI Whisper](https://github.com/openai/whisper) — Model architecture and weights
 - [Nuitka](https://nuitka.net/) — Python compiler
 - [curl-cffi](https://github.com/lexiforest/curl_cffi) — HTTP client with browser fingerprinting
 - [desktop-notifier](https://github.com/samschott/desktop-notifier) — Cross-platform desktop notifications

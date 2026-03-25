@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Tuple
 from core.providers.subtitle import (
     Addic7edProvider,
     JimakuProvider,
-    KitsunekkoProvider,
     OpenSubtitlesManager,
     PodnapisiProvider,
     SubDivXProvider,
@@ -37,18 +36,20 @@ class SubtitleProviders:
             password: OpenSubtitles password (for user login to get higher quotas)
         """
         self.opensubtitles = OpenSubtitlesManager(api_key=opensubtitles_key, username=username, password=password)
-        
+
         # Initialize modular providers
         self.yify = YifyProvider()
         self.addic7ed = Addic7edProvider()
         self.subdl = SubDLProvider()
         self.subf2m = Subf2mProvider()
-        self.kitsunekko = KitsunekkoProvider()
         self.jimaku = JimakuProvider()
         self.podnapisi = PodnapisiProvider()
         self.subdivx = SubDivXProvider()
-        
-        self.providers = ["opensubtitles", "yifysubtitles", "opensubs_com"]
+
+        self.providers = [
+            "OpenSubtitles.com", "Addic7ed", "SubDL", "Subf2m",
+            "YIFY", "Podnapisi", "SubDivX", "Jimaku"
+        ]
         self.session_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
@@ -114,10 +115,6 @@ class SubtitleProviders:
         """Search Subf2m"""
         return self.subf2m.search(video_path, languages)
     
-    def search_kitsunekko(self, video_path: str, languages: List[str]) -> List[Dict]:
-        """Search Kitsunekko"""
-        return self.kitsunekko.search(video_path, languages)
-    
     def search_jimaku(self, video_path: str, languages: List[str], anilist_url: str = "") -> List[Dict]:
         """Search Jimaku"""
         return self.jimaku.search(video_path, languages, anilist_url)
@@ -180,23 +177,26 @@ class SubtitleProviders:
         logger.info(f"=== Searching ALL Providers for: {Path(video_path).name} ===")
         logger.info(f"Languages: {languages}")
         all_results = []
-        
-        # Convert language codes to OpenSubtitles format
+
+        # Normalize to 3-letter ISO 639-2 codes used internally
+        _lang2_to_3 = {
+            'en': 'eng', 'es': 'spa', 'fr': 'fre', 'de': 'ger', 'it': 'ita',
+            'pt': 'por', 'ru': 'rus', 'ar': 'ara', 'zh': 'chi', 'ja': 'jpn',
+            'ko': 'kor', 'hi': 'hin', 'th': 'tha', 'vi': 'vie', 'tr': 'tur',
+            'pl': 'pol', 'nl': 'dut', 'sv': 'swe', 'no': 'nor', 'da': 'dan',
+            'fi': 'fin', 'cs': 'cze', 'el': 'gre', 'he': 'heb', 'hu': 'hun',
+            'ro': 'rum', 'id': 'ind', 'ms': 'may', 'fa': 'per', 'uk': 'ukr',
+            'bg': 'bul', 'hr': 'hrv', 'sr': 'srp', 'sl': 'slv', 'lt': 'lit',
+            'lv': 'lav',
+        }
         lang_codes = []
         for lang in languages:
-            if len(lang) == 3:
-                lang_codes.append(lang)
-            elif lang == "en":
-                lang_codes.append("eng")
-            elif lang == "es":
-                lang_codes.append("spa")
-            elif lang == "fr":
-                lang_codes.append("fre")
-            elif lang == "de":
-                lang_codes.append("ger")
+            if len(lang) == 2:
+                lang_codes.append(_lang2_to_3.get(lang.lower(), lang))
             else:
                 lang_codes.append(lang)
-        
+        lang_codes = list(dict.fromkeys(lang_codes))  # deduplicate, preserve order
+
         logger.info(f"Normalized language codes: {lang_codes}")
         
         # OpenSubtitles.com
@@ -222,9 +222,7 @@ class SubtitleProviders:
         else:
             logger.info("  ⚠️ OpenSubtitles.com: Not configured (no API key)")
         
-        # OpenSubtitles.org REST API (deprecated - skipping)
-        logger.info("→ Searching OpenSubtitles.org (free API)...")
-        logger.info("  ⚠️ OpenSubtitles.org: API deprecated - skipped")
+        # OpenSubtitles.org (legacy free API) — deprecated, not implemented
         
         # Addic7ed (great for TV shows but works for everything)
         logger.info("→ Searching Addic7ed...")
@@ -373,12 +371,10 @@ class SubtitleProviders:
             provider = result.get('provider', 'unknown')
             provider_scores = {
                 "OpenSubtitles.com": 100,
-                "Subscene": 95,
                 "Addic7ed": 90,
                 "Jimaku": 85,
                 "SubDL": 85,
                 "Podnapisi": 80,
-                "AnimeSubtitles": 75,
                 "Subf2m": 70,
                 "YIFY": 65,
                 "SubDivX": 60,
@@ -429,9 +425,6 @@ class SubtitleProviders:
             
             elif provider == "Jimaku":
                 return self.jimaku.download(file_id, download_url, output_path)
-            
-            elif provider == "Kitsunekko":
-                return self.kitsunekko.download(file_id, download_url, output_path)
             
             elif provider == "SubDL":
                 return self.subdl.download(file_id, download_url, output_path)

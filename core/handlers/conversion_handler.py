@@ -33,6 +33,22 @@ class ConversionHandler:
         self._completed_files: List[str] = []
         self._failed_files: List[Dict] = []
     
+    @property
+    def _ffmpeg(self) -> str:
+        """Get the FFmpeg executable path, raising if not found."""
+        p = self.ffmpeg_mgr.get_ffmpeg_path()
+        if p is None:
+            raise RuntimeError("FFmpeg not found — run detect_ffmpeg() first")
+        return str(p)
+
+    @property
+    def _ffprobe(self) -> str:
+        """Get the FFprobe executable path, raising if not found."""
+        p = self.ffmpeg_mgr.get_ffprobe_path()
+        if p is None:
+            raise RuntimeError("FFprobe not found — check FFmpeg installation")
+        return str(p)
+
     def _select_best_encoder(self, is_10bit: bool = False) -> Dict[str, Any]:
         """
         Determine the best available encoder (hardware or software fallback)
@@ -68,24 +84,31 @@ class ConversionHandler:
             if self.settings.use_videotoolbox and "videotoolbox" in hwaccel_options.get("encode", []):
                 logger.info("Selected VideoToolbox HEVC hardware encoder for 10-bit source")
                 return {"type": "hardware", "codec": "hevc_videotoolbox", "platform": "apple", "needs_conversion": False}
-            
-            # If HEVC not available, use H.264 hardware with 8-bit conversion
-            if self.settings.use_nvenc and "nvenc" in hwaccel_options.get("encode", []):
-                logger.info("Using NVENC H.264 with 10-bit to 8-bit conversion")
-                return {"type": "hardware", "codec": "h264_nvenc", "platform": "nvidia", "needs_conversion": True}
-            
-            if self.settings.use_amf and "amf" in hwaccel_options.get("encode", []):
-                logger.info("Using AMF H.264 with 10-bit to 8-bit conversion")
-                return {"type": "hardware", "codec": "h264_amf", "platform": "amd", "needs_conversion": True}
-            
-            if self.settings.use_qsv and "qsv" in hwaccel_options.get("encode", []):
-                logger.info("Using QSV H.264 with 10-bit to 8-bit conversion")
-                return {"type": "hardware", "codec": "h264_qsv", "platform": "intel", "needs_conversion": True}
-            
-            if self.settings.use_videotoolbox and "videotoolbox" in hwaccel_options.get("encode", []):
-                logger.info("Using VideoToolbox H.264 with 10-bit to 8-bit conversion")
-                return {"type": "hardware", "codec": "h264_videotoolbox", "platform": "apple", "needs_conversion": True}
-            
+
+            # No HEVC hardware encoder available — fall back to H.264 hardware with 8-bit conversion
+            hevc_available = (
+                (self.settings.use_nvenc and "nvenc" in hwaccel_options.get("encode", []))
+                or (self.settings.use_amf and "amf" in hwaccel_options.get("encode", []))
+                or (self.settings.use_qsv and "qsv" in hwaccel_options.get("encode", []))
+                or (self.settings.use_videotoolbox and "videotoolbox" in hwaccel_options.get("encode", []))
+            )
+            if not hevc_available:
+                if self.settings.use_nvenc and "nvenc" in hwaccel_options.get("encode", []):
+                    logger.info("Using NVENC H.264 with 10-bit to 8-bit conversion")
+                    return {"type": "hardware", "codec": "h264_nvenc", "platform": "nvidia", "needs_conversion": True}
+
+                if self.settings.use_amf and "amf" in hwaccel_options.get("encode", []):
+                    logger.info("Using AMF H.264 with 10-bit to 8-bit conversion")
+                    return {"type": "hardware", "codec": "h264_amf", "platform": "amd", "needs_conversion": True}
+
+                if self.settings.use_qsv and "qsv" in hwaccel_options.get("encode", []):
+                    logger.info("Using QSV H.264 with 10-bit to 8-bit conversion")
+                    return {"type": "hardware", "codec": "h264_qsv", "platform": "intel", "needs_conversion": True}
+
+                if self.settings.use_videotoolbox and "videotoolbox" in hwaccel_options.get("encode", []):
+                    logger.info("Using VideoToolbox H.264 with 10-bit to 8-bit conversion")
+                    return {"type": "hardware", "codec": "h264_videotoolbox", "platform": "apple", "needs_conversion": True}
+
             # Fallback to software (supports 10-bit natively)
             logger.info("Using software encoder (supports 10-bit natively)")
             return {"type": "software", "codec": self.settings.video_codec_fallback, "platform": "cpu", "needs_conversion": False}
@@ -268,7 +291,7 @@ class ConversionHandler:
         """Get video duration in seconds using ffprobe"""
         try:
             cmd = [
-                self.settings.ffprobe_path,
+                self._ffprobe,
                 "-v", "quiet",
                 "-print_format", "json",
                 "-show_format",
@@ -306,7 +329,7 @@ class ConversionHandler:
         """Get video duration and frame count using ffprobe for accurate progress calculation"""
         try:
             cmd = [
-                self.settings.ffprobe_path,
+                self._ffprobe,
                 "-v", "quiet",
                 "-print_format", "json",
                 "-show_format",
@@ -360,7 +383,7 @@ class ConversionHandler:
         """Get pixel format of video stream using ffprobe"""
         try:
             cmd = [
-                self.settings.ffprobe_path,
+                self._ffprobe,
                 "-v", "quiet",
                 "-print_format", "json",
                 "-show_streams",
@@ -413,7 +436,7 @@ class ConversionHandler:
         """Analyze subtitle tracks and return their formats"""
         try:
             cmd = [
-                self.settings.ffprobe_path,
+                self._ffprobe,
                 "-v", "quiet",
                 "-print_format", "json",
                 "-show_streams",
@@ -462,7 +485,7 @@ class ConversionHandler:
                     temp_srt = output_dir / f"temp_subtitle_{index}.srt"
                     
                     cmd = [
-                        self.settings.ffmpeg_path,
+                        self._ffmpeg,
                         "-hide_banner",
                         "-loglevel", "error",
                         "-i", input_path,
@@ -493,7 +516,7 @@ class ConversionHandler:
         
         # Build software encoding command
         cmd = [
-            self.settings.ffmpeg_path,
+            self._ffmpeg,
             "-hide_banner",
             "-loglevel", "error",
             "-i", str(input_file),
@@ -502,14 +525,19 @@ class ConversionHandler:
             "-crf", str(self.settings.video_crf)
         ]
         
-        # Add audio codec
-        if self.settings.audio_codec == "copy":
+        # Add audio codec (normalization forces decode — cannot filter copy streams)
+        audio_codec = self.settings.audio_codec
+        if self.settings.normalize_audio and audio_codec == "copy":
+            logger.warning("normalize_audio=True with audio_codec=copy; forcing -c:a aac")
+            audio_codec = "aac"
+
+        if audio_codec == "copy":
             cmd.extend(["-c:a", "copy"])
         else:
-            cmd.extend(["-c:a", self.settings.audio_codec])
+            cmd.extend(["-c:a", audio_codec])
             if self.settings.audio_bitrate:
                 cmd.extend(["-b:a", self.settings.audio_bitrate])
-        
+
         # Add audio normalization filter
         if self.settings.normalize_audio:
             logger.info("Applying audio normalization (loudnorm)")
@@ -625,14 +653,17 @@ class ConversionHandler:
                         output_path_obj = output_dir / f"{base_name}.{self.settings.output_format}"
                 
                 # Generate unique name if needed
+                _MAX_DEDUP = 9999
                 if output_path_obj.exists() and not self.settings.overwrite_existing:
                     counter = 1
-                    while output_path_obj.exists():
+                    while output_path_obj.exists() and counter <= _MAX_DEDUP:
                         if self.settings.output_suffix:
                             output_path_obj = output_dir / f"{base_name}{self.settings.output_suffix}_{counter}.{self.settings.output_format}"
                         else:
                             output_path_obj = output_dir / f"{base_name}_{counter}.{self.settings.output_format}"
                         counter += 1
+                    if counter > _MAX_DEDUP:
+                        return {"status": "error", "message": f"Could not generate unique output path after {_MAX_DEDUP} attempts"}
             else:
                 output_path_obj = Path(output_path)
                 if output_path_obj.exists() and not self.settings.overwrite_existing:
@@ -646,7 +677,7 @@ class ConversionHandler:
             # -progress - sends progress to stdout in key=value format
             # -flush_packets 1 reduces buffering delays
             cmd = [
-                self.settings.ffmpeg_path,
+                self._ffmpeg,
                 "-hide_banner",
                 "-nostdin",  # CRITICAL: Prevent FFmpeg from reading stdin (prevents hanging)
                 "-loglevel", "error",  # Only errors to keep stderr clean
@@ -712,21 +743,26 @@ class ConversionHandler:
             
             # Audio stream mapping and codec
             # Map all audio streams by default (Java sends 'all' or 'first')
-            audio_selection = getattr(self.settings, 'audio_track_selection', 'all')
-            if audio_selection == "all":
+            if self.settings.audio_track_selection == "all":
                 cmd.extend(["-map", "0:a"])  # Include all audio streams
                 logger.info("Mapping: All audio tracks")
             else:
                 cmd.extend(["-map", "0:a:0"])  # Only first audio stream
                 logger.info("Mapping: First audio track only")
-            
-            if self.settings.audio_codec == "copy":
+
+            # Determine effective audio codec (normalization forces decode — cannot filter copy streams)
+            audio_codec = self.settings.audio_codec
+            if self.settings.normalize_audio and audio_codec == "copy":
+                logger.warning("normalize_audio=True with audio_codec=copy; forcing -c:a aac (cannot filter a copy stream)")
+                audio_codec = "aac"
+
+            if audio_codec == "copy":
                 cmd.extend(["-c:a", "copy"])
             else:
-                cmd.extend(["-c:a", self.settings.audio_codec])
+                cmd.extend(["-c:a", audio_codec])
                 if self.settings.audio_bitrate and self.settings.audio_bitrate != "Auto":
                     cmd.extend(["-b:a", self.settings.audio_bitrate])
-            
+
             # Add audio normalization filter
             if self.settings.normalize_audio:
                 logger.info("Applying audio normalization (loudnorm)")
@@ -735,7 +771,7 @@ class ConversionHandler:
             # Subtitle handling with comprehensive format support
             temp_subtitle_files = []
             subtitle_tracks = []  # Initialize to avoid unbound variable
-            subtitle_handling = getattr(self.settings, 'subtitle_handling', 'keep')
+            subtitle_handling = self.settings.subtitle_handling
 
             if subtitle_handling in ("keep", "embed"):
                 # Send subtitle analysis progress update
@@ -1183,10 +1219,18 @@ class ConversionHandler:
                                 logger.debug(f"Cleaned up temp subtitle: {temp_file.name}")
                         except Exception as e:
                             logger.debug(f"Could not delete temp subtitle {temp_file}: {e}")
-                    
+
+                    # Remove partial output file
+                    if output_path_obj.exists():
+                        try:
+                            output_path_obj.unlink()
+                            logger.info(f"Removed empty/partial output file: {output_path_obj.name}")
+                        except OSError as rm_err:
+                            logger.warning(f"Could not remove partial output file: {rm_err}")
+
                     # Clear output path tracking on error
                     self.current_output_path = None
-                    
+
                     return {"status": "error", "message": "Output file is empty or missing"}
             else:
                 # Clean up temporary subtitle files on error
@@ -1197,16 +1241,25 @@ class ConversionHandler:
                             logger.debug(f"Cleaned up temp subtitle: {temp_file.name}")
                     except Exception as e:
                         logger.debug(f"Could not delete temp subtitle {temp_file}: {e}")
-                
+
                 # Check if it's a hardware encoder error
                 if encoder_info["type"] == "hardware" and self._is_hardware_encoder_error(stderr):
                     logger.warning("Hardware encoder failed, trying software fallback...")
                     return self._retry_with_software_encoder(input_file, output_path_obj, progress_callback)
                 else:
                     logger.error(f"Conversion failed: {stderr}")
+
+                    # Remove partial output file left by FFmpeg on non-zero exit
+                    if output_path_obj.exists():
+                        try:
+                            output_path_obj.unlink()
+                            logger.info(f"Removed partial output file: {output_path_obj.name}")
+                        except OSError as rm_err:
+                            logger.warning(f"Could not remove partial output file: {rm_err}")
+
                     # Clear output path tracking on error
                     self.current_output_path = None
-                    
+
                     return {
                         "status": "error",
                         "message": f"FFmpeg error: {stderr}"
@@ -1551,8 +1604,8 @@ class ConversionHandler:
                 'completed_count': len(self._completed_files),
                 'failed_count': len(self._failed_files),
                 'settings': {
-                    'ffmpeg_path': self.settings.ffmpeg_path,
-                    'ffprobe_path': self.settings.ffprobe_path,
+                    'ffmpeg_path': self._ffmpeg,
+                    'ffprobe_path': self._ffprobe,
                     'output_format': self.settings.output_format,
                     'video_codec_fallback': self.settings.video_codec_fallback,
                     'audio_codec': self.settings.audio_codec,

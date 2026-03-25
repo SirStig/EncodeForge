@@ -6,7 +6,6 @@ Modular subtitle provider implementations and subtitle-related utilities
 from .addic7ed_provider import Addic7edProvider
 from .base_provider import BaseSubtitleProvider
 from .jimaku_provider import JimakuProvider
-from .kitsunekko_provider import KitsunekkoProvider
 from .opensubtitles_manager import OpenSubtitlesManager
 from .podnapisi_provider import PodnapisiProvider
 from .subdivx_provider import SubDivXProvider
@@ -21,7 +20,6 @@ __all__ = [
     'Addic7edProvider',
     'SubDLProvider',
     'Subf2mProvider',
-    'KitsunekkoProvider',
     'JimakuProvider',
     'PodnapisiProvider',
     'SubDivXProvider',

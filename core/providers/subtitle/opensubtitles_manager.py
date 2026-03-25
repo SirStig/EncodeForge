@@ -12,10 +12,12 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from .base_provider import BaseSubtitleProvider
+
 logger = logging.getLogger(__name__)
 
 
-class OpenSubtitlesManager:
+class OpenSubtitlesManager(BaseSubtitleProvider):
     """
     Manages subtitle downloads from OpenSubtitles.com
     Uses the OpenSubtitles REST API v1
@@ -29,27 +31,28 @@ class OpenSubtitlesManager:
     def __init__(self, api_key: str = "", username: str = "", password: str = ""):
         """
         Initialize OpenSubtitles manager.
-        
+
         OpenSubtitles uses TWO-LEVEL authentication:
-        
+
         1. CONSUMER API KEY (App-level - Developer registers):
            - Identifies Encode Forge as the consumer of the API
            - Limits: 40 requests/10s, 5 downloads/day per IP
-        
+
         2. USER LOGIN (User-level - OPTIONAL):
            - Users can login with their OpenSubtitles username/password
            - Increases to 20 downloads/day per user account
            - No registration needed - uses existing OpenSubtitles account
-        
+
         For open-source apps:
         - You register Consumer API key once (as developer)
         - Users optionally provide their username/password for higher limits
-        
+
         Args:
             api_key: (DEPRECATED - use username/password instead)
             username: User's OpenSubtitles username (optional)
             password: User's OpenSubtitles password (optional)
         """
+        super().__init__()
         self.consumer_api_key = self.CONSUMER_API_KEY or api_key.strip()
         self.username = username.strip() if username else ""
         self.password = password.strip() if password else ""
@@ -248,9 +251,7 @@ class OpenSubtitlesManager:
             logger.info(f"Searching for languages: {', '.join(converted_langs)}")
             
             # Extract metadata from filename for query-based search
-            from subtitle_manager import SubtitleProviders
-            metadata_extractor = SubtitleProviders()
-            metadata = metadata_extractor.extract_media_metadata(file_path)
+            metadata = self.extract_media_metadata(file_path)
             
             # Prepare search parameters - Try hash first, then query-based as fallback
             params = {

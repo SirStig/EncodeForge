@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -108,10 +109,16 @@ class FileHandler:
                 codec_type = stream.get("codec_type", "")
                 
                 if codec_type == "video":
+                    r_rate = stream.get("r_frame_rate", "")
+                    try:
+                        fps_val = float(Fraction(r_rate)) if r_rate else 0.0
+                        fps_str = str(round(fps_val, 3)) if fps_val else "Unknown"
+                    except (ValueError, ZeroDivisionError):
+                        fps_str = "Unknown"
                     video_tracks.append({
                         "codec": stream.get("codec_name", "Unknown"),
                         "resolution": f"{stream.get('width', '?')}x{stream.get('height', '?')}",
-                        "fps": str(eval(stream.get("r_frame_rate", "0/1"))) if "/" in stream.get("r_frame_rate", "") else stream.get("r_frame_rate", "Unknown"),
+                        "fps": fps_str,
                         "bitrate": stream.get("bit_rate", "Unknown")
                     })
                 

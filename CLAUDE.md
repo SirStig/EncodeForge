@@ -60,7 +60,7 @@ The application is organized into four layers:
 
 **Provider Layer (`core/providers/`)** — Two sub-systems, each with an abstract base and concrete implementations:
 - `metadata/`: 8+ providers (TMDB, TVDB, OMDB, Trakt, Kitsu, Jikan, AniDB, TVmaze). The `MetadataGrabber` in `core/metadata_grabber.py` aggregates them.
-- `subtitle/`: 9+ providers (OpenSubtitles, Addic7ed, Jimaku, SubDL, etc.) plus `whisper_manager.py` for AI-based local subtitle generation. Aggregated in `core/subtitle_manager.py`.
+- `subtitle/`: 8+ providers (OpenSubtitles, Addic7ed, Jimaku, SubDL, etc.) plus `whisper_manager.py` for AI-based local subtitle generation. Aggregated in `core/subtitle_manager.py`.
 
 **Utility Layer (`utils/`)** — Cross-cutting concerns: `ffmpeg_manager.py` (FFmpeg detection/path), `gpu_detector.py` (NVENC/AMF/QSV/VideoToolbox detection), `settings_manager.py` (JSON-backed dataclass config), `theme_manager.py` (glassmorphism CSS theming), `workers.py` (QThread worker pool), `download_manager.py` (resumable downloads with hash verification).
 
