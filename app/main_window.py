@@ -7,37 +7,30 @@ from pathlib import Path
 import qtawesome as qta
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
     QFileDialog,
     QFormLayout,
     QFrame,
     QGroupBox,
     QHBoxLayout,
-    QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMainWindow,
     QMessageBox,
-    QPushButton,
     QSizePolicy,
-    QSlider,
     QStackedLayout,
-    QStatusBar,
     QTabWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-try:
-    # Optional project logging config (if present, apply it)
-    from utils import logging_config
-    # Note: setup_logging() is called in main.py, don't call it again here
-except Exception:
-    # If logging_config is absent or fails, proceed with default logging
-    logging.basicConfig(level=logging.INFO)
+from app.widgets.custom_widgets import (
+    GlassmorphicButton,
+    GlassmorphicMainWindow,
+    GlassmorphicStatusBar,
+    StyledCheckBox,
+    StyledComboBox,
+    StyledLabel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +56,7 @@ except Exception:
     LogsTab = None
 
 
-class MainWindow(QMainWindow):
+class MainWindow(GlassmorphicMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("EncodeForge")
@@ -115,7 +108,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.setSpacing(8)
 
         # Modes section
-        modes_label = QLabel("MODES")
+        modes_label = StyledLabel("MODES")
         modes_label.setObjectName("section_label")
         sidebar_layout.addWidget(modes_label)
 
@@ -143,7 +136,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addSpacing(8)
 
         # Files section
-        files_label = QLabel("FILES")
+        files_label = StyledLabel("FILES")
         files_label.setObjectName("section_label")
         sidebar_layout.addWidget(files_label)
 
@@ -170,7 +163,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # System section at bottom
-        system_label = QLabel("SYSTEM")
+        system_label = StyledLabel("SYSTEM")
         system_label.setObjectName("section_label")
         sidebar_layout.addWidget(system_label)
 
@@ -276,12 +269,12 @@ class MainWindow(QMainWindow):
         app_group = QGroupBox("Application")
         app_layout = QFormLayout(app_group)
         
-        self.settings_language_combo = QComboBox()
+        self.settings_language_combo = StyledComboBox()
         self.settings_language_combo.addItems(["English", "Spanish", "French", "German", "Japanese"])
         self.settings_language_combo.setCurrentText(settings.application.language)
         app_layout.addRow("Language:", self.settings_language_combo)
         
-        self.settings_check_updates = QCheckBox("Check for updates on startup")
+        self.settings_check_updates = StyledCheckBox("Check for updates on startup")
         self.settings_check_updates.setChecked(settings.application.check_updates)
         app_layout.addRow("", self.settings_check_updates)
         
@@ -290,7 +283,7 @@ class MainWindow(QMainWindow):
         ui_group = QGroupBox("User Interface")
         ui_layout = QFormLayout(ui_group)
         
-        self.settings_theme_combo = QComboBox()
+        self.settings_theme_combo = StyledComboBox()
         self.settings_theme_combo.addItems(["Dark", "Light", "Auto"])
         self.settings_theme_combo.setCurrentText(settings.ui.theme.capitalize())
         ui_layout.addRow("Theme:", self.settings_theme_combo)
@@ -301,9 +294,9 @@ class MainWindow(QMainWindow):
         tabs.addTab(general_tab, "General")
         
         # Add more tabs as needed (simplified version)
-        tabs.addTab(QLabel("Encoder settings will be available here"), "Encoder")
-        tabs.addTab(QLabel("Subtitle settings will be available here"), "Subtitle")
-        tabs.addTab(QLabel("Advanced settings will be available here"), "Advanced")
+        tabs.addTab(StyledLabel("Encoder settings will be available here"), "Encoder")
+        tabs.addTab(StyledLabel("Subtitle settings will be available here"), "Subtitle")
+        tabs.addTab(StyledLabel("Advanced settings will be available here"), "Advanced")
         
         layout.addWidget(tabs)
         
@@ -311,7 +304,7 @@ class MainWindow(QMainWindow):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        save_btn = QPushButton("Save Settings")
+        save_btn = GlassmorphicButton("Save Settings")
         save_btn.setIcon(qta.icon('fa5s.save'))
         save_btn.clicked.connect(self._save_settings_tab)
         button_layout.addWidget(save_btn)
@@ -327,7 +320,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(20, 20, 20, 20)
         
         # Title
-        title = QLabel("Active Encoding Processes")
+        title = StyledLabel("Active Encoding Processes")
         title.setProperty("heading", True)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -338,7 +331,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.process_list)
         
         # Info label
-        self.process_info_label = QLabel("No active processes")
+        self.process_info_label = StyledLabel("No active processes")
         self.process_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.process_info_label)
         
@@ -484,11 +477,11 @@ class MainWindow(QMainWindow):
 
     # -------------------- Status & callbacks --------------------
     def _create_statusbar(self):
-        self.statusbar = QStatusBar()
+        self.statusbar = GlassmorphicStatusBar()
         self.setStatusBar(self.statusbar)
-        self.status_label = QLabel("Ready")
+        self.status_label = StyledLabel("Ready")
         self.statusbar.addWidget(self.status_label)
-        self.progress_label = QLabel("")
+        self.progress_label = StyledLabel("")
         self.statusbar.addPermanentWidget(self.progress_label)
 
     def _update_status(self, message: str):

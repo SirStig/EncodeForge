@@ -5,33 +5,36 @@ File list, settings panel, and queue management for video encoding
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import qtawesome as qta
 from PySide6.QtCore import Qt, QThreadPool, Signal
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QMenu,
     QProgressBar,
     QPushButton,
-    QSlider,
-    QSpinBox,
     QSplitter,
-    QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+from app.widgets.custom_widgets import (
+    AutoResizeTable,
+    GlassmorphicButton,
+    GlassmorphicCard,
+    StyledCheckBox,
+    StyledComboBox,
+    StyledLabel,
+    StyledSpinBox,
+)
 from utils.notifications import get_notification_manager
 from utils.workers import EncoderWorker
 
@@ -115,10 +118,10 @@ class EncoderTab(QWidget):
         row1_layout.setSpacing(8)
         
         # Format dropdown
-        format_label = QLabel("Format:")
+        format_label = StyledLabel("Format:")
         format_label.setFixedWidth(55)
         format_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.format_combo = QComboBox()
+        self.format_combo = StyledComboBox()
         self.format_combo.addItems(["MP4", "MKV", "WebM", "AVI", "MOV"])
         self.format_combo.setFixedWidth(90)
         row1_layout.addWidget(format_label)
@@ -126,10 +129,10 @@ class EncoderTab(QWidget):
         row1_layout.addSpacing(12)
 
         # Codec dropdown
-        codec_label = QLabel("Codec:")
+        codec_label = StyledLabel("Codec:")
         codec_label.setFixedWidth(50)
         codec_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.codec_combo = QComboBox()
+        self.codec_combo = StyledComboBox()
         self.codec_combo.addItems(["H.264", "H.265/HEVC", "AV1", "VP9", "Copy", "Auto"])
         self.codec_combo.setCurrentText("Auto")
         self.codec_combo.setFixedWidth(120)
@@ -138,10 +141,10 @@ class EncoderTab(QWidget):
         row1_layout.addSpacing(12)
 
         # Quality dropdown
-        quality_label = QLabel("Quality:")
+        quality_label = StyledLabel("Quality:")
         quality_label.setFixedWidth(50)
         quality_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.quality_combo = QComboBox()
+        self.quality_combo = StyledComboBox()
         self.quality_combo.addItems(["High (CQ 18)", "Medium (CQ 23)", "Low (CQ 28)", "Very Low (CQ 33)"])
         self.quality_combo.setCurrentText("Medium (CQ 23)")
         self.quality_combo.setFixedWidth(130)
@@ -150,10 +153,10 @@ class EncoderTab(QWidget):
         row1_layout.addSpacing(12)
 
         # Preset dropdown
-        preset_label = QLabel("Preset:")
+        preset_label = StyledLabel("Preset:")
         preset_label.setFixedWidth(50)
         preset_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.preset_combo = QComboBox()
+        self.preset_combo = StyledComboBox()
         self.preset_combo.addItems(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"])
         self.preset_combo.setCurrentText("medium")
         self.preset_combo.setFixedWidth(100)
@@ -171,7 +174,7 @@ class EncoderTab(QWidget):
         row2_layout.setSpacing(8)
         
         # Hardware acceleration checkbox
-        self.hw_accel_check = QCheckBox("HW Accel")
+        self.hw_accel_check = StyledCheckBox("HW Accel")
         self.hw_accel_check.setChecked(True)
         self.hw_accel_check.setFixedWidth(90)
         self.hw_accel_check.setMaximumHeight(20)
@@ -179,7 +182,7 @@ class EncoderTab(QWidget):
         row2_layout.addSpacing(8)
 
         # Normalize audio checkbox
-        self.normalize_audio_check = QCheckBox("Normalize")
+        self.normalize_audio_check = StyledCheckBox("Normalize")
         self.normalize_audio_check.setFixedWidth(90)
         self.normalize_audio_check.setMaximumHeight(20)
         row2_layout.addWidget(self.normalize_audio_check)
@@ -209,73 +212,51 @@ class EncoderTab(QWidget):
     def _setup_tables_area(self, parent_layout):
         """Set up the single file table with all encoding states."""
         # Main table container
-        table_group = QGroupBox("Files")
+        table_group = GlassmorphicCard("Files")
         table_layout = QVBoxLayout(table_group)
-        table_layout.setContentsMargins(0, 2, 0, 0)
-        table_layout.setSpacing(0)
+        table_layout.setContentsMargins(0, 5, 0, 0)
+        table_layout.setSpacing(8)
         
-        # Single comprehensive table
-        self.files_table = QTableWidget()
-        self.files_table.setColumnCount(8)
-        self.files_table.setHorizontalHeaderLabels([
-            "#", "File Name", "Output", "Size", "New Size", 
-            "Progress", "ETA", "Status"
-        ])
+        # Single comprehensive table with custom widget
+        self.files_table = AutoResizeTable()
+        self.files_table.setColumns(
+            headers=["#", "File Name", "Output", "Size", "New Size", "Progress", "ETA", "Status"],
+            initial_widths=[40, 200, 120, 80, 80, 100, 70]  # Status column auto-stretches
+        )
         
-        # Configure header
-        header = self.files_table.horizontalHeader()
-        header.setVisible(True)
-        header.setMinimumSectionSize(40)
-        header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        header.setStretchLastSection(True)
-        
-        # Set column widths - make them narrower and better fitting
-        self.files_table.setColumnWidth(0, 40)   # #
-        self.files_table.setColumnWidth(1, 250)  # File Name
-        self.files_table.setColumnWidth(2, 200)  # Output
-        self.files_table.setColumnWidth(3, 80)   # Size
-        self.files_table.setColumnWidth(4, 80)   # New Size
-        self.files_table.setColumnWidth(5, 100)  # Progress
-        self.files_table.setColumnWidth(6, 70)   # ETA
-        # Status column stretches (last section)
-        
+        # Additional table configuration
         self.files_table.verticalHeader().setVisible(False)
-        self.files_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.files_table.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-        self.files_table.setAlternatingRowColors(True)
         
-        # Set proper row sizing
-        self.files_table.verticalHeader().setDefaultSectionSize(32)
+        # Set compact row height
+        self.files_table.verticalHeader().setDefaultSectionSize(24)
         
         # Enable context menu
         self.files_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.files_table.customContextMenuRequested.connect(self._show_context_menu)
         
-        table_layout.addWidget(self.files_table)
+        table_layout.addWidget(self.files_table, 1)  # Give table the stretch factor
         
-        # Table control buttons
+        # Table control buttons using glassmorphic buttons
         buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 4, 0, 0)
         buttons_layout.setSpacing(8)
         
-        self.add_files_btn = QPushButton("Add Files")
-        self.add_files_btn.setIcon(qta.icon('fa5s.plus'))
+        self.add_files_btn = GlassmorphicButton("Add Files", qta.icon('fa5s.plus'))
         self.add_files_btn.clicked.connect(self._add_files)
-        self.add_files_btn.setFixedWidth(100)
+        self.add_files_btn.setMinimumWidth(80)
         
-        self.add_folder_btn = QPushButton("Add Folder") 
-        self.add_folder_btn.setIcon(qta.icon('fa5s.folder-plus'))
+        self.add_folder_btn = GlassmorphicButton("Add Folder", qta.icon('fa5s.folder-plus'))
         self.add_folder_btn.clicked.connect(self._add_folder)
-        self.add_folder_btn.setFixedWidth(105)
+        self.add_folder_btn.setMinimumWidth(85)
         
-        self.remove_selected_btn = QPushButton("Remove Selected")
-        self.remove_selected_btn.setIcon(qta.icon('fa5s.trash'))
+        self.remove_selected_btn = GlassmorphicButton("Remove Selected", qta.icon('fa5s.trash'))
         self.remove_selected_btn.clicked.connect(self._remove_selected_files)
-        self.remove_selected_btn.setFixedWidth(140)
+        self.remove_selected_btn.setMinimumWidth(110)
         
-        self.clear_completed_btn = QPushButton("Clear Completed")
-        self.clear_completed_btn.setIcon(qta.icon('fa5s.broom'))
+        self.clear_completed_btn = GlassmorphicButton("Clear Completed", qta.icon('fa5s.broom'))
         self.clear_completed_btn.clicked.connect(self._clear_completed_files)
-        self.clear_completed_btn.setFixedWidth(140)
+        self.clear_completed_btn.setMinimumWidth(110)
         
         buttons_layout.addWidget(self.add_files_btn)
         buttons_layout.addWidget(self.add_folder_btn)
@@ -284,9 +265,9 @@ class EncoderTab(QWidget):
         buttons_layout.addWidget(self.clear_completed_btn)
         buttons_layout.addStretch()
         
-        table_layout.addLayout(buttons_layout)
+        table_layout.addLayout(buttons_layout, 0)  # No stretch for buttons
         
-        parent_layout.addWidget(table_group)
+        parent_layout.addWidget(table_group, 1)  # Give the whole group a stretch factor
     
     def _setup_file_info_sidebar(self, splitter):
         """Set up the file info sidebar on the right."""
@@ -297,15 +278,15 @@ class EncoderTab(QWidget):
         sidebar_layout.setSpacing(10)
         
         # Title
-        title_label = QLabel("File Information")
+        title_label = StyledLabel("File Information")
         title_label.setProperty("heading", True)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sidebar_layout.addWidget(title_label)
         
         # Preview area
-        preview_group = QGroupBox("Preview")
+        preview_group = GlassmorphicCard("Preview")
         preview_layout = QVBoxLayout(preview_group)
-        self.preview_label = QLabel("No file selected")
+        self.preview_label = StyledLabel("No file selected")
         self.preview_label.setObjectName("preview_label")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setMinimumHeight(120)
@@ -313,15 +294,15 @@ class EncoderTab(QWidget):
         sidebar_layout.addWidget(preview_group)
         
         # File Information Section
-        file_group = QGroupBox("File Details")
+        file_group = GlassmorphicCard("File Details")
         file_layout = QFormLayout(file_group)
         file_layout.setSpacing(6)
         file_layout.setContentsMargins(8, 12, 8, 8)
         
-        self.name_label = QLabel("-")
-        self.size_label = QLabel("-")
-        self.duration_label = QLabel("-")
-        self.path_label = QLabel("-")
+        self.name_label = StyledLabel("-")
+        self.size_label = StyledLabel("-")
+        self.duration_label = StyledLabel("-")
+        self.path_label = StyledLabel("-")
         self.path_label.setObjectName("path_label")
         self.path_label.setWordWrap(True)
         
@@ -333,15 +314,15 @@ class EncoderTab(QWidget):
         sidebar_layout.addWidget(file_group)
         
         # Video Information Section
-        video_group = QGroupBox("Video Properties")
+        video_group = GlassmorphicCard("Video Properties")
         video_layout = QFormLayout(video_group)
         video_layout.setSpacing(6)
         video_layout.setContentsMargins(8, 12, 8, 8)
         
-        self.codec_label = QLabel("-")
-        self.resolution_label = QLabel("-")
-        self.frame_rate_label = QLabel("-")
-        self.bitrate_label = QLabel("-")
+        self.codec_label = StyledLabel("-")
+        self.resolution_label = StyledLabel("-")
+        self.frame_rate_label = StyledLabel("-")
+        self.bitrate_label = StyledLabel("-")
         
         video_layout.addRow("Codec:", self.codec_label)
         video_layout.addRow("Resolution:", self.resolution_label)
@@ -351,15 +332,15 @@ class EncoderTab(QWidget):
         sidebar_layout.addWidget(video_group)
         
         # Audio Information Section
-        audio_group = QGroupBox("Audio Properties")
+        audio_group = GlassmorphicCard("Audio Properties")
         audio_layout = QFormLayout(audio_group)
         audio_layout.setSpacing(6)
         audio_layout.setContentsMargins(8, 12, 8, 8)
         
-        self.audio_codec_label = QLabel("-")
-        self.audio_channels_label = QLabel("-")
-        self.sample_rate_label = QLabel("-")
-        self.audio_bitrate_label = QLabel("-")
+        self.audio_codec_label = StyledLabel("-")
+        self.audio_channels_label = StyledLabel("-")
+        self.sample_rate_label = StyledLabel("-")
+        self.audio_bitrate_label = StyledLabel("-")
         
         audio_layout.addRow("Codec:", self.audio_codec_label)
         audio_layout.addRow("Channels:", self.audio_channels_label)
@@ -867,25 +848,34 @@ class EncoderTab(QWidget):
         self.audio_bitrate_label.setText("-")
         self.preview_label.setText("No file selected")
     
-    def _add_files(self):
+    def _add_files(self, files=None):
         """Add files to the encoding queue."""
-        file_dialog = QFileDialog(self)
-        file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
-        file_dialog.setNameFilter("Video files (*.mp4 *.mkv *.avi *.mov *.wmv *.flv *.webm *.m4v *.mpg *.mpeg *.3gp)")
+        if files is None:
+            # Open file dialog if no files provided
+            file_dialog = QFileDialog(self)
+            file_dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
+            file_dialog.setNameFilter("Video files (*.mp4 *.mkv *.avi *.mov *.wmv *.flv *.webm *.m4v *.mpg *.mpeg *.3gp)")
+            
+            if file_dialog.exec():
+                files = file_dialog.selectedFiles()
+            else:
+                return
         
-        if file_dialog.exec():
-            selected_files = file_dialog.selectedFiles()
-            for file_path in selected_files:
-                self._add_file_to_table(Path(file_path))
+        for file_path in files:
+            self._add_file_to_table(Path(file_path))
     
-    def _add_folder(self):
+    def _add_folder(self, folder=None):
         """Add all video files from a folder to the encoding queue."""
-        folder_dialog = QFileDialog(self)
-        folder_dialog.setFileMode(QFileDialog.FileMode.Directory)
+        if folder is None:
+            folder_dialog = QFileDialog(self)
+            folder_dialog.setFileMode(QFileDialog.FileMode.Directory)
+            
+            if folder_dialog.exec():
+                folder = folder_dialog.selectedFiles()[0]
+            else:
+                return
         
-        if folder_dialog.exec():
-            selected_folder = folder_dialog.selectedFiles()[0]
-            self._add_folder_to_table(Path(selected_folder))
+        self._add_folder_to_table(Path(folder))
     
     def _remove_selected_files(self):
         """Remove selected files from the table."""

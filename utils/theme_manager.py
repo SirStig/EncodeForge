@@ -193,6 +193,36 @@ class ThemeManager:
     def get_error_color() -> str:
         """Get the error color."""
         return "#ff453a"
+    
+    @staticmethod
+    def configure_table_columns(table_widget) -> None:
+        """
+        Configure table widget columns to be resizable within full width without scrollbars.
+        
+        Args:
+            table_widget: QTableWidget to configure
+        """
+        try:
+            from PySide6.QtWidgets import QHeaderView
+            
+            # Get header
+            header = table_widget.horizontalHeader()
+            if header:
+                header.setMinimumSectionSize(40)
+                # Allow manual resizing
+                header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+                # Last column stretches to fill remaining space
+                header.setStretchLastSection(True)
+            
+            # Ensure no horizontal scrollbar
+            from PySide6.QtCore import Qt
+            table_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            table_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            
+            logger.debug("Configured table columns for full-width resizable layout")
+            
+        except Exception as e:
+            logger.error(f"Error configuring table columns: {e}")
 
 
 # Singleton instance

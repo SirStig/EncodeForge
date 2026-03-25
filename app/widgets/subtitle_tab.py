@@ -17,22 +17,29 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QProgressBar,
     QPushButton,
-    QSpinBox,
+    QSizePolicy,
     QSplitter,
-    QTableWidget,
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from app.widgets.custom_widgets import (
+    AutoResizeTable,
+    GlassmorphicButton,
+    GlassmorphicCard,
+    StyledCheckBox,
+    StyledComboBox,
+    StyledLabel,
+    StyledTextEdit,
+)
 from utils.notifications import get_notification_manager
 from utils.workers import SubtitleWorker
 
@@ -110,10 +117,10 @@ class SubtitleTab(QWidget):
         quick_bar.setContentsMargins(12, 12, 12, 6)
 
         # Mode dropdown
-        self.mode_combo = QComboBox()
+        self.mode_combo = StyledComboBox()
         self.mode_combo.addItems(["Auto", "Download", "Generate"])
         self.mode_combo.setMinimumWidth(120)
-        quick_bar.addWidget(QLabel("Mode:"))
+        quick_bar.addWidget(StyledLabel("Mode:"))
         quick_bar.addWidget(self.mode_combo)
 
         # Search/Generate button
@@ -122,7 +129,7 @@ class SubtitleTab(QWidget):
         quick_bar.addWidget(self.search_btn)
 
         # Language selection (list, not dropdown)
-        quick_bar.addWidget(QLabel("Languages:"))
+        quick_bar.addWidget(StyledLabel("Languages:"))
         self.language_list = QListWidget()
         self.language_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         languages = [
@@ -140,7 +147,7 @@ class SubtitleTab(QWidget):
         quick_bar.addWidget(self.language_list)
 
         # Providers selection (with All option)
-        quick_bar.addWidget(QLabel("Providers:"))
+        quick_bar.addWidget(StyledLabel("Providers:"))
         self.provider_list = QListWidget()
         self.provider_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         providers = ["All", "OpenSubtitles", "Addic7ed", "SubDL", "Subf2m", "YIFY Subtitles", "Podnapisi", "SubDivX", "Kitsunekko", "Jimaku"]
@@ -154,8 +161,8 @@ class SubtitleTab(QWidget):
         quick_bar.addWidget(self.provider_list)
 
         # Whisper/OpenSubs status widgets
-        self.whisper_status = QLabel("Whisper: Ready")
-        self.opensubs_status = QLabel("OpenSubs: 0/5 downloads left")
+        self.whisper_status = StyledLabel("Whisper: Ready")
+        self.opensubs_status = StyledLabel("OpenSubs: 0/5 downloads left")
         quick_bar.addWidget(self.whisper_status)
         quick_bar.addWidget(self.opensubs_status)
 
@@ -170,13 +177,9 @@ class SubtitleTab(QWidget):
         file_layout = QVBoxLayout(file_panel)
         file_layout.setContentsMargins(8, 0, 4, 0)
         file_layout.setSpacing(4)
-        self.file_table = QTableWidget()
-        self.file_table.setColumnCount(1)
-        self.file_table.setHorizontalHeaderLabels(["Files"])
-        self.file_table.horizontalHeader().setStretchLastSection(True)
-        self.file_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.file_table = AutoResizeTable()
+        self.file_table.setColumns(headers=["Files"])  # Single column auto-stretches
         self.file_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.file_table.setAlternatingRowColors(True)
         self.file_table.setMinimumWidth(200)
         file_layout.addWidget(self.file_table)
         file_panel.setMinimumWidth(220)
@@ -187,13 +190,12 @@ class SubtitleTab(QWidget):
         subs_layout = QVBoxLayout(subs_panel)
         subs_layout.setContentsMargins(4, 0, 4, 0)
         subs_layout.setSpacing(4)
-        self.subs_table = QTableWidget()
-        self.subs_table.setColumnCount(4)
-        self.subs_table.setHorizontalHeaderLabels(["Language", "Provider", "Status", "Score"])
-        self.subs_table.horizontalHeader().setStretchLastSection(True)
-        self.subs_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.subs_table = AutoResizeTable()
+        self.subs_table.setColumns(
+            headers=["Language", "Provider", "Status", "Score"],
+            initial_widths=[80, 100, 80]  # Score column auto-stretches
+        )
         self.subs_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.subs_table.setAlternatingRowColors(True)
         self.subs_table.setMinimumWidth(320)
         subs_layout.addWidget(self.subs_table)
         subs_panel.setMinimumWidth(340)
@@ -204,14 +206,14 @@ class SubtitleTab(QWidget):
         preview_layout = QVBoxLayout(preview_panel)
         preview_layout.setContentsMargins(4, 0, 8, 0)
         preview_layout.setSpacing(4)
-        self.preview_label = QLabel("Subtitle Preview")
+        self.preview_label = StyledLabel("Subtitle Preview")
         self.preview_label.setObjectName("title_label")
         preview_layout.addWidget(self.preview_label)
-        self.preview_text = QTextEdit()
+        self.preview_text = StyledTextEdit()
         self.preview_text.setReadOnly(True)
         self.preview_text.setPlaceholderText("Subtitle preview will appear here...")
         self.preview_text.setMinimumWidth(220)
-        self.preview_text.setMaximumWidth(320)
+        # Don't set maximum width for QTextEdit in splitter layouts
         preview_layout.addWidget(self.preview_text)
         preview_panel.setMinimumWidth(240)
         splitter.addWidget(preview_panel)
@@ -225,12 +227,12 @@ class SubtitleTab(QWidget):
         bottom_bar.setSpacing(12)
         self.apply_btn = QPushButton("Apply")
         self.batch_apply_btn = QPushButton("Batch Apply")
-        self.apply_mode_combo = QComboBox()
+        self.apply_mode_combo = StyledComboBox()
         self.apply_mode_combo.addItems(["External File", "Embed in Video", "Burn-in"])
         self.apply_mode_combo.setMinimumWidth(120)
         bottom_bar.addWidget(self.apply_btn)
         bottom_bar.addWidget(self.batch_apply_btn)
-        bottom_bar.addWidget(QLabel("Mode:"))
+        bottom_bar.addWidget(StyledLabel("Mode:"))
         bottom_bar.addWidget(self.apply_mode_combo)
         bottom_bar.addStretch()
         main_layout.addLayout(bottom_bar)
@@ -275,23 +277,14 @@ class SubtitleTab(QWidget):
         layout.addLayout(toolbar)
         
         # File table
-        self.file_table = QTableWidget()
-        self.file_table.setColumnCount(5)
-        self.file_table.setHorizontalHeaderLabels([
-            "File", "Language", "Status", "Progress", "Method"
-        ])
-        self.file_table.horizontalHeader().setStretchLastSection(True)
-        self.file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.file_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.file_table.setAlternatingRowColors(True)
-        self.file_table.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
-        self.file_table.setAcceptDrops(True)
+        self.file_table = AutoResizeTable()
+        self.file_table.setColumns(
+            headers=["File", "Language", "Status", "Progress", "Method"],
+            initial_widths=[250, 100, 100, 100]  # Method column auto-stretches
+        )
+        self.file_table.enableDragDrop(self._drag_enter_event, self._drop_event)
         
-        # Enable drag and drop
-        self.file_table.dragEnterEvent = self._drag_enter_event
-        self.file_table.dropEvent = self._drop_event
-        
-        layout.addWidget(self.file_table)
+        layout.addWidget(self.file_table, 1)  # Give table full stretch
         
         # Queue controls
         queue_controls = QHBoxLayout()
@@ -318,9 +311,9 @@ class SubtitleTab(QWidget):
         mode_group = QGroupBox("Processing Mode")
         mode_layout = QVBoxLayout()
         
-        self.download_radio = QCheckBox("Download from Providers")
+        self.download_radio = StyledCheckBox("Download from Providers")
         self.download_radio.setChecked(True)
-        self.whisper_radio = QCheckBox("Generate with Whisper AI")
+        self.whisper_radio = StyledCheckBox("Generate with Whisper AI")
         
         mode_layout.addWidget(self.download_radio)
         mode_layout.addWidget(self.whisper_radio)
@@ -332,7 +325,7 @@ class SubtitleTab(QWidget):
         lang_group = QGroupBox("Language Settings")
         lang_layout = QFormLayout()
         
-        self.language_combo = QComboBox()
+        self.language_combo = StyledComboBox()
         self.language_combo.addItems([
             "English", "Spanish", "French", "German", "Italian",
             "Portuguese", "Russian", "Japanese", "Korean", "Chinese",
@@ -340,7 +333,7 @@ class SubtitleTab(QWidget):
         ])
         lang_layout.addRow("Primary Language:", self.language_combo)
         
-        self.fallback_check = QCheckBox("Try other languages if not found")
+        self.fallback_check = StyledCheckBox("Try other languages if not found")
         self.fallback_check.setChecked(True)
         lang_layout.addRow("", self.fallback_check)
         
@@ -351,7 +344,7 @@ class SubtitleTab(QWidget):
         self.provider_group = QGroupBox("Subtitle Providers")
         provider_layout = QVBoxLayout()
         
-        providers_label = QLabel("Select providers to search:")
+        providers_label = StyledLabel("Select providers to search:")
         providers_label.setObjectName("providers_label")
         provider_layout.addWidget(providers_label)
         
@@ -386,7 +379,7 @@ class SubtitleTab(QWidget):
         self.whisper_group = QGroupBox("Whisper AI Settings")
         whisper_layout = QFormLayout()
         
-        self.whisper_model_combo = QComboBox()
+        self.whisper_model_combo = StyledComboBox()
         self.whisper_model_combo.addItems([
             "tiny (fastest, least accurate)",
             "base",
@@ -397,11 +390,11 @@ class SubtitleTab(QWidget):
         self.whisper_model_combo.setCurrentIndex(3)  # medium
         whisper_layout.addRow("Model:", self.whisper_model_combo)
         
-        self.whisper_device_combo = QComboBox()
+        self.whisper_device_combo = StyledComboBox()
         self.whisper_device_combo.addItems(["Auto", "CPU", "CUDA (GPU)", "MPS (Apple Silicon)"])
         whisper_layout.addRow("Device:", self.whisper_device_combo)
         
-        self.translate_check = QCheckBox("Translate to English")
+        self.translate_check = StyledCheckBox("Translate to English")
         whisper_layout.addRow("", self.translate_check)
         
         self.whisper_group.setLayout(whisper_layout)
@@ -412,15 +405,15 @@ class SubtitleTab(QWidget):
         output_group = QGroupBox("Output Settings")
         output_layout = QFormLayout()
         
-        self.subtitle_format_combo = QComboBox()
+        self.subtitle_format_combo = StyledComboBox()
         self.subtitle_format_combo.addItems(["SRT", "VTT", "ASS/SSA"])
         output_layout.addRow("Format:", self.subtitle_format_combo)
         
-        self.encoding_combo = QComboBox()
+        self.encoding_combo = StyledComboBox()
         self.encoding_combo.addItems(["UTF-8", "UTF-8 BOM", "ASCII", "ISO-8859-1"])
         output_layout.addRow("Encoding:", self.encoding_combo)
         
-        self.sync_check = QCheckBox("Attempt to sync subtitles")
+        self.sync_check = StyledCheckBox("Attempt to sync subtitles")
         self.sync_check.setChecked(True)
         output_layout.addRow("", self.sync_check)
         
@@ -431,7 +424,7 @@ class SubtitleTab(QWidget):
         preview_group = QGroupBox("Subtitle Preview")
         preview_layout = QVBoxLayout()
         
-        self.preview_text = QTextEdit()
+        self.preview_text = StyledTextEdit()
         self.preview_text.setReadOnly(True)
         self.preview_text.setPlaceholderText("Subtitle preview will appear here...")
         self.preview_text.setMaximumHeight(150)

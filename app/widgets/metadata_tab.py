@@ -17,21 +17,30 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QProgressBar,
     QPushButton,
+    QSizePolicy,
     QSplitter,
-    QTableWidget,
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from app.widgets.custom_widgets import (
+    AutoResizeTable,
+    GlassmorphicButton,
+    GlassmorphicCard,
+    StyledCheckBox,
+    StyledComboBox,
+    StyledLabel,
+    StyledLineEdit,
+    StyledTextEdit,
+)
 from utils.notifications import get_notification_manager
 from utils.workers import RenamerWorker
 
@@ -78,8 +87,8 @@ class MetadataTab(QWidget):
         top_bar.addWidget(self.clear_btn)
         
         # Provider selection
-        top_bar.addWidget(QLabel("Provider:"))
-        self.provider_combo = QComboBox()
+        top_bar.addWidget(StyledLabel("Provider:"))
+        self.provider_combo = StyledComboBox()
         self.provider_combo.addItems([
             "TMDB (The Movie Database)",
             "TVDB (TheTVDB)",
@@ -93,29 +102,29 @@ class MetadataTab(QWidget):
         top_bar.addWidget(self.provider_combo)
         
         # Language selection
-        top_bar.addWidget(QLabel("Language:"))
-        self.language_combo = QComboBox()
+        top_bar.addWidget(StyledLabel("Language:"))
+        self.language_combo = StyledComboBox()
         self.language_combo.addItems(["English", "Japanese", "Spanish", "French", "German", "Other"])
         top_bar.addWidget(self.language_combo)
         
         # API Key input
-        top_bar.addWidget(QLabel("API Key:"))
-        self.api_key_input = QLineEdit()
+        top_bar.addWidget(StyledLabel("API Key:"))
+        self.api_key_input = StyledLineEdit()
         self.api_key_input.setPlaceholderText("API Key (if required)")
         top_bar.addWidget(self.api_key_input)
         
         # Pattern input
-        top_bar.addWidget(QLabel("Pattern:"))
-        self.pattern_input = QLineEdit()
+        top_bar.addWidget(StyledLabel("Pattern:"))
+        self.pattern_input = StyledLineEdit()
         self.pattern_input.setPlaceholderText("Naming pattern, e.g. {title} - {season}{episode}")
         self.pattern_input.setText("{title} - {season}{episode} - {quality}")
         top_bar.addWidget(self.pattern_input)
         
         # Options checkboxes
-        self.replace_spaces_check = QCheckBox("Dots for spaces")
-        self.lowercase_check = QCheckBox("Lowercase")
-        self.remove_special_check = QCheckBox("No special chars")
-        self.preserve_extension_check = QCheckBox("Keep extension")
+        self.replace_spaces_check = StyledCheckBox("Dots for spaces")
+        self.lowercase_check = StyledCheckBox("Lowercase")
+        self.remove_special_check = StyledCheckBox("No special chars")
+        self.preserve_extension_check = StyledCheckBox("Keep extension")
         self.preserve_extension_check.setChecked(True)
         top_bar.addWidget(self.replace_spaces_check)
         top_bar.addWidget(self.lowercase_check)
@@ -137,34 +146,25 @@ class MetadataTab(QWidget):
 
         # --- Comparison lists ---
         self.comparison_layout = QHBoxLayout()
-        self.file_table = QTableWidget()
-        self.file_table.setColumnCount(1)
-        self.file_table.setHorizontalHeaderLabels(["Input Files"])
-        self.file_table.horizontalHeader().setStretchLastSection(True)
-        self.file_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.file_table.setAlternatingRowColors(True)
-        self.file_table.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
-        self.file_table.setAcceptDrops(True)
-        self.file_table.dragEnterEvent = self._drag_enter_event
-        self.file_table.dropEvent = self._drop_event
-        self.comparison_layout.addWidget(self.file_table)
-        self.metadata_table = QTableWidget()
-        self.metadata_table.setColumnCount(1)
-        self.metadata_table.setHorizontalHeaderLabels(["Metadata Result"])
-        self.metadata_table.horizontalHeader().setStretchLastSection(True)
-        self.metadata_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.file_table = AutoResizeTable()
+        self.file_table.setColumns(headers=["Input Files"])  # Single column auto-stretches
+        self.file_table.enableDragDrop(self._drag_enter_event, self._drop_event)
+        self.comparison_layout.addWidget(self.file_table, 1)  # Add stretch factor
+        
+        self.metadata_table = AutoResizeTable()
+        self.metadata_table.setColumns(headers=["Metadata Result"])  # Single column auto-stretches
         self.metadata_table.setAlternatingRowColors(True)
-        self.comparison_layout.addWidget(self.metadata_table)
-        main_layout.addLayout(self.comparison_layout)
+        self.comparison_layout.addWidget(self.metadata_table, 1)  # Add stretch factor
+        main_layout.addLayout(self.comparison_layout, 1)  # Give whole layout stretch
 
         # --- Preview panel below comparison lists ---
         self.preview_group = QGroupBox("Preview")
         preview_layout = QVBoxLayout(self.preview_group)
-        self.preview_text = QTextEdit()
+        self.preview_text = StyledTextEdit()
         self.preview_text.setReadOnly(True)
         self.preview_text.setPlaceholderText("Select a file to see details or preview output here.")
         preview_layout.addWidget(self.preview_text)
-        main_layout.addWidget(self.preview_group)
+        main_layout.addWidget(self.preview_group, 0)  # No stretch for preview
 
         # Connect selection change to update preview
         self.file_table.itemSelectionChanged.connect(self._update_preview_panel)
@@ -192,14 +192,14 @@ class MetadataTab(QWidget):
         layout = QVBoxLayout(panel)
         type_group = QGroupBox("Media Type")
         type_layout = QVBoxLayout()
-        self.type_combo = QComboBox()
+        self.type_combo = StyledComboBox()
         self.type_combo.addItems(["TV Show", "Movie", "Anime"])
         type_layout.addWidget(self.type_combo)
         type_group.setLayout(type_layout)
         layout.addWidget(type_group)
         provider_group = QGroupBox("Metadata Provider")
         provider_layout = QVBoxLayout()
-        self.provider_combo = QComboBox()
+        self.provider_combo = StyledComboBox()
         self.provider_combo.addItems([
             "TMDB (The Movie Database)",
             "TVDB (TheTVDB)",
@@ -212,9 +212,9 @@ class MetadataTab(QWidget):
         ])
         provider_layout.addWidget(self.provider_combo)
         api_key_layout = QHBoxLayout()
-        api_key_label = QLabel("API Key:")
+        api_key_label = StyledLabel("API Key:")
         api_key_label.setObjectName("api_key_label")
-        self.api_key_input = QLineEdit()
+        self.api_key_input = StyledLineEdit()
         self.api_key_input.setPlaceholderText("Enter API key if required...")
         api_key_layout.addWidget(api_key_label)
         api_key_layout.addWidget(self.api_key_input)
@@ -223,10 +223,10 @@ class MetadataTab(QWidget):
         layout.addWidget(provider_group)
         pattern_group = QGroupBox("Naming Pattern")
         pattern_layout = QVBoxLayout()
-        pattern_help = QLabel("Available variables:")
+        pattern_help = StyledLabel("Available variables:")
         pattern_help.setObjectName("pattern_help")
         pattern_layout.addWidget(pattern_help)
-        variables_text = QTextEdit()
+        variables_text = StyledTextEdit()
         variables_text.setReadOnly(True)
         variables_text.setMaximumHeight(120)
         variables_text.setPlainText(
@@ -241,11 +241,11 @@ class MetadataTab(QWidget):
             "{group} - Release group"
         )
         pattern_layout.addWidget(variables_text)
-        self.pattern_input = QLineEdit()
+        self.pattern_input = StyledLineEdit()
         self.pattern_input.setText("{title} - {season}{episode} - {quality}")
         self.pattern_input.setPlaceholderText("Enter naming pattern...")
         pattern_layout.addWidget(self.pattern_input)
-        presets_label = QLabel("Presets:")
+        presets_label = StyledLabel("Presets:")
         presets_label.setObjectName("presets_label")
         pattern_layout.addWidget(presets_label)
         self.preset_list = QListWidget()
@@ -265,10 +265,10 @@ class MetadataTab(QWidget):
         layout.addWidget(pattern_group)
         options_group = QGroupBox("Options")
         options_layout = QVBoxLayout()
-        self.replace_spaces_check = QCheckBox("Replace spaces with dots")
-        self.lowercase_check = QCheckBox("Convert to lowercase")
-        self.remove_special_check = QCheckBox("Remove special characters")
-        self.preserve_extension_check = QCheckBox("Preserve file extension")
+        self.replace_spaces_check = StyledCheckBox("Replace spaces with dots")
+        self.lowercase_check = StyledCheckBox("Convert to lowercase")
+        self.remove_special_check = StyledCheckBox("Remove special characters")
+        self.preserve_extension_check = StyledCheckBox("Preserve file extension")
         self.preserve_extension_check.setChecked(True)
         options_layout.addWidget(self.replace_spaces_check)
         options_layout.addWidget(self.lowercase_check)
