@@ -14,7 +14,9 @@ from app import __version__ as VERSION
 
 PROJECT_NAME = "EncodeForge"
 MAIN_SCRIPT = "main.py"
-ICON_PATH = "resources/icons/app-icon.png"
+ICON_DIR = Path("resources/icons")
+ICON_PNG = ICON_DIR / "app-icon.png"
+ICON_ICO = ICON_DIR / "app-icon.ico"
 
 # Do not follow legacy / unused ML stacks (faster-whisper uses CTranslate2, not PyTorch).
 NOFOLLOW_IMPORT_TO = (
@@ -60,14 +62,13 @@ def build():
         "--show-memory",
     ]
 
-    icon_path = Path(ICON_PATH)
-    if icon_path.exists():
-        if IS_WINDOWS:
-            cmd.append(f"--windows-icon-from-ico={icon_path}")
-        elif IS_MACOS:
-            cmd.append(f"--macos-app-icon={icon_path}")
-        elif IS_LINUX:
-            cmd.append(f"--linux-icon={icon_path}")
+    if IS_WINDOWS:
+        if ICON_ICO.exists():
+            cmd.append(f"--windows-icon-from-ico={ICON_ICO}")
+    elif IS_MACOS and ICON_PNG.exists():
+        cmd.append(f"--macos-app-icon={ICON_PNG}")
+    elif IS_LINUX and ICON_PNG.exists():
+        cmd.append(f"--linux-icon={ICON_PNG}")
 
     if IS_WINDOWS:
         wver = _windows_pe_version(VERSION)
@@ -85,11 +86,6 @@ def build():
             "--macos-app-mode=gui",
             f"--macos-app-version={VERSION}",
             "--macos-create-app-bundle",
-        ])
-
-    if IS_LINUX:
-        cmd.extend([
-            "--linux-icon=resources/icons/app-icon.png",
         ])
 
     cmd.extend([
@@ -113,7 +109,7 @@ def build():
     result = subprocess.run(cmd)
 
     if result.returncode == 0:
-        print("\n✓ Build successful! Output in dist/ directory")
+        print("\nBuild successful. Output in dist/ directory")
 
         if IS_MACOS:
             print(f"macOS App Bundle: dist/{PROJECT_NAME}.app")
@@ -122,7 +118,7 @@ def build():
         else:
             print(f"Linux Binary: dist/{PROJECT_NAME}")
     else:
-        print(f"\n✗ Build failed with code {result.returncode}")
+        print(f"\nBuild failed with exit code {result.returncode}")
         sys.exit(result.returncode)
 
 
