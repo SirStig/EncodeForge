@@ -31,7 +31,8 @@ class ConversionSettings:
     videotoolbox_bitrate: str = "5M"  # Apple bitrate
     
     # Subtitle options
-    convert_subtitles: bool = True
+    convert_subtitles: bool = False
+    subtitle_handling: str = "keep"
     subtitle_format: str = "srt"
     extract_forced_subs: bool = True
     extract_sdh_subs: bool = True
@@ -70,7 +71,7 @@ class ConversionSettings:
     
     # General options
     traverse_subdirs: bool = True
-    delete_original: bool = True
+    delete_original: bool = False
     use_faststart: bool = True
     output_suffix: str = ""
     overwrite_existing: bool = False

@@ -20,6 +20,7 @@ from utils.logging_config import get_logger, setup_logging
 setup_logging()
 logger = get_logger(__name__)
 
+from app import __version__ as APP_VERSION
 from app.dialogs import FFmpegSetupDialog
 from app.main_window import MainWindow
 from utils.ffmpeg_manager import get_ffmpeg_manager
@@ -65,7 +66,7 @@ def run_ffmpeg_setup() -> bool:
 
 def main():
     """Main application entry point"""
-    logger.info("Starting EncodeForge v0.5.0")
+    logger.info("Starting EncodeForge v%s", APP_VERSION)
 
     # Enable High DPI scaling
     QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -75,7 +76,7 @@ def main():
     # Create application
     app = QApplication(sys.argv)
     app.setApplicationName("EncodeForge")
-    app.setApplicationVersion("0.5.0")
+    app.setApplicationVersion(APP_VERSION)
     app.setOrganizationName("EncodeForge")
     
     # Load glassmorphism theme

@@ -572,14 +572,10 @@ class SettingsDialog(QDialog):
             self.ffmpeg_path_edit.setText(self.settings.application.ffmpeg_path)
     
     def _run_whisper_setup(self):
-        """Run Whisper setup dialog."""
-        QMessageBox.information(
-            self,
-            "Whisper Setup",
-            "Whisper AI setup dialog will be implemented soon.\n\n"
-            "For now, please install PyTorch and Whisper manually:\n"
-            "pip install torch whisper"
-        )
+        """Open the Whisper AI install/status dialog."""
+        from app.dialogs.whisper_setup_dialog import WhisperSetupDialog
+        dlg = WhisperSetupDialog(self)
+        dlg.exec()
     
     def _show_pattern_help(self):
         """Show pattern help dialog."""

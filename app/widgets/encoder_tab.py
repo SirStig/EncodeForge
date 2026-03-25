@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 import qtawesome as qta
 from PySide6.QtCore import Qt, QThreadPool, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -69,17 +70,24 @@ class EncoderTab(QWidget):
         self.thread_pool = thread_pool
         self.notifier = get_notification_manager()
         self.active_workers: Dict[str, EncoderWorker] = {}
-        
+        self._mp4_subtitle_warned = False
+
         self._setup_ui()
         self._connect_signals()
-    
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        total = self.width()
+        if total > 0 and hasattr(self, '_main_splitter'):
+            self._main_splitter.setSizes([int(total * 0.70), int(total * 0.30)])
+
     def _setup_ui(self):
         """Set up the user interface."""
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
         # Main splitter: Left (tables) | Right (file info)
-        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left side: Settings + Tables
         left_widget = QWidget()
@@ -92,15 +100,12 @@ class EncoderTab(QWidget):
         # Below: Tables splitter (Queued | Processing | Completed)
         self._setup_tables_area(left_layout)
         
-        main_splitter.addWidget(left_widget)
-        
+        self._main_splitter.addWidget(left_widget)
+
         # Right side: File Info sidebar
-        self._setup_file_info_sidebar(main_splitter)
-        
-        # Set splitter proportions (more space for tables, less for sidebar)
-        main_splitter.setSizes([700, 320])
-        
-        layout.addWidget(main_splitter)
+        self._setup_file_info_sidebar(self._main_splitter)
+
+        layout.addWidget(self._main_splitter)
         
         logger.debug("Encoder tab initialized - using base glassmorphism theme")
     
@@ -110,8 +115,8 @@ class EncoderTab(QWidget):
         settings_widget = QWidget()
         settings_widget.setObjectName("encoder_toolbar")
         settings_main_layout = QVBoxLayout(settings_widget)
-        settings_main_layout.setContentsMargins(10, 6, 10, 6)
-        settings_main_layout.setSpacing(4)
+        settings_main_layout.setContentsMargins(12, 8, 12, 8)
+        settings_main_layout.setSpacing(6)
         
         # Row 1: Format, Codec, Quality, Preset
         row1_layout = QHBoxLayout()
@@ -119,11 +124,12 @@ class EncoderTab(QWidget):
         
         # Format dropdown
         format_label = StyledLabel("Format:")
-        format_label.setFixedWidth(55)
+        format_label.setFixedWidth(52)
         format_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.format_combo = StyledComboBox()
         self.format_combo.addItems(["MP4", "MKV", "WebM", "AVI", "MOV"])
-        self.format_combo.setFixedWidth(90)
+        self.format_combo.setMinimumWidth(72)
+        self.format_combo.setMaximumWidth(110)
         row1_layout.addWidget(format_label)
         row1_layout.addWidget(self.format_combo)
         row1_layout.addSpacing(12)
@@ -135,7 +141,8 @@ class EncoderTab(QWidget):
         self.codec_combo = StyledComboBox()
         self.codec_combo.addItems(["H.264", "H.265/HEVC", "AV1", "VP9", "Copy", "Auto"])
         self.codec_combo.setCurrentText("Auto")
-        self.codec_combo.setFixedWidth(120)
+        self.codec_combo.setMinimumWidth(100)
+        self.codec_combo.setMaximumWidth(145)
         row1_layout.addWidget(codec_label)
         row1_layout.addWidget(self.codec_combo)
         row1_layout.addSpacing(12)
@@ -147,7 +154,8 @@ class EncoderTab(QWidget):
         self.quality_combo = StyledComboBox()
         self.quality_combo.addItems(["High (CQ 18)", "Medium (CQ 23)", "Low (CQ 28)", "Very Low (CQ 33)"])
         self.quality_combo.setCurrentText("Medium (CQ 23)")
-        self.quality_combo.setFixedWidth(130)
+        self.quality_combo.setMinimumWidth(115)
+        self.quality_combo.setMaximumWidth(155)
         row1_layout.addWidget(quality_label)
         row1_layout.addWidget(self.quality_combo)
         row1_layout.addSpacing(12)
@@ -159,7 +167,8 @@ class EncoderTab(QWidget):
         self.preset_combo = StyledComboBox()
         self.preset_combo.addItems(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"])
         self.preset_combo.setCurrentText("medium")
-        self.preset_combo.setFixedWidth(100)
+        self.preset_combo.setMinimumWidth(85)
+        self.preset_combo.setMaximumWidth(120)
         row1_layout.addWidget(preset_label)
         row1_layout.addWidget(self.preset_combo)
         
@@ -176,16 +185,43 @@ class EncoderTab(QWidget):
         # Hardware acceleration checkbox
         self.hw_accel_check = StyledCheckBox("HW Accel")
         self.hw_accel_check.setChecked(True)
-        self.hw_accel_check.setFixedWidth(90)
-        self.hw_accel_check.setMaximumHeight(20)
         row2_layout.addWidget(self.hw_accel_check)
         row2_layout.addSpacing(8)
 
         # Normalize audio checkbox
         self.normalize_audio_check = StyledCheckBox("Normalize")
-        self.normalize_audio_check.setFixedWidth(90)
-        self.normalize_audio_check.setMaximumHeight(20)
         row2_layout.addWidget(self.normalize_audio_check)
+
+        # Subtitle handling
+        subtitle_label = StyledLabel("Subtitles:")
+        subtitle_label.setFixedWidth(65)
+        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.subtitle_handling_combo = StyledComboBox()
+        self.subtitle_handling_combo.addItems(["Keep/Passthrough", "Convert to SRT", "Embed", "Burn-in", "Skip"])
+        self.subtitle_handling_combo.setMinimumWidth(115)
+        self.subtitle_handling_combo.setMaximumWidth(155)
+        row2_layout.addSpacing(8)
+        row2_layout.addWidget(subtitle_label)
+        row2_layout.addWidget(self.subtitle_handling_combo)
+        row2_layout.addSpacing(8)
+
+        # Audio handling
+        audio_label = StyledLabel("Audio:")
+        audio_label.setFixedWidth(45)
+        audio_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.audio_handling_combo = StyledComboBox()
+        self.audio_handling_combo.addItems(["Copy", "AAC 192k", "AAC 320k", "AC3", "Normalize+Copy"])
+        self.audio_handling_combo.setMinimumWidth(100)
+        self.audio_handling_combo.setMaximumWidth(140)
+        row2_layout.addSpacing(8)
+        row2_layout.addWidget(audio_label)
+        row2_layout.addWidget(self.audio_handling_combo)
+        row2_layout.addSpacing(8)
+
+        # Delete original checkbox - UNCHECKED by default
+        self.delete_original_check = StyledCheckBox("Delete Source")
+        self.delete_original_check.setChecked(False)  # SAFE DEFAULT
+        row2_layout.addWidget(self.delete_original_check)
 
         # Spacer
         row2_layout.addStretch()
@@ -194,16 +230,16 @@ class EncoderTab(QWidget):
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.setIcon(qta.icon('fa5s.stop'))
         self.stop_btn.setEnabled(False)
-        self.stop_btn.setFixedWidth(70)
-        self.stop_btn.setMaximumHeight(22)
+        self.stop_btn.setMinimumWidth(65)
+        self.stop_btn.setProperty("danger", True)
         row2_layout.addWidget(self.stop_btn)
         row2_layout.addSpacing(6)
 
         # Start button
         self.start_btn = QPushButton("Start Encoding")
         self.start_btn.setIcon(qta.icon('fa5s.play'))
-        self.start_btn.setFixedWidth(130)
-        self.start_btn.setMaximumHeight(22)
+        self.start_btn.setMinimumWidth(120)
+        self.start_btn.setProperty("primary", True)
         row2_layout.addWidget(self.start_btn)
         
         settings_main_layout.addLayout(row2_layout)
@@ -272,7 +308,8 @@ class EncoderTab(QWidget):
     def _setup_file_info_sidebar(self, splitter):
         """Set up the file info sidebar on the right."""
         sidebar = QWidget()
-        sidebar.setFixedWidth(320)
+        sidebar.setMinimumWidth(260)
+        sidebar.setMaximumWidth(380)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(10, 10, 10, 10)
         sidebar_layout.setSpacing(10)
@@ -359,10 +396,30 @@ class EncoderTab(QWidget):
         self.files_table.itemSelectionChanged.connect(self._on_file_selected)
         self.files_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.files_table.customContextMenuRequested.connect(self._show_context_menu)
-        
+
         # Button connections
         self.start_btn.clicked.connect(self._start_encoding)
         self.stop_btn.clicked.connect(self._stop_encoding)
+
+        # MP4 subtitle warning
+        self.format_combo.currentTextChanged.connect(self._check_mp4_subtitle_warning)
+        self.subtitle_handling_combo.currentTextChanged.connect(self._check_mp4_subtitle_warning)
+
+    def _check_mp4_subtitle_warning(self):
+        """Show one-time warning about MP4 subtitle limitations."""
+        if self._mp4_subtitle_warned:
+            return
+        fmt = self.format_combo.currentText()
+        subtitle_mode = self.subtitle_handling_combo.currentText()
+        if fmt == "MP4" and subtitle_mode != "Skip":
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "MP4 Subtitle Notice",
+                "ASS/SSA styled subtitles will be converted to mov_text in MP4 containers.\n\n"
+                "To preserve full subtitle formatting (fonts, positioning, styles), use MKV instead."
+            )
+            self._mp4_subtitle_warned = True
     
     def _is_video_file(self, file_path: Path) -> bool:
         """Check if file is a video file."""
@@ -505,14 +562,37 @@ class EncoderTab(QWidget):
     
     def _get_encoder_settings(self) -> Dict[str, Any]:
         """Get current encoder settings as dictionary."""
+        subtitle_map = {
+            'Keep/Passthrough': 'keep',
+            'Convert to SRT': 'convert_to_srt',
+            'Embed': 'embed',
+            'Burn-in': 'burn_in',
+            'Skip': 'skip'
+        }
+        audio_codec_map = {
+            'Copy': 'copy',
+            'AAC 192k': 'aac',
+            'AAC 320k': 'aac',
+            'AC3': 'ac3',
+            'Normalize+Copy': 'copy'
+        }
+        audio_bitrate_map = {
+            'AAC 192k': '192k',
+            'AAC 320k': '320k',
+        }
+        audio_text = self.audio_handling_combo.currentText()
         return {
             'format': self.format_combo.currentText(),
             'codec': self.codec_combo.currentText(),
             'quality': self.quality_combo.currentText(),
             'preset': self.preset_combo.currentText(),
             'hw_accel': self.hw_accel_check.isChecked(),
-            'normalize_audio': self.normalize_audio_check.isChecked(),
-            'container': self.format_combo.currentText().lower()
+            'normalize_audio': self.normalize_audio_check.isChecked() or audio_text == 'Normalize+Copy',
+            'container': self.format_combo.currentText().lower(),
+            'subtitle_handling': subtitle_map.get(self.subtitle_handling_combo.currentText(), 'keep'),
+            'delete_original': self.delete_original_check.isChecked(),
+            'audio_codec': audio_codec_map.get(audio_text, 'copy'),
+            'audio_bitrate': audio_bitrate_map.get(audio_text),
         }
     
     def _on_encode_started(self, row: int, file_path: str):
@@ -522,15 +602,28 @@ class EncoderTab(QWidget):
     
     def _on_encode_progress(self, proc_row: int, current: int, total: int, message: str):
         """Handle encoding progress update."""
+        # Parse ETA from message if encoded
+        eta = "-"
+        if "|eta:" in message:
+            parts = message.split("|eta:", 1)
+            message = parts[0]
+            eta = parts[1]
+
         progress_bar = self.files_table.cellWidget(proc_row, 5)
         if progress_bar and isinstance(progress_bar, QProgressBar):
-            progress_bar.setValue(int((current / total) * 100))
-        
+            if total > 0:
+                progress_bar.setValue(int((current / total) * 100))
+
         # Update status
         status_item = self.files_table.item(proc_row, 7)
-        if status_item:
+        if status_item and total > 0:
             status_item.setText(f"Encoding... {int((current / total) * 100)}%")
-        
+
+        # Update ETA column
+        eta_item = self.files_table.item(proc_row, 6)
+        if eta_item:
+            eta_item.setText(eta)
+
         file_item = self.files_table.item(proc_row, 1)
         if file_item:
             file_path = file_item.data(Qt.ItemDataRole.UserRole)
@@ -540,7 +633,10 @@ class EncoderTab(QWidget):
         """Handle encoding completed event."""
         # Update status to completed
         self.files_table.setItem(proc_row, 7, QTableWidgetItem("Completed"))
-        
+        status_item = self.files_table.item(proc_row, 7)
+        if status_item:
+            status_item.setForeground(QColor(34, 197, 94))  # #22c55e success green
+
         # Update progress to 100%
         progress_bar = self.files_table.cellWidget(proc_row, 5)
         if progress_bar and isinstance(progress_bar, QProgressBar):
@@ -574,7 +670,10 @@ class EncoderTab(QWidget):
         
         # Update status to error
         self.files_table.setItem(proc_row, 7, QTableWidgetItem(f"Error: {error_msg}"))
-        
+        status_item = self.files_table.item(proc_row, 7)
+        if status_item:
+            status_item.setForeground(QColor(239, 68, 68))  # #ef4444 error red
+
         # Remove progress bar
         self.files_table.removeCellWidget(proc_row, 5)
         

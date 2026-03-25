@@ -86,6 +86,9 @@ class Worker(QRunnable):
                 current = progress_data.get('progress', 0)
                 total = progress_data.get('total', 100)
                 message = progress_data.get('message', '')
+                eta = progress_data.get('eta', '')
+                if eta:
+                    message = f"{message}|eta:{eta}"
                 self.signals.progress.emit(current, total, message)
             else:
                 # Handle old-style progress callbacks
@@ -242,8 +245,23 @@ class EncoderWorker(Worker):
                 settings.video_crf = cq_value
         if 'hw_accel' in encoder_settings:
             settings.use_nvenc = encoder_settings['hw_accel']
+        # Fix: select correct HW variant based on codec choice
+        if encoder_settings.get('hw_accel') and 'codec' in encoder_settings:
+            codec = encoder_settings['codec']
+            if codec == 'H.265/HEVC':
+                settings.nvenc_codec = 'hevc_nvenc'
+            else:
+                settings.nvenc_codec = 'h264_nvenc'
         if 'normalize_audio' in encoder_settings:
             settings.normalize_audio = encoder_settings['normalize_audio']
+        if 'subtitle_handling' in encoder_settings:
+            settings.subtitle_handling = encoder_settings['subtitle_handling']
+        if 'delete_original' in encoder_settings:
+            settings.delete_original = encoder_settings['delete_original']
+        if 'audio_codec' in encoder_settings:
+            settings.audio_codec = encoder_settings['audio_codec']
+        if 'audio_bitrate' in encoder_settings and encoder_settings['audio_bitrate']:
+            settings.audio_bitrate = encoder_settings['audio_bitrate']
         if 'format' in encoder_settings:
             format_map = {
                 'MP4': 'mp4',

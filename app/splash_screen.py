@@ -4,6 +4,8 @@ Beautiful loading screen with progress updates
 """
 
 import logging
+
+from app import __version__ as APP_VERSION
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap, QPalette, QColor, QFont
@@ -62,7 +64,7 @@ class SplashScreen(QWidget):
         layout.addWidget(title_label)
         
         # Version
-        version_label = QLabel("Version 0.5.0")
+        version_label = QLabel(f"Version {APP_VERSION}")
         version_label.setAlignment(Qt.AlignCenter)
         version_font = QFont("Segoe UI", 12)
         version_label.setFont(version_font)

@@ -72,6 +72,8 @@ class ApplicationSettings:
     """Application-wide settings."""
     check_updates: bool = True
     auto_download_updates: bool = False
+    update_last_check_ts: float = 0.0
+    update_skipped_version: str = ""
     clear_temp_on_exit: bool = True
     log_level: str = "INFO"
     max_threads: int = 4

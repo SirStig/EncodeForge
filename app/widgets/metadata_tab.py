@@ -66,18 +66,26 @@ class MetadataTab(QWidget):
         self.thread_pool = thread_pool
         self.notifier = get_notification_manager()
         self.active_workers: Dict[str, RenamerWorker] = {}
+        self._rename_history: Dict[str, str] = {}
         self._setup_ui()
         self._connect_signals()
         logger.debug("Metadata tab initialized - using base glassmorphism theme")
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(8, 8, 8, 8)
-        
-        # --- Top bar: all controls and settings ---
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # --- Toolbar container ---
+        toolbar_widget = QWidget()
+        toolbar_widget.setObjectName("encoder_toolbar")
+        toolbar_main = QVBoxLayout(toolbar_widget)
+        toolbar_main.setContentsMargins(12, 8, 12, 8)
+
+        # Top bar: all controls and settings
         top_bar = QHBoxLayout()
         from PySide6.QtWidgets import QStyle
-        
+
         # File management buttons
         self.remove_btn = QPushButton("Remove")
         self.remove_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
@@ -85,7 +93,7 @@ class MetadataTab(QWidget):
         self.clear_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         top_bar.addWidget(self.remove_btn)
         top_bar.addWidget(self.clear_btn)
-        
+
         # Provider selection
         top_bar.addWidget(StyledLabel("Provider:"))
         self.provider_combo = StyledComboBox()
@@ -100,26 +108,26 @@ class MetadataTab(QWidget):
             "OMDB"
         ])
         top_bar.addWidget(self.provider_combo)
-        
+
         # Language selection
         top_bar.addWidget(StyledLabel("Language:"))
         self.language_combo = StyledComboBox()
         self.language_combo.addItems(["English", "Japanese", "Spanish", "French", "German", "Other"])
         top_bar.addWidget(self.language_combo)
-        
+
         # API Key input
         top_bar.addWidget(StyledLabel("API Key:"))
         self.api_key_input = StyledLineEdit()
         self.api_key_input.setPlaceholderText("API Key (if required)")
         top_bar.addWidget(self.api_key_input)
-        
+
         # Pattern input
         top_bar.addWidget(StyledLabel("Pattern:"))
         self.pattern_input = StyledLineEdit()
         self.pattern_input.setPlaceholderText("Naming pattern, e.g. {title} - {season}{episode}")
         self.pattern_input.setText("{title} - {season}{episode} - {quality}")
         top_bar.addWidget(self.pattern_input)
-        
+
         # Options checkboxes
         self.replace_spaces_check = StyledCheckBox("Dots for spaces")
         self.lowercase_check = StyledCheckBox("Lowercase")
@@ -130,19 +138,29 @@ class MetadataTab(QWidget):
         top_bar.addWidget(self.lowercase_check)
         top_bar.addWidget(self.remove_special_check)
         top_bar.addWidget(self.preserve_extension_check)
-        
+
         # Action buttons
         self.fetch_metadata_btn = QPushButton("Fetch Metadata")
         self.preview_btn = QPushButton("Preview")
         self.preview_btn.setEnabled(False)
         self.rename_btn = QPushButton("Apply Rename")
         self.rename_btn.setEnabled(False)
+        self.undo_btn = QPushButton("Undo Rename")
+        self.undo_btn.setEnabled(False)
         top_bar.addWidget(self.fetch_metadata_btn)
         top_bar.addWidget(self.preview_btn)
         top_bar.addWidget(self.rename_btn)
+        top_bar.addWidget(self.undo_btn)
         top_bar.addStretch()
-        
-        main_layout.addLayout(top_bar)
+
+        toolbar_main.addLayout(top_bar)
+        main_layout.addWidget(toolbar_widget)
+
+        # --- Content area ---
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(8, 8, 8, 8)
+        content_layout.setSpacing(8)
 
         # --- Comparison lists ---
         self.comparison_layout = QHBoxLayout()
@@ -150,12 +168,12 @@ class MetadataTab(QWidget):
         self.file_table.setColumns(headers=["Input Files"])  # Single column auto-stretches
         self.file_table.enableDragDrop(self._drag_enter_event, self._drop_event)
         self.comparison_layout.addWidget(self.file_table, 1)  # Add stretch factor
-        
+
         self.metadata_table = AutoResizeTable()
         self.metadata_table.setColumns(headers=["Metadata Result"])  # Single column auto-stretches
         self.metadata_table.setAlternatingRowColors(True)
         self.comparison_layout.addWidget(self.metadata_table, 1)  # Add stretch factor
-        main_layout.addLayout(self.comparison_layout, 1)  # Give whole layout stretch
+        content_layout.addLayout(self.comparison_layout, 1)  # Give whole layout stretch
 
         # --- Preview panel below comparison lists ---
         self.preview_group = QGroupBox("Preview")
@@ -164,7 +182,9 @@ class MetadataTab(QWidget):
         self.preview_text.setReadOnly(True)
         self.preview_text.setPlaceholderText("Select a file to see details or preview output here.")
         preview_layout.addWidget(self.preview_text)
-        main_layout.addWidget(self.preview_group, 0)  # No stretch for preview
+        content_layout.addWidget(self.preview_group, 0)  # No stretch for preview
+
+        main_layout.addWidget(content_widget, 1)
 
         # Connect selection change to update preview
         self.file_table.itemSelectionChanged.connect(self._update_preview_panel)
@@ -285,9 +305,30 @@ class MetadataTab(QWidget):
         self.fetch_metadata_btn.clicked.connect(self._fetch_metadata)
         self.preview_btn.clicked.connect(self._preview_names)
         self.rename_btn.clicked.connect(self._apply_rename)
+        self.undo_btn.clicked.connect(self._undo_rename)
         # Only connect preset_list if it exists (for future pattern dialog)
         if hasattr(self, 'preset_list'):
             self.preset_list.itemClicked.connect(self._on_preset_selected)
+
+    def _undo_rename(self):
+        """Undo the last batch of renames."""
+        if not self._rename_history:
+            return
+        errors = 0
+        for new_path_str, original_path_str in list(self._rename_history.items()):
+            try:
+                new_path = Path(new_path_str)
+                original_path = Path(original_path_str)
+                if new_path.exists():
+                    new_path.rename(original_path)
+                    logger.info(f"Undid rename: {new_path.name} → {original_path.name}")
+            except Exception as e:
+                errors += 1
+                logger.error(f"Failed to undo rename: {e}")
+        self._rename_history.clear()
+        self.undo_btn.setEnabled(False)
+        if errors == 0:
+            self.notifier.show_notification(title="Undo Complete", message="Renames undone successfully", notification_type="success")
 
     def _on_preset_selected(self, item: QListWidgetItem):
         self.pattern_input.setText(item.text())
@@ -487,26 +528,50 @@ class MetadataTab(QWidget):
         self.rename_btn.setEnabled(True)
         logger.info("Generated name previews")
 
-    def _generate_new_name(self, file_path: Path, pattern: str) -> str:
+    def _generate_new_name(self, file_path: Path, pattern: str, metadata: dict = None) -> str:
         name = file_path.stem
         ext = file_path.suffix
         new_name = pattern
-        new_name = new_name.replace("{title}", name)
-        new_name = new_name.replace("{season}", "S01")
-        new_name = new_name.replace("{episode}", "E01")
-        new_name = new_name.replace("{quality}", "1080p")
-        new_name = new_name.replace("{year}", "2024")
-        new_name = new_name.replace("{codec}", "x264")
-        new_name = new_name.replace("{audio}", "AAC")
-        new_name = new_name.replace("{group}", "EncodeForge")
-        new_name = new_name.replace("{resolution}", "1920x1080")
-        if self.replace_spaces_check.isChecked():
+        if metadata and isinstance(metadata, dict):
+            title = metadata.get('title', name)
+            year = metadata.get('year', '')
+            season = metadata.get('season', '')
+            episode = metadata.get('episode', '')
+            resolution = metadata.get('resolution', '')
+            codec = metadata.get('codec', '')
+            audio = metadata.get('audio', '')
+            group = metadata.get('group', '')
+
+            season_str = f"S{int(season):02d}" if season else "S01"
+            episode_str = f"E{int(episode):02d}" if episode else "E01"
+
+            new_name = new_name.replace("{title}", str(title))
+            new_name = new_name.replace("{year}", str(year) if year else "")
+            new_name = new_name.replace("{season}", season_str)
+            new_name = new_name.replace("{episode}", episode_str)
+            new_name = new_name.replace("{quality}", resolution or "")
+            new_name = new_name.replace("{resolution}", resolution or "")
+            new_name = new_name.replace("{codec}", codec or "")
+            new_name = new_name.replace("{audio}", audio or "")
+            new_name = new_name.replace("{group}", group or "")
+        else:
+            new_name = new_name.replace("{title}", name)
+            new_name = new_name.replace("{season}", "S01")
+            new_name = new_name.replace("{episode}", "E01")
+            new_name = new_name.replace("{quality}", "")
+            new_name = new_name.replace("{year}", "")
+            new_name = new_name.replace("{codec}", "")
+            new_name = new_name.replace("{audio}", "")
+            new_name = new_name.replace("{group}", "")
+            new_name = new_name.replace("{resolution}", "")
+
+        if hasattr(self, 'replace_spaces_check') and self.replace_spaces_check.isChecked():
             new_name = new_name.replace(" ", ".")
-        if self.lowercase_check.isChecked():
+        if hasattr(self, 'lowercase_check') and self.lowercase_check.isChecked():
             new_name = new_name.lower()
-        if self.remove_special_check.isChecked():
+        if hasattr(self, 'remove_special_check') and self.remove_special_check.isChecked():
             new_name = "".join(c for c in new_name if c.isalnum() or c in ".-_ ")
-        if self.preserve_extension_check.isChecked():
+        if hasattr(self, 'preserve_extension_check') and self.preserve_extension_check.isChecked():
             new_name += ext
         return new_name
 
@@ -547,24 +612,13 @@ class MetadataTab(QWidget):
             metadata = meta_item.data(Qt.ItemDataRole.UserRole) if meta_item else {}
             
             # Generate new name using metadata and pattern
-            new_name = self._apply_pattern(file_path, pattern, metadata)
-            
-            # Apply transformations
-            if hasattr(self, 'replace_spaces_check') and self.replace_spaces_check.isChecked():
-                new_name = new_name.replace(" ", ".")
-            if hasattr(self, 'lowercase_check') and self.lowercase_check.isChecked():
-                new_name = new_name.lower()
-            if hasattr(self, 'remove_special_check') and self.remove_special_check.isChecked():
-                new_name = "".join(c for c in new_name if c.isalnum() or c in ".-_ ")
-            
-            # Preserve extension
-            if hasattr(self, 'preserve_extension_check') and self.preserve_extension_check.isChecked():
-                new_name += file_path.suffix
-            
+            new_name = self._generate_new_name(file_path, pattern, metadata)
+
             # Try to rename
             new_path = file_path.parent / new_name
             try:
                 if new_path != file_path:
+                    self._rename_history[str(new_path)] = str(file_path)
                     file_path.rename(new_path)
                     file_item.setText(new_name)
                     file_item.setData(Qt.ItemDataRole.UserRole, str(new_path))
@@ -581,6 +635,7 @@ class MetadataTab(QWidget):
         
         # Show notification
         if renamed_count > 0:
+            self.undo_btn.setEnabled(True)
             self.rename_completed.emit(f"{renamed_count} files")
             self.notifier.show_notification(
                 title="Renaming Complete",
@@ -588,7 +643,7 @@ class MetadataTab(QWidget):
                 notification_type="success" if error_count == 0 else "warning"
             )
             logger.info(f"Batch rename complete: {renamed_count} files, {error_count} errors")
-        
+
         self.rename_btn.setEnabled(False)
     
     def _apply_pattern(self, file_path: Path, pattern: str, metadata: Dict[str, Any]) -> str:

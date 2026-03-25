@@ -137,24 +137,16 @@ class ThemeManager:
     def _read_css_file(self, file_path: Path) -> Optional[str]:
         """
         Read CSS file contents.
-        
+
         Args:
             file_path: Path to CSS file
-            
+
         Returns:
             CSS content as string, or None if failed
         """
         try:
-            file = QFile(str(file_path))
-            if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
-                stream = QTextStream(file)
-                css_content = stream.readAll()
-                file.close()
-                return css_content
-            else:
-                logger.warning(f"Could not open CSS file: {file_path}")
-                return None
-                
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
         except Exception as e:
             logger.error(f"Error reading CSS file {file_path}: {e}")
             return None

@@ -13,6 +13,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+from app import __version__ as APP_VERSION
 from core import ffmpeg_manager, subtitle_manager, metadata_grabber
 
 # Setup logging
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 @click.group()
-@click.version_option(version="0.5.0")
+@click.version_option(version=APP_VERSION)
 def cli():
     """EncodeForge - FFmpeg GUI and CLI for video encoding, subtitles, and renaming"""
     pass

@@ -735,7 +735,9 @@ class ConversionHandler:
             # Subtitle handling with comprehensive format support
             temp_subtitle_files = []
             subtitle_tracks = []  # Initialize to avoid unbound variable
-            if self.settings.convert_subtitles:
+            subtitle_handling = getattr(self.settings, 'subtitle_handling', 'keep')
+
+            if subtitle_handling in ("keep", "embed"):
                 # Send subtitle analysis progress update
                 if progress_callback:
                     progress_callback({
@@ -744,26 +746,23 @@ class ConversionHandler:
                         'progress': 5,
                         'message': 'Analyzing subtitle tracks...'
                     })
-                
+
                 # Analyze subtitle tracks
                 subtitle_tracks = self._analyze_subtitle_tracks(str(input_file))
-                
+
                 if subtitle_tracks:
                     logger.info(f"Found {len(subtitle_tracks)} subtitle track(s)")
-                    
-                    # For MP4, handle different subtitle formats appropriately
+
                     if self.settings.output_format.lower() in ["mp4", "m4v"]:
-                        # Check subtitle formats
+                        # For MP4, check subtitle formats
                         has_ass_ssa = any(t.get("codec") in ["ass", "ssa"] for t in subtitle_tracks)
                         has_mov_text = any(t.get("codec") in ["mov_text", "text"] for t in subtitle_tracks)
                         has_srt = any(t.get("codec") in ["srt", "subrip"] for t in subtitle_tracks)
-                        
+
                         logger.info(f"Subtitle formats detected - ASS/SSA: {has_ass_ssa}, mov_text: {has_mov_text}, SRT: {has_srt}")
-                        
+
                         if has_ass_ssa:
                             logger.info("ASS/SSA subtitles detected, converting directly to mov_text...")
-                            
-                            # Send progress update
                             if progress_callback:
                                 progress_callback({
                                     'file': input_file.name,
@@ -771,38 +770,50 @@ class ConversionHandler:
                                     'progress': 15,
                                     'message': 'Converting ASS/SSA subtitles to mov_text...'
                                 })
-                            
-                            # Map all subtitle tracks directly and convert ASS/SSA to mov_text
                             cmd.extend(["-map", "0:s?"])
                             cmd.extend(["-c:s", "mov_text"])
                             logger.info(f"Mapped {len(subtitle_tracks)} subtitle tracks, converting ASS/SSA to mov_text")
                         else:
-                            # No ASS/SSA, map all subtitle tracks directly
                             cmd.extend(["-map", "0:s?"])
-                            
-                            # For MP4, convert all subtitles to mov_text for compatibility
-                            if has_mov_text or has_srt:
-                                cmd.extend(["-c:s", "mov_text"])
-                                logger.info("Converting subtitles to mov_text for MP4 compatibility")
-                            else:
-                                cmd.extend(["-c:s", "mov_text"])
-                                logger.info("Converting all subtitles to mov_text for MP4")
+                            cmd.extend(["-c:s", "mov_text"])
+                            logger.info("Converting subtitles to mov_text for MP4 compatibility")
                     else:
-                        # MKV/WebM can handle most subtitle formats natively
+                        # MKV/WebM: copy all subtitle tracks as-is
                         cmd.extend(["-map", "0:s?"])
-                        
-                        if self.settings.subtitle_format == "auto":
-                            cmd.extend(["-c:s", "copy"])
-                        else:
-                            cmd.extend(["-c:s", self.settings.subtitle_format])
-                        
+                        cmd.extend(["-c:s", "copy"])
                         logger.info("Mapping all subtitle tracks (copy)")
                 else:
-                    # No subtitle tracks found, but user wants subtitles enabled
                     logger.info("No subtitle tracks found in input file")
-            else:
+
+            elif subtitle_handling == "convert_to_srt":
+                subtitle_tracks = self._analyze_subtitle_tracks(str(input_file))
+                if subtitle_tracks:
+                    if hasattr(self, '_extract_and_convert_subtitles'):
+                        logger.info("Extracting and converting subtitles to SRT...")
+                        self._extract_and_convert_subtitles(str(input_file), temp_subtitle_files)
+                    else:
+                        # Fallback: treat like keep
+                        logger.info("_extract_and_convert_subtitles not available, falling back to keep mode")
+                        cmd.extend(["-map", "0:s?"])
+                        if self.settings.output_format.lower() in ["mp4", "m4v"]:
+                            cmd.extend(["-c:s", "mov_text"])
+                        else:
+                            cmd.extend(["-c:s", "copy"])
+                else:
+                    logger.info("No subtitle tracks found in input file")
+
+            elif subtitle_handling == "burn_in":
+                logger.warning(
+                    "Burn-in subtitle mode requires an external subtitle file path. "
+                    "Use '-vf subtitles=path/to/file.srt' manually or set subtitle_file on settings. "
+                    "Falling back to skip."
+                )
                 cmd.extend(["-sn"])
-                logger.info("Subtitles disabled")
+
+            else:
+                # "skip" or unknown — strip all subtitles
+                cmd.extend(["-sn"])
+                logger.info("Subtitles disabled (skip mode)")
             
             # MP4 faststart
             if self.settings.use_faststart and self.settings.output_format in ["mp4", "m4v"]:
@@ -828,8 +839,8 @@ class ConversionHandler:
             logger.info(f"Full FFmpeg command: {' '.join(cmd)}")
             
             # Log subtitle handling details
-            if self.settings.convert_subtitles and subtitle_tracks:
-                logger.info("Subtitle conversion details:")
+            if subtitle_handling in ("keep", "embed", "convert_to_srt") and subtitle_tracks:
+                logger.info(f"Subtitle handling mode: {subtitle_handling}")
                 for i, track in enumerate(subtitle_tracks):
                     logger.info(f"  Track {i}: {track.get('codec', 'unknown')} ({track.get('language', 'und')})")
                 if self.settings.output_format.lower() in ["mp4", "m4v"]:

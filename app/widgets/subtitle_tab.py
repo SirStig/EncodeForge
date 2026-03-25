@@ -104,6 +104,16 @@ class SubtitleTab(QWidget):
         self._setup_ui()
         self._connect_signals()
         logger.debug("Subtitle tab initialized - using base glassmorphism theme")
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        total = self.width()
+        if total > 0 and hasattr(self, '_main_splitter'):
+            self._main_splitter.setSizes([
+                int(total * 0.26),
+                int(total * 0.44),
+                int(total * 0.30),
+            ])
     
     def _setup_ui(self):
         """Set up the redesigned user interface."""
@@ -170,7 +180,7 @@ class SubtitleTab(QWidget):
         main_layout.addLayout(quick_bar)
 
         # --- Main Content Splitter ---
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Left: File list
         file_panel = QWidget()
@@ -182,8 +192,23 @@ class SubtitleTab(QWidget):
         self.file_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.file_table.setMinimumWidth(200)
         file_layout.addWidget(self.file_table)
-        file_panel.setMinimumWidth(220)
-        splitter.addWidget(file_panel)
+
+        # File management buttons under the file table
+        file_btn_layout = QHBoxLayout()
+        self.add_files_btn = GlassmorphicButton("Add Files")
+        self.add_files_btn.clicked.connect(self._add_files)
+        self.add_folder_btn = GlassmorphicButton("Add Folder")
+        self.add_folder_btn.clicked.connect(self._add_folder)
+        self.remove_sub_btn = GlassmorphicButton("Remove")
+        self.remove_sub_btn.clicked.connect(self._remove_selected)
+        file_btn_layout.addWidget(self.add_files_btn)
+        file_btn_layout.addWidget(self.add_folder_btn)
+        file_btn_layout.addWidget(self.remove_sub_btn)
+        file_btn_layout.addStretch()
+        file_layout.addLayout(file_btn_layout)
+
+        file_panel.setMinimumWidth(180)
+        self._main_splitter.addWidget(file_panel)
 
         # Center: Subtitles found for selected file
         subs_panel = QWidget()
@@ -198,8 +223,8 @@ class SubtitleTab(QWidget):
         self.subs_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.subs_table.setMinimumWidth(320)
         subs_layout.addWidget(self.subs_table)
-        subs_panel.setMinimumWidth(340)
-        splitter.addWidget(subs_panel)
+        subs_panel.setMinimumWidth(260)
+        self._main_splitter.addWidget(subs_panel)
 
         # Right: Subtitle preview/info panel
         preview_panel = QWidget()
@@ -215,11 +240,10 @@ class SubtitleTab(QWidget):
         self.preview_text.setMinimumWidth(220)
         # Don't set maximum width for QTextEdit in splitter layouts
         preview_layout.addWidget(self.preview_text)
-        preview_panel.setMinimumWidth(240)
-        splitter.addWidget(preview_panel)
+        preview_panel.setMinimumWidth(180)
+        self._main_splitter.addWidget(preview_panel)
 
-        splitter.setSizes([220, 340, 240])
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(self._main_splitter)
 
         # --- Bottom Bar: Apply/Batch Apply ---
         bottom_bar = QHBoxLayout()
@@ -244,6 +268,7 @@ class SubtitleTab(QWidget):
         self.search_btn.clicked.connect(self._on_search_clicked)
         self.apply_btn.clicked.connect(self._on_apply_clicked)
         self.batch_apply_btn.clicked.connect(self._on_batch_apply_clicked)
+        self.subs_table.itemSelectionChanged.connect(self._on_subtitle_selected)
 
         # Hide Add Files/Add Folder buttons (now only in sidebar)
         # Remove sync, encoding, format, and other legacy options
@@ -452,10 +477,30 @@ class SubtitleTab(QWidget):
     
     def _on_mode_changed(self):
         """Handle processing mode change."""
-        download_mode = self.download_radio.isChecked()
-        self.provider_group.setVisible(download_mode)
-        self.whisper_group.setVisible(not download_mode)
+        mode = self.mode_combo.currentText()
+        # Provider list only applies for Download/Auto mode
+        show_providers = mode in ("Auto", "Download")
+        self.provider_list.setEnabled(show_providers)
     
+    def _on_subtitle_selected(self):
+        """Show subtitle preview when user selects a subtitle in the results table."""
+        selected = self.subs_table.selectedItems()
+        if not selected:
+            return
+        row = selected[0].row()
+        item = self.subs_table.item(row, 0)
+        if not item:
+            return
+        subtitle_path = item.data(Qt.ItemDataRole.UserRole)
+        if subtitle_path and Path(subtitle_path).exists():
+            try:
+                with open(subtitle_path, 'r', encoding='utf-8', errors='replace') as f:
+                    lines = f.readlines()
+                preview = ''.join(lines[:50])
+                self.preview_text.setPlainText(preview)
+            except Exception as e:
+                self.preview_text.setPlainText(f"Error loading preview: {e}")
+
     def _drag_enter_event(self, event: QDragEnterEvent):
         """Handle drag enter event."""
         if event.mimeData().hasUrls():
@@ -637,7 +682,7 @@ class SubtitleTab(QWidget):
         self.subtitle_progress.emit("", current, total, message)
         logger.debug(f"Subtitle progress row {row}: {current}/{total} - {message}")
     
-    def _on_subtitle_completed(self, row: int, file_path: str):
+    def _on_subtitle_completed(self, _row: int, file_path: str):
         """Handle subtitle processing completed."""
         self.subtitle_completed.emit(file_path)
         logger.info(f"Subtitle processing completed for: {file_path}")
@@ -653,7 +698,7 @@ class SubtitleTab(QWidget):
             notification_type="success"
         )
     
-    def _on_subtitle_error(self, row: int, file_path: str, error: tuple):
+    def _on_subtitle_error(self, _row: int, file_path: str, error: tuple):
         """Handle subtitle processing error."""
         error_msg = str(error[1]) if len(error) > 1 else "Unknown error"
         self.subtitle_error.emit(file_path, error_msg)

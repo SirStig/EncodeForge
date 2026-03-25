@@ -2,35 +2,35 @@
 """
 
 import logging
+import time
 from pathlib import Path
 
 import qtawesome as qta
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
-    QFormLayout,
     QFrame,
-    QGroupBox,
     QHBoxLayout,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QSizePolicy,
     QStackedLayout,
-    QTabWidget,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
+from app import __version__ as APP_VERSION
 from app.widgets.custom_widgets import (
     GlassmorphicButton,
     GlassmorphicMainWindow,
     GlassmorphicStatusBar,
-    StyledCheckBox,
-    StyledComboBox,
+    SectionDivider,
     StyledLabel,
 )
+from utils.update_checker import UpdateCheckOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -85,15 +85,16 @@ class MainWindow(GlassmorphicMainWindow):
         self.subtitle_tab = None
         self.metadata_tab = None
         self.logs_tab = None
-        self.settings_tab = None
+        self._update_toast = None
 
         self._setup_ui()
         self._create_statusbar()
+        QTimer.singleShot(2000, self._maybe_auto_check_updates)
         logger.debug("Main window initialized - theme loaded at startup")
     
     def _setup_ui(self):
         central = QWidget()
-        central.setStyleSheet("background-color: #1a1a1c;")
+        central.setStyleSheet("background-color: #141416;")
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -102,15 +103,23 @@ class MainWindow(GlassmorphicMainWindow):
         # Sidebar (left)
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(170)  # Narrower sidebar for better content space
+        sidebar.setFixedWidth(185)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(12, 12, 12, 12)
-        sidebar_layout.setSpacing(8)
+        sidebar_layout.setSpacing(4)
+
+        # App name / logo area
+        app_name = StyledLabel("EncodeForge")
+        app_name.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        app_name.setStyleSheet("font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.90); padding: 4px 2px 12px 2px; letter-spacing: 0.3px;")
+        app_name.setMinimumHeight(36)
+        sidebar_layout.addWidget(app_name)
 
         # Modes section
         modes_label = StyledLabel("MODES")
         modes_label.setObjectName("section_label")
         sidebar_layout.addWidget(modes_label)
+        sidebar_layout.addSpacing(2)
 
         # All tabs in order (encoder, subtitles, metadata, logs, settings, processes)
         self.modes = [
@@ -133,7 +142,7 @@ class MainWindow(GlassmorphicMainWindow):
             sidebar_layout.addWidget(btn)
             self.sidebar_buttons[key] = btn
 
-        sidebar_layout.addSpacing(8)
+        sidebar_layout.addSpacing(10)
 
         # Files section
         files_label = StyledLabel("FILES")
@@ -159,9 +168,13 @@ class MainWindow(GlassmorphicMainWindow):
         add_folder_btn.setMaximumHeight(34)
         sidebar_layout.addWidget(add_folder_btn)
 
+        sidebar_layout.addSpacing(4)
+        sidebar_layout.addWidget(SectionDivider())
+
         # Push everything to top, system section at bottom
         sidebar_layout.addStretch()
 
+        sidebar_layout.addSpacing(4)
         # System section at bottom
         system_label = StyledLabel("SYSTEM")
         system_label.setObjectName("section_label")
@@ -180,18 +193,16 @@ class MainWindow(GlassmorphicMainWindow):
         sidebar_layout.addWidget(logs_btn)
         self.sidebar_buttons["logs"] = logs_btn
 
-        # Settings button
+        # Settings button — opens SettingsDialog, not an inline tab
         settings_btn = QToolButton()
         settings_btn.setText("  Settings")
         settings_btn.setIcon(qta.icon('fa5s.cogs'))
         settings_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        settings_btn.setCheckable(True)
         settings_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         settings_btn.setMinimumHeight(28)
         settings_btn.setMaximumHeight(34)
-        settings_btn.clicked.connect(lambda checked: self._switch_mode(4))
+        settings_btn.clicked.connect(self._open_settings_dialog)
         sidebar_layout.addWidget(settings_btn)
-        self.sidebar_buttons["settings"] = settings_btn
 
         # Processes button with badge
         self.processes_btn = QToolButton()
@@ -201,7 +212,7 @@ class MainWindow(GlassmorphicMainWindow):
         self.processes_btn.setCheckable(True)
         self.processes_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.processes_btn.setObjectName("processes_btn")
-        self.processes_btn.clicked.connect(lambda checked: self._switch_mode(5))
+        self.processes_btn.clicked.connect(lambda checked: self._switch_mode(4))
         self.processes_btn.setMinimumHeight(28)
         self.processes_btn.setMaximumHeight(34)
         sidebar_layout.addWidget(self.processes_btn)
@@ -211,7 +222,7 @@ class MainWindow(GlassmorphicMainWindow):
         self._update_processes_badge(0)
 
         # Bottom spacing
-        sidebar_layout.addSpacing(12)
+        sidebar_layout.addSpacing(8)
 
         # Main area (right) - now uses full height
         main_area = QWidget()
@@ -227,16 +238,14 @@ class MainWindow(GlassmorphicMainWindow):
         self.subtitle_tab = SubtitleTab(self.threadpool) if SubtitleTab is not None else None
         self.metadata_tab = MetadataTab(self.threadpool) if MetadataTab is not None else None
         self.logs_tab = LogsTab() if LogsTab is not None else None
-        self.settings_tab = self._create_settings_tab()
         self.processes_tab = self._create_processes_tab()
-        
+
         self.tabs = [
-            self.encoder_tab,      # 0
-            self.subtitle_tab,     # 1
-            self.metadata_tab,     # 2
-            self.logs_tab,         # 3
-            self.settings_tab,     # 4
-            self.processes_tab     # 5
+            self.encoder_tab,   # 0
+            self.subtitle_tab,  # 1
+            self.metadata_tab,  # 2
+            self.logs_tab,      # 3
+            self.processes_tab  # 4
         ]
         for tab in self.tabs:
             self.stacked_layout.addWidget(tab if tab is not None else QWidget())
@@ -246,72 +255,6 @@ class MainWindow(GlassmorphicMainWindow):
 
         # If mode widgets expose signals we want to react to, connect them safely
         self._safe_connect_signals()
-    
-    def _create_settings_tab(self):
-        """Create the settings tab widget."""
-        # Create a wrapper widget that contains the settings dialog content
-        settings_widget = QWidget()
-        layout = QVBoxLayout(settings_widget)
-        layout.setContentsMargins(20, 20, 20, 20)
-        
-        # Import the settings dialog and extract its content
-        from utils.settings_manager import SettingsManager
-        
-        settings = SettingsManager()
-        
-        # Create a tab widget for settings
-        tabs = QTabWidget()
-        
-        # General Tab
-        general_tab = QWidget()
-        general_layout = QVBoxLayout(general_tab)
-        
-        app_group = QGroupBox("Application")
-        app_layout = QFormLayout(app_group)
-        
-        self.settings_language_combo = StyledComboBox()
-        self.settings_language_combo.addItems(["English", "Spanish", "French", "German", "Japanese"])
-        self.settings_language_combo.setCurrentText(settings.application.language)
-        app_layout.addRow("Language:", self.settings_language_combo)
-        
-        self.settings_check_updates = StyledCheckBox("Check for updates on startup")
-        self.settings_check_updates.setChecked(settings.application.check_updates)
-        app_layout.addRow("", self.settings_check_updates)
-        
-        general_layout.addWidget(app_group)
-        
-        ui_group = QGroupBox("User Interface")
-        ui_layout = QFormLayout(ui_group)
-        
-        self.settings_theme_combo = StyledComboBox()
-        self.settings_theme_combo.addItems(["Dark", "Light", "Auto"])
-        self.settings_theme_combo.setCurrentText(settings.ui.theme.capitalize())
-        ui_layout.addRow("Theme:", self.settings_theme_combo)
-        
-        general_layout.addWidget(ui_group)
-        general_layout.addStretch()
-        
-        tabs.addTab(general_tab, "General")
-        
-        # Add more tabs as needed (simplified version)
-        tabs.addTab(StyledLabel("Encoder settings will be available here"), "Encoder")
-        tabs.addTab(StyledLabel("Subtitle settings will be available here"), "Subtitle")
-        tabs.addTab(StyledLabel("Advanced settings will be available here"), "Advanced")
-        
-        layout.addWidget(tabs)
-        
-        # Add save/apply buttons
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        save_btn = GlassmorphicButton("Save Settings")
-        save_btn.setIcon(qta.icon('fa5s.save'))
-        save_btn.clicked.connect(self._save_settings_tab)
-        button_layout.addWidget(save_btn)
-        
-        layout.addLayout(button_layout)
-        
-        return settings_widget
     
     def _create_processes_tab(self):
         """Create the processes monitoring tab."""
@@ -352,7 +295,7 @@ class MainWindow(GlassmorphicMainWindow):
         
         active_processes = []
         if self.encoder_tab is not None and hasattr(self.encoder_tab, 'active_workers') and self.encoder_tab.active_workers:
-            for file_path, worker in self.encoder_tab.active_workers.items():
+            for file_path, _worker in self.encoder_tab.active_workers.items():
                 item = QListWidgetItem(f"Encoding: {Path(file_path).name}")
                 item.setIcon(qta.icon('fa5s.cog'))
                 self.process_list.addItem(item)
@@ -363,23 +306,6 @@ class MainWindow(GlassmorphicMainWindow):
         else:
             self.process_info_label.setText("No active processes")
     
-    def _save_settings_tab(self):
-        """Save settings from the settings tab."""
-        from utils.settings_manager import SettingsManager
-        settings = SettingsManager()
-        
-        # Update settings from UI
-        if hasattr(self, 'settings_language_combo'):
-            settings.application.language = self.settings_language_combo.currentText().lower()[:2]
-        if hasattr(self, 'settings_check_updates'):
-            settings.application.check_updates = self.settings_check_updates.isChecked()
-        if hasattr(self, 'settings_theme_combo'):
-            settings.ui.theme = self.settings_theme_combo.currentText().lower()
-        
-        settings.save()
-        logger.info("Settings saved successfully")
-        
-        QMessageBox.information(self, "Settings Saved", "Your settings have been saved successfully.")
 
 
     def _safe_connect_signals(self):
@@ -413,15 +339,32 @@ class MainWindow(GlassmorphicMainWindow):
         except Exception:
             logger.debug("Could not connect metadata signals")
 
+    def _open_settings_dialog(self):
+        """Open the full settings dialog."""
+        from app.dialogs.settings_dialog import SettingsDialog
+        dlg = SettingsDialog(self)
+        dlg.settings_changed.connect(self._on_settings_changed)
+        dlg.exec()
+
+    def _on_settings_changed(self):
+        """React to settings being saved from the dialog."""
+        import logging
+        from utils.settings_manager import SettingsManager
+        sm = SettingsManager()
+        logging.getLogger().setLevel(getattr(logging, sm.application.log_level, logging.INFO))
+        if hasattr(self, 'threadpool'):
+            self.threadpool.setMaxThreadCount(sm.application.max_threads)
+        logger.debug("Settings applied to running application")
+
     def _switch_mode(self, idx: int):
         """Switch between different modes/tabs."""
         # Uncheck all sidebar buttons first
         for btn in self.sidebar_buttons.values():
             btn.setChecked(False)
 
-        # Map index to button key
-        button_keys = ["encoder", "subtitles", "metadata", "logs", "settings", "processes"]
-        
+        # Map index to button key (settings opens as dialog, not inline)
+        button_keys = ["encoder", "subtitles", "metadata", "logs", "processes"]
+
         # Check the appropriate button
         if 0 <= idx < len(button_keys):
             key = button_keys[idx]
@@ -493,7 +436,7 @@ class MainWindow(GlassmorphicMainWindow):
     def _on_encode_started(self, file_path: str):
         self._update_status(f"Encoding: {Path(file_path).name}")
 
-    def _on_encode_progress(self, file_path: str, current: int, total: int, message: str = ""):
+    def _on_encode_progress(self, _file_path: str, current: int, total: int, message: str = ""):
         pct = int((current / total) * 100) if total else 0
         self.progress_label.setText(f"{pct}% - {message}")
 
@@ -501,7 +444,7 @@ class MainWindow(GlassmorphicMainWindow):
         self._update_status(f"Completed: {Path(file_path).name}")
         self.progress_label.setText("")
 
-    def _on_process_count_changed(self, *args):
+    def _on_process_count_changed(self, *_args):
         """Update the processes badge when process count changes."""
         try:
             if self.encoder_tab is not None and hasattr(self.encoder_tab, 'active_workers'):
@@ -510,13 +453,142 @@ class MainWindow(GlassmorphicMainWindow):
         except Exception:
             pass
 
-    def _on_subtitle_progress(self, *args, **kwargs):
-        # Placeholder for subtitle progress updates
+    def _on_subtitle_progress(self, *_args, **_kwargs):
         pass
 
-    def _on_rename_progress(self, *args, **kwargs):
-        # Placeholder for renamer progress updates
+    def _on_rename_progress(self, *_args, **_kwargs):
         pass
+
+    def _maybe_auto_check_updates(self) -> None:
+        from utils.settings_manager import SettingsManager
+
+        sm = SettingsManager()
+        if not sm.application.check_updates:
+            return
+        now = time.time()
+        if now - sm.application.update_last_check_ts < 6 * 3600:
+            return
+        self._start_update_check(auto=True)
+
+    def _manual_check_updates(self) -> None:
+        self._start_update_check(auto=False)
+
+    def _start_update_check(self, auto: bool) -> None:
+        from utils.update_runner import UpdateCheckRunnable
+
+        runnable = UpdateCheckRunnable(APP_VERSION)
+        runnable.signals.setParent(self)
+
+        def _done(outcome: object) -> None:
+            self._on_update_check_done(outcome, auto)
+
+        runnable.signals.finished.connect(_done)
+        self.threadpool.start(runnable)
+
+    def _on_update_check_done(self, outcome: object, auto: bool) -> None:
+        if not isinstance(outcome, UpdateCheckOutcome):
+            return
+        from utils.settings_manager import SettingsManager
+
+        sm = SettingsManager()
+        if outcome.error:
+            if not auto:
+                QMessageBox.warning(
+                    self,
+                    "Update check",
+                    f"Could not reach GitHub:\n{outcome.error}",
+                )
+            return
+        if outcome.release:
+            sm.application.update_last_check_ts = time.time()
+            sm.save()
+        if auto:
+            if not outcome.release or not outcome.is_newer:
+                return
+            if outcome.release.version == sm.application.update_skipped_version:
+                return
+            self._show_update_toast(outcome.release)
+            return
+        if not outcome.release:
+            QMessageBox.information(
+                self,
+                "Updates",
+                "No releases were found for this project on GitHub.",
+            )
+            return
+        if not outcome.is_newer:
+            QMessageBox.information(
+                self,
+                "Updates",
+                f"You are up to date (v{APP_VERSION}).",
+            )
+            return
+        from app.dialogs.update_dialog import UpdateAvailableDialog
+
+        dlg = UpdateAvailableDialog(outcome.release, APP_VERSION, self)
+        dlg.exec()
+
+    def _show_update_toast(self, release) -> None:
+        from app.widgets.update_toast import UpdateToast
+
+        cw = self.centralWidget()
+        if cw is None:
+            return
+        if self._update_toast is not None:
+            self._update_toast.hide()
+            self._update_toast.deleteLater()
+            self._update_toast = None
+        toast = UpdateToast(cw)
+        toast.set_version_text(release.version, release.name)
+        toast.later_clicked.connect(
+            lambda v=release.version: self._dismiss_update_toast(v)
+        )
+        toast.notes_clicked.connect(lambda r=release: self._open_update_dialog(r))
+        toast.download_clicked.connect(
+            lambda u=release.html_url: self._open_release_page(u)
+        )
+        self._update_toast = toast
+        toast.show()
+        toast.raise_()
+        self._position_update_toast()
+
+    def _dismiss_update_toast(self, skipped_version: str) -> None:
+        from utils.settings_manager import SettingsManager
+
+        sm = SettingsManager()
+        sm.application.update_skipped_version = skipped_version
+        sm.save()
+        if self._update_toast is not None:
+            self._update_toast.hide()
+            self._update_toast.deleteLater()
+            self._update_toast = None
+
+    def _open_update_dialog(self, release) -> None:
+        from app.dialogs.update_dialog import UpdateAvailableDialog
+
+        dlg = UpdateAvailableDialog(release, APP_VERSION, self)
+        dlg.exec()
+
+    def _open_release_page(self, url: str) -> None:
+        if url:
+            QDesktopServices.openUrl(QUrl(url))
+
+    def _position_update_toast(self) -> None:
+        if self._update_toast is None:
+            return
+        parent = self._update_toast.parentWidget()
+        if parent is None:
+            return
+        m = 24
+        self._update_toast.adjustSize()
+        self._update_toast.move(
+            max(0, parent.width() - self._update_toast.width() - m),
+            max(0, parent.height() - self._update_toast.height() - m),
+        )
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_update_toast()
 
     def _update_processes_badge(self, count: int):
         """Update the processes button badge with the current count."""
