@@ -53,7 +53,7 @@
         "dateModified": "2026-03-25",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "url": "https://sirstig.github.io/EncodeForge/",
-        "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/latest",
+        "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe",
         "codeRepository": "https://github.com/SirStig/EncodeForge",
         "license": "https://opensource.org/licenses/MIT",
         "description": "Free open-source PySide6 FFmpeg GUI for hardware-accelerated video encoding, AI subtitles via faster-whisper (v0.5.0), and smart media renaming.",
@@ -89,6 +89,7 @@
     <nav class="header-nav">
       <a href="#features">Features</a>
       <a href="#screenshots">Screenshots</a>
+      <a href="#downloads">Download</a>
       <a href="changelog.html">Changelog</a>
       <a href="https://github.com/SirStig/EncodeForge/releases" target="_blank" rel="noopener">Releases</a>
       <a class="header-badge" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
@@ -100,16 +101,17 @@
 
     <!-- ===== HERO ===== -->
     <section class="hero">
-      <div class="hero-eyebrow">Open source · MIT License · v0.5.0-alpha-1 (PySide6, unreleased)</div>
+      <div class="hero-eyebrow">Open source · MIT License · v0.5.0-alpha-1 (PySide6)</div>
       <h1>Encode, subtitle,<br>and organize your media</h1>
       <p class="hero-sub">
         EncodeForge is a professional FFmpeg GUI built with PySide6. Hardware-accelerated batch encoding,
         <strong>v0.5.0</strong> AI subtitles via <strong>faster-whisper</strong> (CTranslate2) — <strong>much faster</strong> and lighter than the OpenAI Whisper + PyTorch path in v0.4.x — plus smart media renaming, all in one app.
-        Installable releases are still <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">v0.4.1</a> (JavaFX; deprecated) until this line ships.
+        Current pre-release binaries: <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">v0.5.0-alpha-1</a> (macOS Apple Silicon and Windows; Linux packages coming soon). Legacy <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">v0.4.1</a> was JavaFX.
       </p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" id="download-btn" href="https://github.com/SirStig/EncodeForge/releases/latest">Download for Windows</a>
-        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases">All Releases</a>
+        <a class="btn btn-primary" id="download-btn" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe">Download for Windows</a>
+        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">Release notes</a>
+        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases">All releases</a>
         <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
       </div>
     </section>
@@ -232,23 +234,58 @@
       <img class="modal-img" src="screenshots/metadata.png" alt="Media renaming interface">
     </div>
 
-    <!-- ===== DOWNLOADS / DOCS ===== -->
+    <!-- ===== DOWNLOADS ===== -->
+    <section id="downloads" class="landing-section download-section">
+      <h2>Download v0.5.0-alpha-1</h2>
+      <p class="download-lead">
+        One-click links go straight to the GitHub release assets. FFmpeg is not bundled — the app helps you locate or download it on first launch.
+        Linux .deb, .rpm, and AppImage will appear here when those builds are published.
+      </p>
+      <div class="download-grid">
+        <div class="download-column">
+          <h3 class="download-os">macOS</h3>
+          <ul class="download-list">
+            <li>
+              <a class="dl-btn dl-btn-primary" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/encodeforge-macos-arm.zip">Apple Silicon (.zip)</a>
+            </li>
+            <li>
+              <span class="dl-btn dl-btn-soon">Intel 64-bit (.zip) — coming soon</span>
+            </li>
+          </ul>
+        </div>
+        <div class="download-column">
+          <h3 class="download-os">Windows</h3>
+          <ul class="download-list">
+            <li>
+              <a class="dl-btn dl-btn-primary" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe">Executable (.exe)</a>
+            </li>
+          </ul>
+        </div>
+        <div class="download-column">
+          <h3 class="download-os">Linux</h3>
+          <ul class="download-list">
+            <li><span class="dl-btn dl-btn-soon">.deb (Debian / Ubuntu) — coming soon</span></li>
+            <li><span class="dl-btn dl-btn-soon">.rpm (Fedora / RHEL) — coming soon</span></li>
+            <li><span class="dl-btn dl-btn-soon">AppImage — coming soon</span></li>
+          </ul>
+        </div>
+      </div>
+      <p class="download-foot">
+        <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">All assets on GitHub</a>
+        · <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">Legacy v0.4.1 (JavaFX)</a>
+        · <a href="https://github.com/SirStig/EncodeForge/blob/HEAD/README.md#installation">Build from source</a>
+      </p>
+    </section>
+
+    <!-- ===== RESOURCES ===== -->
     <section class="landing-section">
-      <h2>Download &amp; Resources</h2>
+      <h2>Resources</h2>
       <div class="docs-card">
         <table>
           <thead>
-            <tr><th>Platform / Resource</th><th>Link</th></tr>
+            <tr><th>Resource</th><th>Link</th></tr>
           </thead>
           <tbody>
-            <tr>
-              <td><strong>Windows (exe)</strong></td>
-              <td><a href="https://github.com/SirStig/EncodeForge/releases/latest">GitHub Releases →</a></td>
-            </tr>
-            <tr>
-              <td><strong>Linux (deb / AppImage)</strong></td>
-              <td><a href="https://github.com/SirStig/EncodeForge/releases/latest">GitHub Releases →</a></td>
-            </tr>
             <tr>
               <td>Install from source (Python 3.10+)</td>
               <td><a href="https://github.com/SirStig/EncodeForge#installation">README →</a></td>
@@ -297,22 +334,35 @@
       btn.textContent = next === 'dark' ? '☀ Light' : '🌙 Dark';
     });
 
-    // ===== Platform download button =====
+    // ===== Platform download button (direct asset URLs) =====
     (function () {
       const ua = navigator.userAgent.toLowerCase();
       const btn = document.getElementById('download-btn');
       if (!btn) return;
-      const latest = 'https://github.com/SirStig/EncodeForge/releases/latest';
+      const winExe = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe';
+      const macArmZip = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/encodeforge-macos-arm.zip';
+      const downloadsAnchor = './#downloads';
+
       if (/linux/.test(ua)) {
-        btn.textContent = 'Download for Linux';
-        btn.href = latest;
-      } else if (/mac|darwin/.test(ua)) {
-        btn.textContent = 'Download for macOS';
-        btn.href = latest;
-      } else {
-        btn.textContent = 'Download for Windows';
-        btn.href = latest;
+        btn.textContent = 'Linux downloads';
+        btn.href = downloadsAnchor;
+        return;
       }
+      if (/mac|darwin/.test(ua)) {
+        btn.href = macArmZip;
+        btn.textContent = 'Download for macOS (Apple Silicon)';
+        if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+          navigator.userAgentData.getHighEntropyValues(['architecture']).then(function (h) {
+            if (h.architecture && h.architecture !== 'arm') {
+              btn.textContent = 'macOS Intel — see downloads';
+              btn.href = downloadsAnchor;
+            }
+          }).catch(function () {});
+        }
+        return;
+      }
+      btn.textContent = 'Download for Windows';
+      btn.href = winExe;
     })();
 
     // ===== Modal =====

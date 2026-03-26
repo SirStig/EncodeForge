@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.5.0-alpha-1] — *Unreleased*
+## [0.5.0-alpha-1] — 2026-03-25
 
-> **PySide6 line (this version) is not published on GitHub Releases yet.** The latest installable release is **[v0.4.1](https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1)** (JavaFX; deprecated).
+> **First PySide6 pre-release on GitHub Releases.** Installers for **macOS (Apple Silicon)** and **Windows** are published; **Linux** packages (.deb, .rpm, AppImage) are not uploaded yet. The previous **[v0.4.1](https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1)** line was JavaFX (deprecated).
 
 ### Highlights
 
@@ -115,14 +115,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Release Links
 
-- **Status** — Pre-release; no GitHub Release tag for `0.5.0-alpha-1` yet.
-- **Compare (development)** — [v0.4.1...HEAD](https://github.com/SirStig/EncodeForge/compare/v0.4.1...HEAD)
+- **GitHub Release** — [v0.5.0-alpha-1](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1)
+- **Direct downloads** — [macOS Apple Silicon (.zip)](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/encodeforge-macos-arm.zip) · [Windows (.exe)](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe)
+- **Compare** — [v0.4.1...v0.5.0-alpha-1](https://github.com/SirStig/EncodeForge/compare/v0.4.1...v0.5.0-alpha-1)
 
 ---
 
 ## [0.4.1] — 2025-10-24
 
-> **Note:** This was the final JavaFX release and remains the latest **published** binary. The PySide6 rewrite is in development as **0.5.0-alpha-1** (unreleased).
+> **Note:** Final **JavaFX** release (deprecated). Current binaries are the **PySide6** line; see **[v0.5.0-alpha-1](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1)**.
 
 ### Highlights
 

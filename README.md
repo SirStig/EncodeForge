@@ -23,7 +23,7 @@
 
 **EncodeForge** is a free, open-source FFmpeg GUI built with Python and PySide6. It brings professional video encoding, AI subtitle generation, and media file management into a single, clean desktop application — no command-line experience required.
 
-**v0.5.0-alpha-1** is the in-development PySide6 rewrite: modern Fluent-style UI, improved performance, and a unified settings layer for the **desktop app**. It is **not** on GitHub Releases yet. **v0.4.1** remains the latest published binary (JavaFX; deprecated). Command-line and web interfaces are planned for a later release.
+**v0.5.0-alpha-1** is the current **PySide6** desktop line on [GitHub Releases](https://github.com/SirStig/EncodeForge/releases/latest): modern Fluent-style UI, improved performance, and a unified settings layer. Published builds today are **macOS (Apple Silicon)** and **Windows** (.exe); **Linux** (.deb / .rpm / AppImage) builds are planned but not uploaded yet. **[v0.4.1](https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1)** was the last **JavaFX** release (deprecated). Command-line and web interfaces are planned for a later release.
 
 **AI subtitles in v0.5.0** use **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** (Whisper models via **CTranslate2**) instead of the OpenAI Whisper + PyTorch path from the JavaFX era. Expect **much faster** transcription, **lower RAM use**, and the same GPU backends (CUDA, ROCm, Apple Silicon, CPU) — a clear upgrade over **v0.4.x**.
 
@@ -88,13 +88,16 @@
 
 ### Pre-Built Binaries (Recommended)
 
-Download the latest release from the [Releases page](https://github.com/SirStig/EncodeForge/releases):
+Latest pre-release: **[v0.5.0-alpha-1](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1)** (also at [`/releases/latest`](https://github.com/SirStig/EncodeForge/releases/latest)).
 
-| Platform | Format |
-|----------|--------|
-| **Windows** | `.exe` installer |
-| **Linux** | `.deb` (Debian/Ubuntu) or `.AppImage` |
-| **macOS** | Build from source (see below) |
+| Platform | Format | Direct download |
+|----------|--------|-----------------|
+| **Windows** | `.exe` | [EncodeForge.exe](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe) |
+| **macOS** | Apple Silicon `.zip` | [encodeforge-macos-arm.zip](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/encodeforge-macos-arm.zip) |
+| **macOS** | Intel `.zip` | *Not published yet* — use [from source](#from-source) |
+| **Linux** | `.deb` / `.rpm` / AppImage | *Not published yet* — use [from source](#from-source) |
+
+Legacy JavaFX build: [v0.4.1](https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1) (deprecated).
 
 ### From Source
 
