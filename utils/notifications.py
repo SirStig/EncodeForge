@@ -6,10 +6,16 @@ Desktop notifications using desktop-notifier
 import asyncio
 import logging
 from typing import Optional
-from desktop_notifier import DesktopNotifier, Urgency, Button, ReplyField
+from desktop_notifier import DesktopNotifier, Icon, Urgency, Button, ReplyField
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _encodeforge_notification_icon() -> Icon | None:
+    """Real filesystem path only — Nuitka breaks desktop_notifier's DEFAULT_ICON (importlib.resources → as_uri)."""
+    path = Path(__file__).resolve().parent.parent / "resources" / "icons" / "app-icon.png"
+    return Icon(path=path) if path.is_file() else None
 
 
 class NotificationManager:
@@ -18,13 +24,9 @@ class NotificationManager:
     def __init__(self, app_name: str = "EncodeForge"):
         self.notifier = DesktopNotifier(
             app_name=app_name,
-            notification_limit=10
+            notification_limit=10,
+            app_icon=_encodeforge_notification_icon(),
         )
-        
-        # Set app icon if available
-        icon_path = Path(__file__).parent.parent / "resources" / "icons" / "app-icon.png"
-        if icon_path.exists():
-            self.notifier.app_icon = str(icon_path)
     
     async def notify_success(self, title: str, message: str):
         """Show success notification"""
