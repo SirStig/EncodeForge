@@ -55,13 +55,19 @@ def build():
     cmd = [
         sys.executable, "-m", "nuitka",
         "--standalone",
+    ]
+
+    if os.environ.get("NUITKA_ONEFILE", "").lower() in ("1", "true", "yes"):
+        cmd.append("--onefile")
+
+    cmd.extend([
         "--enable-plugin=pyside6",
         "--output-dir=dist",
         f"--output-filename={PROJECT_NAME}",
         "--assume-yes-for-downloads",
         "--show-progress",
         "--show-memory",
-    ]
+    ])
 
     if IS_WINDOWS:
         if ICON_ICO.exists():
