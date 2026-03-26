@@ -34,9 +34,9 @@
     <a class="header-logo" href="./">Encode<span>Forge</span></a>
     <div class="header-spacer"></div>
     <nav class="header-nav">
-      <a href="./#features">Features</a>
+      <a href="downloads.html">Download</a>
+      <a href="guide.html">Guide</a>
       <a href="./#screenshots">Screenshots</a>
-      <a href="./#downloads">Download</a>
       <a href="changelog.html" class="active">Changelog</a>
       <a href="https://github.com/SirStig/EncodeForge/releases" target="_blank" rel="noopener">Releases</a>
       <a class="header-badge" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
@@ -54,6 +54,8 @@
 
       <footer class="doc-footer" style="margin-top:2rem">
         <a href="./">Home</a>
+        <a href="downloads.html">Download</a>
+        <a href="guide.html">Guide</a>
         <a href="https://github.com/SirStig/EncodeForge/releases" target="_blank" rel="noopener">Releases</a>
         <a href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub</a>
       </footer>
@@ -62,19 +64,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/marked@13.0.3/marked.min.js"></script>
   <script src="assets/changelog.js"></script>
-
-  <script>
-    const btn = document.getElementById('themeBtn');
-    const root = document.documentElement;
-    const saved = localStorage.getItem('ef-theme') || 'dark';
-    root.dataset.theme = saved;
-    if (btn) btn.textContent = saved === 'dark' ? '☀ Light' : '🌙 Dark';
-    if (btn) btn.addEventListener('click', () => {
-      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-      root.dataset.theme = next;
-      localStorage.setItem('ef-theme', next);
-      btn.textContent = next === 'dark' ? '☀ Light' : '🌙 Dark';
-    });
-  </script>
+  <script src="assets/site.js"></script>
 </body>
 </html>

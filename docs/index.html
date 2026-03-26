@@ -6,7 +6,7 @@
 
   <!-- SEO -->
   <title>EncodeForge — FFmpeg GUI for Video Encoding, AI Subtitles &amp; Media Renaming</title>
-  <meta name="description" content="EncodeForge is a free, open-source PySide6 desktop application for hardware-accelerated video encoding, AI subtitles with faster-whisper (v0.5.0 — much faster than v0.4.x), and smart media renaming. Windows, macOS, and Linux.">
+  <meta name="description" content="EncodeForge — free PySide6 FFmpeg GUI: GPU batch encoding, faster-whisper AI subtitles, and smart media renaming. v0.5.0-alpha-1 for Windows and Apple Silicon; Linux builds coming.">
   <meta name="keywords" content="encodeforge, ffmpeg gui, pyside6, qt6, video encoding, hardware acceleration, nvenc, quicksync, amd amf, videotoolbox, ai subtitles, faster-whisper, whisper, ctranslate2, opensubtitles, media renaming, tmdb, tvdb, batch encoding, python desktop app, joshua kac">
   <meta name="author" content="Joshua Kac">
   <meta name="robots" content="index, follow">
@@ -21,7 +21,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sirstig.github.io/EncodeForge/">
   <meta property="og:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta property="og:description" content="Hardware-accelerated encoding and smart renaming. v0.5.0 uses faster-whisper for AI subtitles — much faster than the v0.4.x stack. Free and open source.">
+  <meta property="og:description" content="PySide6 FFmpeg GUI: GPU encoding, faster-whisper subtitles, media renaming. v0.5.0-alpha-1. Free and open source.">
   <meta property="og:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -32,7 +32,7 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta name="twitter:description" content="Hardware-accelerated encoding and smart renaming. v0.5.0: faster-whisper for AI subtitles — much faster than v0.4.x. Free and open source.">
+  <meta name="twitter:description" content="PySide6 FFmpeg GUI: GPU encoding, faster-whisper subtitles, renaming. v0.5.0-alpha-1. Free and open source.">
   <meta name="twitter:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta name="twitter:creator" content="@SirStig">
 
@@ -87,9 +87,9 @@
     <a class="header-logo" href="./">Encode<span>Forge</span></a>
     <div class="header-spacer"></div>
     <nav class="header-nav">
-      <a href="#features">Features</a>
+      <a href="downloads.html">Download</a>
+      <a href="guide.html">Guide</a>
       <a href="#screenshots">Screenshots</a>
-      <a href="#downloads">Download</a>
       <a href="changelog.html">Changelog</a>
       <a href="https://github.com/SirStig/EncodeForge/releases" target="_blank" rel="noopener">Releases</a>
       <a class="header-badge" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
@@ -104,64 +104,20 @@
       <div class="hero-eyebrow">Open source · MIT License · v0.5.0-alpha-1 (PySide6)</div>
       <h1>Encode, subtitle,<br>and organize your media</h1>
       <p class="hero-sub">
-        EncodeForge is a professional FFmpeg GUI built with PySide6. Hardware-accelerated batch encoding,
-        <strong>v0.5.0</strong> AI subtitles via <strong>faster-whisper</strong> (CTranslate2) — <strong>much faster</strong> and lighter than the OpenAI Whisper + PyTorch path in v0.4.x — plus smart media renaming, all in one app.
-        Current pre-release binaries: <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">v0.5.0-alpha-1</a> (macOS Apple Silicon and Windows; Linux packages coming soon). Legacy <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">v0.4.1</a> was JavaFX.
+        A PySide6 FFmpeg GUI for hardware-accelerated batch encoding, smart renaming, and local AI subtitles with <strong>faster-whisper</strong>.
+        <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">v0.5.0-alpha-1</a> — Apple Silicon &amp; Windows; Linux packages soon. Legacy <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">v0.4.1</a> (JavaFX).
       </p>
       <div class="hero-ctas">
         <a class="btn btn-primary" id="download-btn" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe">Download for Windows</a>
+        <a class="btn btn-ghost" href="downloads.html">All platforms</a>
+        <a class="btn btn-ghost" href="guide.html">Guide</a>
         <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">Release notes</a>
-        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases">All releases</a>
         <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
       </div>
     </section>
 
-    <!-- ===== FEATURES ===== -->
-    <div id="features" class="feature-grid">
-      <div class="feature-card">
-        <div class="feature-icon">⚡</div>
-        <h3>Hardware Acceleration</h3>
-        <p>NVIDIA NVENC, AMD AMF, Intel Quick Sync, and Apple VideoToolbox — up to 10x faster than CPU encoding.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🤖</div>
-        <h3>AI Subtitle Generation</h3>
-        <p><strong>v0.5.0:</strong> Local subtitles in 90+ languages with <strong>faster-whisper</strong> and GPU acceleration — dramatically faster than the v0.4.x Whisper stack. No cloud required.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🗂</div>
-        <h3>Smart Media Renaming</h3>
-        <p>Auto-detect and rename files using 10+ metadata providers including TMDB, TVDB, AniDB, and Trakt.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">📦</div>
-        <h3>Batch Processing</h3>
-        <p>Queue entire libraries and process them overnight. Real-time progress tracking per file and overall.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🌐</div>
-        <h3>8 Subtitle Providers</h3>
-        <p>Download from OpenSubtitles, Addic7ed, Jimaku, SubDL, and more — with anime-specific sources built in.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🎬</div>
-        <h3>Plex &amp; Jellyfin Ready</h3>
-        <p>Custom naming patterns compatible with Plex and Jellyfin. Preview all changes before applying.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">💻</div>
-        <h3>CLI Interface</h3>
-        <p>CLI architecture is built and ready — encode, subtitle, and rename from scripts or shell. Full commands shipping in a future release.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🔓</div>
-        <h3>Free &amp; Open Source</h3>
-        <p>MIT licensed. No telemetry, no subscriptions, no ads. Compiled with Nuitka for self-contained installs.</p>
-      </div>
-    </div>
-
     <!-- ===== SCREENSHOTS ===== -->
-    <section id="screenshots" class="screenshots-section">
+    <section id="screenshots" class="screenshots-section section-stack">
       <h2>See it in action</h2>
       <div class="screenshot-list">
 
@@ -234,51 +190,8 @@
       <img class="modal-img" src="screenshots/metadata.png" alt="Media renaming interface">
     </div>
 
-    <!-- ===== DOWNLOADS ===== -->
-    <section id="downloads" class="landing-section download-section">
-      <h2>Download v0.5.0-alpha-1</h2>
-      <p class="download-lead">
-        One-click links go straight to the GitHub release assets. FFmpeg is not bundled — the app helps you locate or download it on first launch.
-        Linux .deb, .rpm, and AppImage will appear here when those builds are published.
-      </p>
-      <div class="download-grid">
-        <div class="download-column">
-          <h3 class="download-os">macOS</h3>
-          <ul class="download-list">
-            <li>
-              <a class="dl-btn dl-btn-primary" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/encodeforge-macos-arm.zip">Apple Silicon (.zip)</a>
-            </li>
-            <li>
-              <span class="dl-btn dl-btn-soon">Intel 64-bit (.zip) — coming soon</span>
-            </li>
-          </ul>
-        </div>
-        <div class="download-column">
-          <h3 class="download-os">Windows</h3>
-          <ul class="download-list">
-            <li>
-              <a class="dl-btn dl-btn-primary" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe">Executable (.exe)</a>
-            </li>
-          </ul>
-        </div>
-        <div class="download-column">
-          <h3 class="download-os">Linux</h3>
-          <ul class="download-list">
-            <li><span class="dl-btn dl-btn-soon">.deb (Debian / Ubuntu) — coming soon</span></li>
-            <li><span class="dl-btn dl-btn-soon">.rpm (Fedora / RHEL) — coming soon</span></li>
-            <li><span class="dl-btn dl-btn-soon">AppImage — coming soon</span></li>
-          </ul>
-        </div>
-      </div>
-      <p class="download-foot">
-        <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">All assets on GitHub</a>
-        · <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">Legacy v0.4.1 (JavaFX)</a>
-        · <a href="https://github.com/SirStig/EncodeForge/blob/HEAD/README.md#installation">Build from source</a>
-      </p>
-    </section>
-
     <!-- ===== RESOURCES ===== -->
-    <section class="landing-section">
+    <section class="landing-section section-stack">
       <h2>Resources</h2>
       <div class="docs-card">
         <table>
@@ -286,6 +199,14 @@
             <tr><th>Resource</th><th>Link</th></tr>
           </thead>
           <tbody>
+            <tr>
+              <td>Download binaries</td>
+              <td><a href="downloads.html">Download page →</a></td>
+            </tr>
+            <tr>
+              <td>Guide &amp; how-to</td>
+              <td><a href="guide.html">Guide →</a></td>
+            </tr>
             <tr>
               <td>Install from source (Python 3.10+)</td>
               <td><a href="https://github.com/SirStig/EncodeForge#installation">README →</a></td>
@@ -311,6 +232,8 @@
     <footer class="site-footer">
       <span>MIT License · Personal open-source project by <a href="https://solutions.ironcoffee.com/" target="_blank" rel="noopener">Joshua Kac</a> · <a href="https://github.com/SirStig" target="_blank" rel="noopener">GitHub</a> · <a href="https://www.linkedin.com/in/joshua-kac-aa50b7131" target="_blank" rel="noopener">LinkedIn</a></span>
       <span>
+        <a href="downloads.html">Download</a> ·
+        <a href="guide.html">Guide</a> ·
         <a href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub</a> ·
         <a href="https://github.com/SirStig/EncodeForge/releases">Releases</a> ·
         <a href="changelog.html">Changelog</a>
@@ -319,53 +242,37 @@
 
   </div><!-- /.landing -->
 
+  <script src="assets/site.js"></script>
   <script>
-    // ===== Theme toggle =====
-    const btn = document.getElementById('themeBtn');
-    const root = document.documentElement;
-    const saved = localStorage.getItem('ef-theme') || 'dark';
-    root.dataset.theme = saved;
-    btn.textContent = saved === 'dark' ? '☀ Light' : '🌙 Dark';
-
-    btn.addEventListener('click', () => {
-      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-      root.dataset.theme = next;
-      localStorage.setItem('ef-theme', next);
-      btn.textContent = next === 'dark' ? '☀ Light' : '🌙 Dark';
-    });
-
-    // ===== Platform download button (direct asset URLs) =====
     (function () {
       const ua = navigator.userAgent.toLowerCase();
-      const btn = document.getElementById('download-btn');
-      if (!btn) return;
+      const dl = document.getElementById('download-btn');
+      if (!dl) return;
       const winExe = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe';
       const macArmZip = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/encodeforge-macos-arm.zip';
-      const downloadsAnchor = './#downloads';
+      const downloadsPage = 'downloads.html';
 
       if (/linux/.test(ua)) {
-        btn.textContent = 'Linux downloads';
-        btn.href = downloadsAnchor;
+        dl.textContent = 'Linux downloads';
+        dl.href = downloadsPage;
         return;
       }
       if (/mac|darwin/.test(ua)) {
-        btn.href = macArmZip;
-        btn.textContent = 'Download for macOS (Apple Silicon)';
+        dl.href = macArmZip;
+        dl.textContent = 'Download for macOS (Apple Silicon)';
         if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
           navigator.userAgentData.getHighEntropyValues(['architecture']).then(function (h) {
             if (h.architecture && h.architecture !== 'arm') {
-              btn.textContent = 'macOS Intel — see downloads';
-              btn.href = downloadsAnchor;
+              dl.textContent = 'macOS Intel — downloads';
+              dl.href = downloadsPage;
             }
           }).catch(function () {});
         }
         return;
       }
-      btn.textContent = 'Download for Windows';
-      btn.href = winExe;
+      dl.textContent = 'Download for Windows';
+      dl.href = winExe;
     })();
-
-    // ===== Modal =====
     function openModal(id) {
       const m = document.getElementById(id);
       if (m) { m.classList.add('open'); document.body.style.overflow = 'hidden'; }
@@ -374,8 +281,8 @@
       const m = document.getElementById(id);
       if (m) { m.classList.remove('open'); document.body.style.overflow = ''; }
     }
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') document.querySelectorAll('.modal.open').forEach(m => {
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') document.querySelectorAll('.modal.open').forEach(function (m) {
         m.classList.remove('open'); document.body.style.overflow = '';
       });
     });
