@@ -19,10 +19,9 @@
         encodeURIComponent(file)
       );
     },
-    // Homepage Windows button uses direct .exe URL only when this filename exists on defaultTag; else downloads.html.
     defaultReleaseAssets: {
       macArmZip: 'encodeforge-macos-arm.zip',
-      windowsExe: null,
+      windowsAsset: 'encodeforge-windows-86_64.zip',
     },
     previewReleases: [],
   };

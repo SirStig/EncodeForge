@@ -6,7 +6,7 @@
 
   <!-- SEO -->
   <title>EncodeForge — FFmpeg GUI for Video Encoding, AI Subtitles &amp; Media Renaming</title>
-  <meta name="description" content="EncodeForge — free desktop FFmpeg app: GPU batch encoding, faster-whisper AI subtitles, and smart media renaming. Latest 0.5.0 Alpha 2: macOS Apple Silicon now; Windows for this tag soon.">
+  <meta name="description" content="EncodeForge — free desktop FFmpeg app: GPU batch encoding, faster-whisper AI subtitles, and smart media renaming. Latest 0.5.0 Alpha 2: Windows, macOS (Apple Silicon), and Linux builds on the download page.">
   <meta name="keywords" content="encodeforge, ffmpeg gui, video encoding, hardware acceleration, nvenc, quicksync, amd amf, videotoolbox, ai subtitles, faster-whisper, whisper, ctranslate2, opensubtitles, media renaming, tmdb, tvdb, batch encoding, desktop app, joshua kac">
   <meta name="author" content="Joshua Kac">
   <meta name="robots" content="index, follow">
@@ -21,7 +21,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sirstig.github.io/EncodeForge/">
   <meta property="og:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta property="og:description" content="Desktop FFmpeg app: GPU encoding, faster-whisper subtitles, media renaming. 0.5.0 Alpha 2: Mac Apple Silicon out now. Free and open source.">
+  <meta property="og:description" content="Desktop FFmpeg app: GPU encoding, faster-whisper subtitles, media renaming. 0.5.0 Alpha 2: Windows, Mac, Linux. Free and open source.">
   <meta property="og:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -32,7 +32,7 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta name="twitter:description" content="Desktop FFmpeg app: GPU encoding, faster-whisper subtitles, renaming. 0.5.0 Alpha 2: Mac Apple Silicon available. Free and open source.">
+  <meta name="twitter:description" content="Desktop FFmpeg app: GPU encoding, faster-whisper subtitles, renaming. 0.5.0 Alpha 2: Windows, Mac, Linux. Free and open source.">
   <meta name="twitter:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta name="twitter:creator" content="@SirStig">
 
@@ -106,7 +106,7 @@
       <h1>Encode, subtitle,<br>and organize your media</h1>
       <p class="hero-sub">
         A desktop FFmpeg app for hardware-accelerated batch encoding, smart renaming, and local AI subtitles with <strong>faster-whisper</strong>.
-        <strong>0.5.0 Alpha 2</strong> is the latest — <strong>macOS (Apple Silicon)</strong> download is live. A <strong>Windows</strong> build for this tag is not on the release yet; use <strong>0.5.0 Alpha 1</strong> on the <a href="downloads.html">download page</a> if you need Windows today. Linux installers soon. Older <strong>0.4.x</strong> builds stay on that page too.
+        <strong>0.5.0 Alpha 2</strong> is the latest — <strong>Windows</strong> (.zip), <strong>macOS</strong> (Apple Silicon .zip), and <strong>Linux</strong> (.deb, .rpm, AppImage) are on the <a href="downloads.html">download page</a> and <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2">GitHub</a>. Older <strong>0.4.x</strong> builds are there too.
       </p>
       <div class="hero-ctas">
         <a class="btn btn-primary" id="download-btn" href="downloads.html">Download for Windows</a>
@@ -256,7 +256,7 @@
         return p.tag_name === tag && p.pending;
       });
       var assets = cfg.defaultReleaseAssets || {};
-      var winFile = assets.windowsExe;
+      var winFile = assets.windowsAsset || assets.windowsExe;
       var macFile = assets.macArmZip || 'encodeforge-macos-arm.zip';
       var winExe = winFile ? cfg.downloadUrl(tag, winFile) : null;
       var macArmZip = cfg.downloadUrl(tag, macFile);

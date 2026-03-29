@@ -103,6 +103,9 @@
       }) ||
       first(function (f) {
         return /\.exe$/i.test(f);
+      }) ||
+      first(function (f) {
+        return /windows.*\.zip$/i.test(f);
       });
     var macArm =
       first(function (f) {
@@ -127,6 +130,12 @@
       return /\.AppImage$/i.test(f);
     });
     return { win: win, macArm: macArm, macIntel: macIntel, deb: deb, rpm: rpm, appimage: appimage };
+  }
+
+  function windowsDownloadLabel(file) {
+    if (!file) return 'Windows download';
+    if (/\.zip$/i.test(file)) return 'Windows (.zip)';
+    return 'Windows (.exe)';
   }
 
   function linkRow(href, label, primary, pending) {
@@ -197,20 +206,25 @@
       grid.appendChild(
         column('Windows', [
           function () {
-            return linkRow(url(slots.win), 'Executable (.exe)', true, pending || !slots.win);
+            return linkRow(
+              url(slots.win),
+              windowsDownloadLabel(slots.win),
+              true,
+              pending || !slots.win
+            );
           },
         ])
       );
       grid.appendChild(
         column('Linux', [
           function () {
-            return linkRow(null, '.deb (Debian / Ubuntu)', false, true);
+            return linkRow(url(slots.deb), slots.deb ? 'Debian / Ubuntu (.deb)' : '.deb', !!slots.deb, !slots.deb);
           },
           function () {
-            return linkRow(null, '.rpm (Fedora / RHEL)', false, true);
+            return linkRow(url(slots.rpm), slots.rpm ? 'Fedora / RHEL (.rpm)' : '.rpm', !!slots.rpm, !slots.rpm);
           },
           function () {
-            return linkRow(null, 'AppImage', false, true);
+            return linkRow(url(slots.appimage), 'AppImage', !!slots.appimage, !slots.appimage);
           },
         ])
       );
@@ -218,7 +232,12 @@
       grid.appendChild(
         column('Windows', [
           function () {
-            return linkRow(url(slots.win), slots.win ? 'Installer (.exe)' : 'Windows (.exe)', true, !slots.win);
+            return linkRow(
+              url(slots.win),
+              slots.win ? windowsDownloadLabel(slots.win) : 'Windows (.exe)',
+              true,
+              !slots.win
+            );
           },
         ])
       );

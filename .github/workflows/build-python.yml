@@ -6,51 +6,22 @@ on:
   pull_request:
     branches: [ main, 0.4.1 ]
   workflow_dispatch:
+    inputs:
+      targets:
+        description: "Which platforms to build (push/PR always builds all)"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - windows
+          - linux
 
 jobs:
-  test:
-    name: Test ${{ matrix.os }} / Python ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.10', '3.11', '3.12']
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Lint with flake8
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-      - name: Type check with mypy
-        run: |
-          mypy app/ core/ utils/ --ignore-missing-imports
-        continue-on-error: true
-
-      - name: Run tests
-        run: |
-          pytest tests/ -v --cov=app --cov=core --cov=utils
-        continue-on-error: true
-
   build-windows:
-    name: Windows (Nuitka + zip)
+    name: Windows (Nuitka one-file .exe)
     runs-on: windows-latest
-    needs: test
+    if: github.event_name != 'workflow_dispatch' || inputs.targets == 'all' || inputs.targets == 'windows'
     timeout-minutes: 120
     steps:
       - name: Checkout code
@@ -68,29 +39,24 @@ jobs:
           pip install -r requirements.txt
           pip install nuitka ordered-set zstandard
 
-      - name: Build with Nuitka
+      - name: Build with Nuitka (one-file)
         timeout-minutes: 90
         env:
           PYTHONUNBUFFERED: "1"
+          NUITKA_ONEFILE: "1"
         run: python build_nuitka.py
 
-      - name: Zip distribution
+      - name: Stage Windows artifact
         shell: pwsh
-        run: |
-          $dist = Get-ChildItem -Path dist -Directory -Filter "*.dist" | Select-Object -First 1
-          if (-not $dist) { throw "No dist\*.dist folder after Nuitka build" }
-          $ver = python -c "from app import __version__; print(__version__)"
-          New-Item -ItemType Directory -Force -Path dist-packages | Out-Null
-          $zip = "dist-packages/EncodeForge-$ver-windows-x64.zip"
-          if (Test-Path $zip) { Remove-Item $zip }
-          Compress-Archive -Path (Join-Path $dist.FullName "*") -DestinationPath $zip -CompressionLevel Optimal
+        run: powershell -ExecutionPolicy Bypass -File packaging/windows/package-zip.ps1
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: encodeforge-windows-${{ github.run_number }}
           path: |
-            dist-packages/*.zip
+            dist-packages/*.exe
+          if-no-files-found: error
           retention-days: 14
 
       - name: Build summary
@@ -98,12 +64,12 @@ jobs:
         run: |
           echo "## Windows build" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Nuitka standalone + zip: artifact encodeforge-windows-${{ github.run_number }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Nuitka one-file Windows .exe (dist-packages/EncodeForge-*-windows-x64.exe): artifact encodeforge-windows-${{ github.run_number }}" >> "$GITHUB_STEP_SUMMARY"
 
   build-linux-packages:
     name: Linux (Nuitka + deb + rpm + AppImage)
     runs-on: ubuntu-22.04
-    needs: test
+    if: github.event_name != 'workflow_dispatch' || inputs.targets == 'all' || inputs.targets == 'linux'
     timeout-minutes: 180
     steps:
       - name: Checkout code
