@@ -6,7 +6,7 @@
 
 ### Video Encoding, AI Subtitles & Smart Media Renaming — all in one place
 
-*A free, open-source desktop app built with Python & PySide6*
+*A free, open-source desktop app for Windows, macOS, and Linux*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://sirstig.github.io/EncodeForge/downloads.html)
@@ -23,7 +23,7 @@
 
 **EncodeForge** is a free, open-source FFmpeg GUI that brings professional video encoding, AI subtitle generation, and smart media file renaming together in a single, clean desktop application — no command-line experience required.
 
-It's built on PySide6 with a modern Fluent Design interface, GPU-accelerated encoding via NVENC/AMF/Quick Sync/VideoToolbox, and local AI subtitles powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — fast transcription in 90+ languages that runs entirely on your machine.
+It pairs a modern desktop interface with GPU-accelerated encoding via NVENC/AMF/Quick Sync/VideoToolbox, and local AI subtitles powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — fast transcription in 90+ languages that runs entirely on your machine.
 
 ### Why EncodeForge?
 
@@ -86,7 +86,7 @@ It's built on PySide6 with a modern Fluent Design interface, GPU-accelerated enc
 
 **Download links and version history live on the [EncodeForge website](https://sirstig.github.io/EncodeForge/)** so they stay accurate without editing this README for every release.
 
-- **[Downloads](https://sirstig.github.io/EncodeForge/downloads.html)** — pick **v0.5.0-alpha-2** (current PySide6 line; binaries show as “coming soon” until that GitHub release is published), **v0.5.0-alpha-1**, or legacy **0.4.x** JavaFX builds. The page pulls live data from [GitHub Releases](https://github.com/SirStig/EncodeForge/releases) where possible.
+- **[Downloads](https://sirstig.github.io/EncodeForge/downloads.html)** — versions are listed **newest first**; the latest is marked **(Latest)**. **0.5.0 Alpha 2** ([release](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2)) currently includes **macOS Apple Silicon** only; add **0.5.0 Alpha 1** if you need a **Windows** `.exe` until Alpha 2’s Windows asset is published. Older **0.4.x** builds are listed too. Any file not yet on GitHub shows as “coming soon.” The page pulls live data from [GitHub Releases](https://github.com/SirStig/EncodeForge/releases) when available.
 - **[Changelog](https://sirstig.github.io/EncodeForge/changelog.html)** — web version of `CHANGELOG.md`. Add a hash to jump to a version section when it exists, e.g. [`changelog.html#release-0-5-0-alpha-2`](https://sirstig.github.io/EncodeForge/changelog.html#release-0-5-0-alpha-2), [`#release-0-4-1`](https://sirstig.github.io/EncodeForge/changelog.html#release-0-4-1).
 
 > FFmpeg is required but not bundled. EncodeForge will prompt you to set it up on first launch.
@@ -171,7 +171,7 @@ EncodeForge auto-detects available GPU encoders on startup:
 
 ## Roadmap
 
-- ✅ Modern PySide6 + Fluent Design UI
+- ✅ Modern Fluent Design desktop UI
 - ✅ GPU-accelerated faster-whisper for local AI subtitles
 - ✅ Shared core backend (GUI & CLI)
 - ✅ Nuitka compilation for all platforms

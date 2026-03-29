@@ -8,10 +8,20 @@
   var statusEl = document.getElementById('downloadFetchStatus');
   if (!sel || !grid) return;
 
-  function tagLine(tag) {
+  function usesNewInstallerLayout(tag) {
     var t = (tag || '').replace(/^v/i, '');
-    if (/^0\.5\./.test(t)) return 'pyside';
-    return 'legacy';
+    return /^0\.5\./.test(t);
+  }
+
+  function displayVersionFromTag(tag) {
+    var v = String(tag || '')
+      .replace(/^v/i, '')
+      .trim();
+    var alpha = v.match(/^(.*)-alpha-(\d+)$/i);
+    if (alpha) return alpha[1] + ' Alpha ' + alpha[2];
+    var beta = v.match(/^(.*)-beta-(\d+)$/i);
+    if (beta) return beta[1] + ' Beta ' + beta[2];
+    return v;
   }
 
   function parseTime(iso) {
@@ -161,14 +171,14 @@
       return a.name;
     });
     var slots = pickSlots(names);
-    var line = tagLine(tag);
+    var line = usesNewInstallerLayout(tag);
 
     function url(file) {
       if (!file) return null;
       return cfg.downloadUrl(tag, file);
     }
 
-    if (line === 'pyside') {
+    if (line) {
       grid.appendChild(
         column('macOS', [
           function () {
@@ -245,16 +255,14 @@
     if (leadEl) {
       leadEl.replaceChildren();
       var st = document.createElement('strong');
-      st.textContent = tag;
+      st.textContent = displayVersionFromTag(tag);
       leadEl.appendChild(st);
       leadEl.appendChild(
         document.createTextNode(
-          ' ' +
-            (rel.prerelease ? 'pre-release' : 'release') +
-            ' — ' +
+          ' — ' +
             (pending
-              ? 'binaries on this page are marked coming until the GitHub release is published.'
-              : 'direct links to GitHub assets.')
+              ? 'downloads will go live here as soon as this version is published.'
+              : 'choose a platform below; each button opens the file from GitHub.')
         )
       );
       leadEl.appendChild(document.createElement('br'));
@@ -279,25 +287,14 @@
 
   function populateSelect(list) {
     sel.innerHTML = '';
-    var pyside = [];
-    var legacy = [];
-    list.forEach(function (r) {
-      (tagLine(r.tag_name) === 'pyside' ? pyside : legacy).push(r);
+    list.forEach(function (r, i) {
+      var o = document.createElement('option');
+      o.value = r.tag_name;
+      var label = displayVersionFromTag(r.tag_name);
+      if (i === 0) label += ' (Latest)';
+      o.textContent = label;
+      sel.appendChild(o);
     });
-    function addGroup(label, rows) {
-      if (!rows.length) return;
-      var og = document.createElement('optgroup');
-      og.label = label;
-      rows.forEach(function (r) {
-        var o = document.createElement('option');
-        o.value = r.tag_name;
-        o.textContent = r.name.length > 56 ? r.tag_name : r.name;
-        og.appendChild(o);
-      });
-      sel.appendChild(og);
-    }
-    addGroup('PySide6 (0.5.x)', pyside);
-    addGroup('Legacy JavaFX (0.4.x and earlier)', legacy);
   }
 
   function defaultSelectedTag(list) {
@@ -307,10 +304,6 @@
     })) {
       return want;
     }
-    var pyside = list.filter(function (r) {
-      return tagLine(r.tag_name) === 'pyside';
-    });
-    if (pyside.length) return pyside[0].tag_name;
     return list[0] ? list[0].tag_name : '';
   }
 
