@@ -79,31 +79,55 @@ class OMDBProvider(BaseMetadataProvider):
         """Search TV show using OMDB API"""
         if not self.api_key:
             return None
-            
+
         try:
+            # Step 1: get show info
             params = {
                 "apikey": self.api_key,
                 "t": title,
-                "type": "series"
+                "type": "series",
             }
-            
             url = f"{self.API_URL}?{urllib.parse.urlencode(params)}"
-            
             with urllib.request.urlopen(url, timeout=10) as response:
                 data = json.loads(response.read().decode())
-            
-            if data.get("Response") == "True":
-                return {
-                    "show_title": data.get("Title", ""),
-                    "show_year": data.get("Year", "")[:4] if data.get("Year") else "",
-                    "season": season,
-                    "episode": episode,
-                    "episode_title": f"Episode {episode}",
-                    "overview": data.get("Plot", ""),
-                    "source": "omdb"
-                }
+
+            if data.get("Response") != "True":
+                return None
+
+            show_title = data.get("Title", "")
+            show_year = data.get("Year", "")[:4] if data.get("Year") else ""
+
+            # Step 2: get specific episode details
+            ep_params = {
+                "apikey": self.api_key,
+                "t": title,
+                "Season": str(season),
+                "Episode": str(episode),
+            }
+            ep_url = f"{self.API_URL}?{urllib.parse.urlencode(ep_params)}"
+            episode_title = ""
+            episode_airdate = ""
+            try:
+                with urllib.request.urlopen(ep_url, timeout=10) as ep_response:
+                    ep_data = json.loads(ep_response.read().decode())
+                if ep_data.get("Response") == "True":
+                    episode_title = ep_data.get("Title", "")
+                    episode_airdate = ep_data.get("Released", "")
+            except Exception as e:
+                logger.warning(f"OMDB episode detail fetch failed: {e}")
+
+            return {
+                "show_title": show_title,
+                "show_year": show_year,
+                "season": season,
+                "episode": episode,
+                "episode_title": episode_title,
+                "episode_airdate": episode_airdate,
+                "overview": data.get("Plot", ""),
+                "source": "omdb",
+            }
         except Exception as e:
             logger.error(f"OMDB TV search error: {e}")
-        
+
         return None
 

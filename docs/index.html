@@ -6,7 +6,7 @@
 
   <!-- SEO -->
   <title>EncodeForge — FFmpeg GUI for Video Encoding, AI Subtitles &amp; Media Renaming</title>
-  <meta name="description" content="EncodeForge — free PySide6 FFmpeg GUI: GPU batch encoding, faster-whisper AI subtitles, and smart media renaming. v0.5.0-alpha-1 for Windows and Apple Silicon; Linux builds coming.">
+  <meta name="description" content="EncodeForge — free PySide6 FFmpeg GUI: GPU batch encoding, faster-whisper AI subtitles, and smart media renaming. v0.5.0-alpha-2 for Windows and Apple Silicon; Linux builds coming.">
   <meta name="keywords" content="encodeforge, ffmpeg gui, pyside6, qt6, video encoding, hardware acceleration, nvenc, quicksync, amd amf, videotoolbox, ai subtitles, faster-whisper, whisper, ctranslate2, opensubtitles, media renaming, tmdb, tvdb, batch encoding, python desktop app, joshua kac">
   <meta name="author" content="Joshua Kac">
   <meta name="robots" content="index, follow">
@@ -21,7 +21,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sirstig.github.io/EncodeForge/">
   <meta property="og:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta property="og:description" content="PySide6 FFmpeg GUI: GPU encoding, faster-whisper subtitles, media renaming. v0.5.0-alpha-1. Free and open source.">
+  <meta property="og:description" content="PySide6 FFmpeg GUI: GPU encoding, faster-whisper subtitles, media renaming. v0.5.0-alpha-2. Free and open source.">
   <meta property="og:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -32,7 +32,7 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="EncodeForge — Professional FFmpeg GUI">
-  <meta name="twitter:description" content="PySide6 FFmpeg GUI: GPU encoding, faster-whisper subtitles, renaming. v0.5.0-alpha-1. Free and open source.">
+  <meta name="twitter:description" content="PySide6 FFmpeg GUI: GPU encoding, faster-whisper subtitles, renaming. v0.5.0-alpha-2. Free and open source.">
   <meta name="twitter:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta name="twitter:creator" content="@SirStig">
 
@@ -48,12 +48,12 @@
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Windows, macOS, Linux",
         "programmingLanguage": "Python",
-        "softwareVersion": "0.5.0-alpha-1",
+        "softwareVersion": "0.5.0-alpha-2",
         "datePublished": "2026-03-24",
         "dateModified": "2026-03-25",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "url": "https://sirstig.github.io/EncodeForge/",
-        "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe",
+        "downloadUrl": "https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/EncodeForge.exe",
         "codeRepository": "https://github.com/SirStig/EncodeForge",
         "license": "https://opensource.org/licenses/MIT",
         "description": "Free open-source PySide6 FFmpeg GUI for hardware-accelerated video encoding, AI subtitles via faster-whisper (v0.5.0), and smart media renaming.",
@@ -101,17 +101,17 @@
 
     <!-- ===== HERO ===== -->
     <section class="hero">
-      <div class="hero-eyebrow">Open source · MIT License · v0.5.0-alpha-1 (PySide6)</div>
+      <div class="hero-eyebrow">Open source · MIT License · v0.5.0-alpha-2 (PySide6)</div>
       <h1>Encode, subtitle,<br>and organize your media</h1>
       <p class="hero-sub">
         A PySide6 FFmpeg GUI for hardware-accelerated batch encoding, smart renaming, and local AI subtitles with <strong>faster-whisper</strong>.
-        <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">v0.5.0-alpha-1</a> — Apple Silicon &amp; Windows; Linux packages soon. Legacy <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">v0.4.1</a> (JavaFX).
+        <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2">v0.5.0-alpha-2</a> — Apple Silicon &amp; Windows; Linux packages soon. Legacy <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">v0.4.1</a> (JavaFX).
       </p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" id="download-btn" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe">Download for Windows</a>
+        <a class="btn btn-primary" id="download-btn" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/EncodeForge.exe">Download for Windows</a>
         <a class="btn btn-ghost" href="downloads.html">All platforms</a>
         <a class="btn btn-ghost" href="guide.html">Guide</a>
-        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1">Release notes</a>
+        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2">Release notes</a>
         <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
       </div>
     </section>
@@ -248,8 +248,8 @@
       const ua = navigator.userAgent.toLowerCase();
       const dl = document.getElementById('download-btn');
       if (!dl) return;
-      const winExe = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe';
-      const macArmZip = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/encodeforge-macos-arm.zip';
+      const winExe = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/EncodeForge.exe';
+      const macArmZip = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/encodeforge-macos-arm.zip';
       const downloadsPage = 'downloads.html';
 
       if (/linux/.test(ua)) {

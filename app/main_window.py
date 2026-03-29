@@ -400,6 +400,10 @@ class MainWindow(GlassmorphicMainWindow):
             if self.subtitle_tab is not None:
                 if hasattr(self.subtitle_tab, 'subtitle_progress') and callable(getattr(self.subtitle_tab, 'subtitle_progress', None)):
                     self.subtitle_tab.subtitle_progress.connect(self._on_subtitle_progress)
+                if hasattr(self.subtitle_tab, 'subtitle_completed') and callable(getattr(self.subtitle_tab, 'subtitle_completed', None)):
+                    self.subtitle_tab.subtitle_completed.connect(self._on_subtitle_completed)
+                if hasattr(self.subtitle_tab, 'subtitle_error') and callable(getattr(self.subtitle_tab, 'subtitle_error', None)):
+                    self.subtitle_tab.subtitle_error.connect(self._on_subtitle_error)
         except Exception:
             logger.debug("Could not connect subtitle signals")
 
@@ -418,6 +422,11 @@ class MainWindow(GlassmorphicMainWindow):
         logging.getLogger().setLevel(getattr(logging, sm.application.log_level, logging.INFO))
         if hasattr(self, 'threadpool'):
             self.threadpool.setMaxThreadCount(sm.application.max_threads)
+        if self.subtitle_tab is not None:
+            if hasattr(self.subtitle_tab, "_show_idle_subtitle_banner"):
+                self.subtitle_tab._show_idle_subtitle_banner()
+            if hasattr(self.subtitle_tab, "_update_subtitle_action_buttons"):
+                self.subtitle_tab._update_subtitle_action_buttons()
         logger.debug("Settings applied to running application")
 
     def _switch_mode(self, idx: int):
@@ -556,7 +565,7 @@ class MainWindow(GlassmorphicMainWindow):
 
     def _open_ffmpeg_setup(self):
         from app.dialogs.ffmpeg_setup_dialog import FFmpegSetupDialog
-        dlg = FFmpegSetupDialog(self)
+        dlg = FFmpegSetupDialog(self, required=False)
         dlg.exec()
         self._refresh_tool_status()
 
@@ -592,8 +601,16 @@ class MainWindow(GlassmorphicMainWindow):
         except Exception:
             pass
 
-    def _on_subtitle_progress(self, *_args, **_kwargs):
-        pass
+    def _on_subtitle_progress(self, _file_path: str, _current: int, _total: int, message: str = ""):
+        if message:
+            self._update_status(message)
+
+    def _on_subtitle_completed(self, file_path: str):
+        self._update_status(f"Subtitles: done — {Path(file_path).name}")
+
+    def _on_subtitle_error(self, file_path: str, error_message: str):
+        self._update_status(f"Subtitles failed — {Path(file_path).name}")
+        self.progress_label.setText(error_message[:120] + ("…" if len(error_message) > 120 else ""))
 
     def _on_rename_progress(self, *_args, **_kwargs):
         pass

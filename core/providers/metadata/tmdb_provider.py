@@ -124,7 +124,7 @@ class TMDBProvider(BaseMetadataProvider):
                         "episode_airdate": episode_data.get("air_date", ""),
                         "episode_runtime": episode_data.get("runtime"),  # in minutes
                         "overview": episode_data.get("overview", ""),
-                        "genres": [genre["name"] for genre in show.get("genre_ids", [])] if "genre_ids" in show else [],
+                        "genres": [],
                         "rating": str(show.get("vote_average", "")) if show.get("vote_average") else "",
                         "popularity": str(show.get("popularity", "")) if show.get("popularity") else "",
                         "poster_url": f"https://image.tmdb.org/t/p/w500{show['poster_path']}" if show.get("poster_path") else "",

@@ -7,7 +7,7 @@ import logging
 from copy import deepcopy
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -62,10 +62,20 @@ def _hint(text: str) -> QLabel:
     return lbl
 
 
+def _link(text: str, url: str) -> QLabel:
+    """Return a small clickable hyperlink label."""
+    lbl = QLabel(f'<a href="{url}" style="color:#6366f1;text-decoration:none;">{text}</a>')
+    lbl.setOpenExternalLinks(True)
+    lbl.setStyleSheet("font-size: 10px;")
+    return lbl
+
+
 def _settings_form(parent: QWidget) -> QFormLayout:
     lay = QFormLayout(parent)
     lay.setVerticalSpacing(10)
-    lay.setHorizontalSpacing(12)
+    lay.setHorizontalSpacing(16)
+    lay.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+    lay.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
     return lay
 
 
@@ -498,42 +508,57 @@ class SettingsPanel(QWidget):
         renamer_layout.addRow("Default Media Type:", self.media_type_combo)
 
         self.metadata_provider_combo = QComboBox()
-        self.metadata_provider_combo.addItems([
-            "TMDB (The Movie Database)",
-            "TVDB (TheTVDB)",
-            "OMDb",
-            "Trakt",
-            "TVmaze",
-            "AniDB (Anime)",
-            "Kitsu (Anime)",
-            "Jikan (MyAnimeList)",
-        ])
+        _prov_items = [
+            ("Auto (Best Match)", "auto"),
+            ("All Providers", "all"),
+            (None, None),  # separator
+            ("TVmaze  (free)", "tvmaze"),
+            ("AniDB  (free)", "anidb"),
+            ("Kitsu  (free)", "kitsu"),
+            ("Jikan / MyAnimeList  (free)", "jikan"),
+            (None, None),  # separator
+            ("TMDB (The Movie Database)", "tmdb"),
+            ("TVDB (TheTVDB)", "tvdb"),
+            ("OMDb", "omdb"),
+            ("Trakt", "trakt"),
+        ]
+        for label, data in _prov_items:
+            if label is None:
+                self.metadata_provider_combo.insertSeparator(self.metadata_provider_combo.count())
+            else:
+                self.metadata_provider_combo.addItem(label, data)
         self.metadata_provider_combo.setToolTip(
-            "Online database used to look up titles, episode names, and other metadata.\n\n"
-            "TMDB        — Recommended for movies and TV. Requires free API key.\n"
-            "TVDB        — Best episode-level data for TV shows. Requires free API key.\n"
-            "OMDb         — Uses IMDb data; free tier available.\n"
-            "Trakt        — Community-driven; good for watch-history integration.\n"
-            "TVmaze       — Free, no API key needed; good for TV episode data.\n"
-            "AniDB        — Comprehensive anime database; account required.\n"
-            "Kitsu        — Modern anime database; no key required.\n"
-            "Jikan        — Unofficial MyAnimeList API; no key required."
+            "Metadata source used for renaming.\n\n"
+            "Auto — tries providers in priority order, returns first match.\n"
+            "All  — queries all providers in parallel, picks most complete result.\n\n"
+            "Free providers require no API key. Keyed providers (TMDB, TVDB, OMDb, Trakt)\n"
+            "need keys configured in the Accounts tab for the best results."
         )
         renamer_layout.addRow("Metadata Provider:", self.metadata_provider_combo)
 
         self.pattern_edit = QLineEdit()
-        self.pattern_edit.setPlaceholderText("{title} - {season}{episode} - {quality}")
+        self.pattern_edit.setReadOnly(True)
+        self.pattern_edit.setPlaceholderText("{title} - S{season:02d}E{episode:02d} - {episode_title}")
         self.pattern_edit.setToolTip(
-            "Template for the output filename. Use curly-brace placeholders that\n"
-            "will be replaced with real values fetched from the metadata provider.\n\n"
-            "Click 'Pattern Help' below for a full list of available placeholders."
+            "Current filename template. Use Format / Templates to edit, pick presets,\n"
+            "insert placeholders, and manage saved layouts."
         )
-        renamer_layout.addRow("Filename Pattern:", self.pattern_edit)
-
-        pattern_help = QPushButton("Pattern Help…")
-        pattern_help.setToolTip("Show all available placeholders and example patterns.")
+        pat_row = QHBoxLayout()
+        pat_row.addWidget(self.pattern_edit, 1)
+        self.pattern_format_btn = QPushButton("Format / Templates…")
+        self.pattern_format_btn.setToolTip(
+            "Open the pattern editor: built-in layouts, placeholder buttons, live samples, and your saved templates."
+        )
+        self.pattern_format_btn.clicked.connect(self._open_renamer_pattern_dialog)
+        pat_row.addWidget(self.pattern_format_btn)
+        pattern_help = QPushButton("Quick help…")
+        pattern_help.setToolTip("Short list of placeholders and examples in a popup.")
         pattern_help.clicked.connect(self._show_pattern_help)
-        renamer_layout.addRow("", pattern_help)
+        pat_row.addWidget(pattern_help)
+        renamer_layout.addRow("Filename Pattern:", pat_row)
+        renamer_layout.addRow("", _hint(
+            "Editing is done in Format / Templates. Apply or OK below to save changes to disk."
+        ))
 
         self.replace_spaces_check = QCheckBox("Replace spaces with underscores")
         self.replace_spaces_check.setToolTip(
@@ -567,6 +592,82 @@ class SettingsPanel(QWidget):
         layout.addStretch()
         return widget
 
+    def _make_api_key_row(self, key_edit: QLineEdit, provider: str, url: str = ""):
+        """Return a widget containing [key_field | Test btn | status label] + optional link."""
+        container = QWidget()
+        vbox = QVBoxLayout(container)
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(3)
+
+        row_widget = QWidget()
+        row = QHBoxLayout(row_widget)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(key_edit, 1)
+        btn = QPushButton("Test")
+        btn.setFixedWidth(55)
+        btn.clicked.connect(lambda: self._test_api_key(provider))
+        row.addWidget(btn)
+        lbl = QLabel("—")
+        lbl.setMinimumWidth(140)
+        row.addWidget(lbl)
+        setattr(self, f"_{provider}_status_lbl", lbl)
+        vbox.addWidget(row_widget)
+
+        if url:
+            vbox.addWidget(_link("Get free API key →", url))
+
+        return container
+
+    def _test_api_key(self, provider: str) -> None:
+        key_map = {
+            "tmdb": self.tmdb_key_edit,
+            "tvdb": self.tvdb_key_edit,
+            "omdb": self.omdb_key_edit,
+            "trakt": self.trakt_key_edit,
+        }
+        if provider not in key_map:
+            return
+        key = key_map[provider].text().strip()
+        lbl = getattr(self, f"_{provider}_status_lbl", None)
+        if not lbl:
+            return
+        if not key:
+            lbl.setText("⚠ No key entered")
+            lbl.setStyleSheet("color: #ff9800;")
+            return
+
+        lbl.setText("Testing…")
+        lbl.setStyleSheet("")
+
+        def _validate():
+            if provider == "tmdb":
+                from core.providers.metadata.tmdb_provider import TMDBProvider
+                return TMDBProvider(key).validate_api_key()
+            elif provider == "tvdb":
+                from core.providers.metadata.tvdb_provider import TVDBProvider
+                return TVDBProvider(key).validate_api_key()
+            elif provider == "omdb":
+                from core.providers.metadata.omdb_provider import OMDBProvider
+                return OMDBProvider(key).validate_api_key()
+            elif provider == "trakt":
+                from core.providers.metadata.trakt_provider import TraktProvider
+                return TraktProvider(key).validate_api_key()
+
+        from utils.workers import Worker
+        w = Worker(_validate)
+        w.signals.result.connect(lambda r, _lbl=lbl: self._apply_key_status(_lbl, r[0], r[1]))
+        w.signals.error.connect(lambda _e, _lbl=lbl: self._apply_key_status(_lbl, False, "Error"))
+        QThreadPool.globalInstance().start(w)
+
+    @staticmethod
+    def _apply_key_status(lbl: QLabel, valid: bool, message: str) -> None:
+        if valid:
+            lbl.setText(f"✓  {message}")
+            lbl.setStyleSheet("color: #4caf50; font-weight: bold;")
+        else:
+            lbl.setText(f"✗  {message}")
+            lbl.setStyleSheet("color: #f44336; font-weight: bold;")
+
     # ------------------------------------------------------------------ #
     #  Accounts tab
     # ------------------------------------------------------------------ #
@@ -591,7 +692,8 @@ class SettingsPanel(QWidget):
             "Used for movie and TV show metadata, posters, and episode data.\n"
             "Recommended for best results with the Renamer."
         )
-        meta_form.addRow("TMDB:", self.tmdb_key_edit)
+        meta_form.addRow("TMDB:", self._make_api_key_row(
+            self.tmdb_key_edit, "tmdb", "https://www.themoviedb.org/settings/api"))
 
         self.tvdb_key_edit = QLineEdit()
         self.tvdb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
@@ -600,7 +702,8 @@ class SettingsPanel(QWidget):
             "TheTVDB — free API key at thetvdb.com/dashboard\n"
             "Best database for TV show episode-level metadata and artwork."
         )
-        meta_form.addRow("TVDB:", self.tvdb_key_edit)
+        meta_form.addRow("TVDB:", self._make_api_key_row(
+            self.tvdb_key_edit, "tvdb", "https://thetvdb.com/dashboard"))
 
         self.omdb_key_edit = QLineEdit()
         self.omdb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
@@ -609,7 +712,8 @@ class SettingsPanel(QWidget):
             "Open Movie Database — free tier at omdbapi.com\n"
             "Provides IMDb-sourced metadata. Free tier allows 1,000 requests/day."
         )
-        meta_form.addRow("OMDb:", self.omdb_key_edit)
+        meta_form.addRow("OMDb:", self._make_api_key_row(
+            self.omdb_key_edit, "omdb", "https://www.omdbapi.com/apikey.aspx"))
 
         self.trakt_key_edit = QLineEdit()
         self.trakt_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
@@ -618,7 +722,8 @@ class SettingsPanel(QWidget):
             "Trakt — free API key at trakt.tv/oauth/applications\n"
             "Community-driven tracking and metadata. Good for TV ratings and history."
         )
-        meta_form.addRow("Trakt:", self.trakt_key_edit)
+        meta_form.addRow("Trakt:", self._make_api_key_row(
+            self.trakt_key_edit, "trakt", "https://trakt.tv/oauth/applications"))
 
         self.fanart_key_edit = QLineEdit()
         self.fanart_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
@@ -627,16 +732,28 @@ class SettingsPanel(QWidget):
             "Fanart.tv — free personal key at fanart.tv/get-an-api-key\n"
             "High-resolution artwork, logos, and backgrounds for movies and TV."
         )
-        meta_form.addRow("Fanart.tv:", self.fanart_key_edit)
+        fanart_container = QWidget()
+        fanart_vbox = QVBoxLayout(fanart_container)
+        fanart_vbox.setContentsMargins(0, 0, 0, 0)
+        fanart_vbox.setSpacing(3)
+        fanart_vbox.addWidget(self.fanart_key_edit)
+        fanart_vbox.addWidget(_link("Get free API key →", "https://fanart.tv/get-an-api-key/"))
+        meta_form.addRow("Fanart.tv:", fanart_container)
 
         self.anidb_key_edit = QLineEdit()
         self.anidb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.anidb_key_edit.setPlaceholderText("Paste your AniDB API key…")
+        self.anidb_key_edit.setPlaceholderText("Paste your AniDB client name…")
         self.anidb_key_edit.setToolTip(
             "AniDB — requires a free account at anidb.net\n"
             "Comprehensive anime database with detailed episode and character data."
         )
-        meta_form.addRow("AniDB:", self.anidb_key_edit)
+        anidb_container = QWidget()
+        anidb_vbox = QVBoxLayout(anidb_container)
+        anidb_vbox.setContentsMargins(0, 0, 0, 0)
+        anidb_vbox.setSpacing(3)
+        anidb_vbox.addWidget(self.anidb_key_edit)
+        anidb_vbox.addWidget(_link("Register a client → anidb.net/software/add", "https://anidb.net/software/add"))
+        meta_form.addRow("AniDB:", anidb_container)
 
         layout.addWidget(meta)
 
@@ -658,6 +775,10 @@ class SettingsPanel(QWidget):
         self.os_pass_edit.setPlaceholderText("Your opensubtitles.com password…")
         self.os_pass_edit.setToolTip("Password for your opensubtitles.com account. Stored locally only.")
         subs_form.addRow("Password:", self.os_pass_edit)
+        subs_form.addRow("", _link(
+            "Create free account → opensubtitles.com",
+            "https://www.opensubtitles.com/en/users/sign_up"
+        ))
 
         layout.addWidget(subs)
         layout.addStretch()
@@ -931,7 +1052,11 @@ class SettingsPanel(QWidget):
 
         # Renamer
         self.media_type_combo.setCurrentText(self.settings.renamer.media_type)
-        self.metadata_provider_combo.setCurrentText(self.settings.renamer.provider)
+        _prov_idx = self.metadata_provider_combo.findData(self.settings.renamer.provider)
+        if _prov_idx >= 0:
+            self.metadata_provider_combo.setCurrentIndex(_prov_idx)
+        else:
+            self.metadata_provider_combo.setCurrentIndex(0)  # default to Auto
         self.pattern_edit.setText(self.settings.renamer.pattern)
         self.replace_spaces_check.setChecked(self.settings.renamer.replace_spaces)
         self.lowercase_check.setChecked(self.settings.renamer.lowercase)
@@ -996,7 +1121,7 @@ class SettingsPanel(QWidget):
 
         # Renamer
         self.settings.renamer.media_type = self.media_type_combo.currentText()
-        self.settings.renamer.provider = self.metadata_provider_combo.currentText()
+        self.settings.renamer.provider = self.metadata_provider_combo.currentData() or "auto"
         self.settings.renamer.pattern = self.pattern_edit.text()
         self.settings.renamer.replace_spaces = self.replace_spaces_check.isChecked()
         self.settings.renamer.lowercase = self.lowercase_check.isChecked()
@@ -1086,9 +1211,19 @@ class SettingsPanel(QWidget):
         dlg = WhisperSetupDialog(self)
         dlg.exec()
 
+    def _open_renamer_pattern_dialog(self) -> None:
+        from app.dialogs.rename_pattern_dialog import RenamePatternDialog
+
+        dlg = RenamePatternDialog(self, self.pattern_edit.text())
+        if dlg.exec():
+            self.pattern_edit.setText(dlg.selected_pattern())
+
     def _show_pattern_help(self):
         help_text = """
 <h3>Renaming Pattern Help</h3>
+
+<p>For the full editor (presets, insert buttons, live samples, saved templates), use
+<strong>Format / Templates…</strong> next to the pattern field.</p>
 
 <p>Build a filename template using the placeholders below. EncodeForge will
 replace each <code>{placeholder}</code> with the real value fetched from
@@ -1097,8 +1232,8 @@ the selected metadata provider.</p>
 <p><b>Available placeholders:</b></p>
 <table cellpadding="4">
 <tr><td><code>{title}</code></td><td>Media title (e.g. <i>Breaking Bad</i>)</td></tr>
-<tr><td><code>{season}</code></td><td>Season number with leading zero (e.g. <i>S01</i>)</td></tr>
-<tr><td><code>{episode}</code></td><td>Episode number with leading zero (e.g. <i>E05</i>)</td></tr>
+<tr><td><code>{season}</code></td><td>Season number as integer; use <code>{season:02d}</code> for two digits (e.g. in <code>S{season:02d}E{episode:02d}</code>)</td></tr>
+<tr><td><code>{episode}</code></td><td>Episode number as integer; use <code>{episode:02d}</code> for two digits</td></tr>
 <tr><td><code>{year}</code></td><td>Release year (e.g. <i>2008</i>)</td></tr>
 <tr><td><code>{quality}</code></td><td>Video resolution (e.g. <i>1080p</i>, <i>720p</i>)</td></tr>
 <tr><td><code>{codec}</code></td><td>Video codec short name (e.g. <i>h264</i>, <i>hevc</i>)</td></tr>
@@ -1107,11 +1242,11 @@ the selected metadata provider.</p>
 
 <p><b>Examples:</b></p>
 <ul>
-  <li><code>{title} - {season}{episode} - {quality}</code>
+  <li><code>{title} - S{season:02d}E{episode:02d} - {quality}</code>
       &nbsp;→&nbsp; <i>Breaking Bad - S01E05 - 1080p</i></li>
   <li><code>{title} ({year})</code>
       &nbsp;→&nbsp; <i>Inception (2010)</i></li>
-  <li><code>{title}.{season}{episode}.{quality}.{codec}</code>
+  <li><code>{title}.S{season:02d}E{episode:02d}.{quality}.{codec}</code>
       &nbsp;→&nbsp; <i>Breaking.Bad.S01E05.1080p.h264</i></li>
 </ul>
 """
@@ -1136,7 +1271,8 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings - EncodeForge")
-        self.setMinimumSize(560, 520)
+        self.setMinimumSize(860, 600)
+        self.resize(920, 660)
         layout = QVBoxLayout(self)
         self.panel = SettingsPanel(self, show_action_bar=False)
         self.panel.settings_changed.connect(self.settings_changed.emit)

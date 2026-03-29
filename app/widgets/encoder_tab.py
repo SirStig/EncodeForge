@@ -307,11 +307,11 @@ class EncoderTab(QWidget):
         buttons_layout.setSpacing(8)
         
         self.add_files_btn = GlassmorphicButton("Add Files", qta.icon('fa5s.plus'))
-        self.add_files_btn.clicked.connect(self._add_files)
+        self.add_files_btn.clicked.connect(lambda: self._add_files())
         self.add_files_btn.setMinimumWidth(80)
         
         self.add_folder_btn = GlassmorphicButton("Add Folder", qta.icon('fa5s.folder-plus'))
-        self.add_folder_btn.clicked.connect(self._add_folder)
+        self.add_folder_btn.clicked.connect(lambda: self._add_folder())
         self.add_folder_btn.setMinimumWidth(85)
         
         self.remove_selected_btn = GlassmorphicButton("Remove Selected", qta.icon('fa5s.trash'))
@@ -371,9 +371,10 @@ class EncoderTab(QWidget):
         
         # File Information Section
         file_group = GlassmorphicCard("File Details")
-        file_layout = QFormLayout(file_group.body())
+        file_layout = QFormLayout()
         file_layout.setSpacing(6)
         file_layout.setContentsMargins(8, 12, 8, 8)
+        file_group.content_layout().addLayout(file_layout)
         
         self.name_label = StyledLabel("-")
         self.size_label = StyledLabel("-")
@@ -391,9 +392,10 @@ class EncoderTab(QWidget):
         
         # Video Information Section
         video_group = GlassmorphicCard("Video Properties")
-        video_layout = QFormLayout(video_group.body())
+        video_layout = QFormLayout()
         video_layout.setSpacing(6)
         video_layout.setContentsMargins(8, 12, 8, 8)
+        video_group.content_layout().addLayout(video_layout)
         
         self.codec_label = StyledLabel("-")
         self.resolution_label = StyledLabel("-")
@@ -409,9 +411,10 @@ class EncoderTab(QWidget):
         
         # Audio Information Section
         audio_group = GlassmorphicCard("Audio Properties")
-        audio_layout = QFormLayout(audio_group.body())
+        audio_layout = QFormLayout()
         audio_layout.setSpacing(6)
         audio_layout.setContentsMargins(8, 12, 8, 8)
+        audio_group.content_layout().addLayout(audio_layout)
         
         self.audio_codec_label = StyledLabel("-")
         self.audio_channels_label = StyledLabel("-")

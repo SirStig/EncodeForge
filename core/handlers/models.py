@@ -49,7 +49,7 @@ class ConversionSettings:
     
     # Media renaming
     enable_renaming: bool = False
-    renaming_pattern_tv: str = "{title} - S{season}E{episode} - {episodeTitle}"
+    renaming_pattern_tv: str = "{title} - S{season:02d}E{episode:02d} - {episode_title}"
     renaming_pattern_movie: str = "{title} ({year})"
     tmdb_api_key: str = ""
     tvdb_api_key: str = ""

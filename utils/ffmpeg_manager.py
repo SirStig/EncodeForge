@@ -56,7 +56,10 @@ class FFmpegManager:
             return True
         
         logger.info("Detecting FFmpeg...")
-        
+
+        ffmpeg_exe = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
+        ffprobe_exe = "ffprobe.exe" if platform.system() == "Windows" else "ffprobe"
+
         # Try settings first
         try:
             from utils.settings_manager import SettingsManager
@@ -66,22 +69,22 @@ class FFmpegManager:
                 ffmpeg_path = Path(settings.application.ffmpeg_path)
                 if ffmpeg_path.exists() and self._validate_ffmpeg(ffmpeg_path):
                     self._ffmpeg_path = ffmpeg_path
-                    
-                    # Also check for ffprobe
+
                     if settings.application.ffprobe_path:
-                        ffprobe_path = Path(settings.application.ffprobe_path)
-                        if ffprobe_path.exists():
-                            self._ffprobe_path = ffprobe_path
-                    
+                        fp = Path(settings.application.ffprobe_path)
+                        if fp.exists():
+                            self._ffprobe_path = fp
+                    if not self._ffprobe_path:
+                        sibling = ffmpeg_path.parent / ffprobe_exe
+                        if sibling.exists():
+                            self._ffprobe_path = sibling
+
                     logger.info(f"FFmpeg found in settings: {self._ffmpeg_path}")
                     return True
         except Exception as e:
             logger.debug(f"Could not load from settings: {e}")
-        
+
         # Try system PATH
-        ffmpeg_exe = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
-        ffprobe_exe = "ffprobe.exe" if platform.system() == "Windows" else "ffprobe"
-        
         ffmpeg_in_path = shutil.which(ffmpeg_exe)
         if ffmpeg_in_path:
             ffmpeg_path = Path(ffmpeg_in_path)
@@ -267,17 +270,29 @@ class FFmpegManager:
             ffprobe_path: Optional path to FFprobe executable
         """
         if self._validate_ffmpeg(ffmpeg_path):
+            ffprobe_exe = "ffprobe.exe" if platform.system() == "Windows" else "ffprobe"
+            resolved_ffprobe: Optional[Path] = None
+            if ffprobe_path is not None:
+                fp = Path(ffprobe_path)
+                if fp.is_file() and fp.resolve() != ffmpeg_path.resolve():
+                    resolved_ffprobe = fp
+            if resolved_ffprobe is None:
+                candidate = ffmpeg_path.parent / ffprobe_exe
+                if candidate.exists():
+                    resolved_ffprobe = candidate
+
             self._ffmpeg_path = ffmpeg_path
-            self._ffprobe_path = ffprobe_path
+            self._ffprobe_path = resolved_ffprobe
             logger.info(f"FFmpeg path set to: {ffmpeg_path}")
-            
+
             # Save to settings
             try:
                 from utils.settings_manager import SettingsManager
                 settings = SettingsManager()
                 settings.application.ffmpeg_path = str(ffmpeg_path)
-                if ffprobe_path:
-                    settings.application.ffprobe_path = str(ffprobe_path)
+                settings.application.ffprobe_path = (
+                    str(resolved_ffprobe) if resolved_ffprobe else ""
+                )
                 settings.save()
             except Exception as e:
                 logger.error(f"Failed to save FFmpeg path to settings: {e}")

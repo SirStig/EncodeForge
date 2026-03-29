@@ -55,8 +55,8 @@ class SubtitleSettings:
 class RenamerSettings:
     """Renamer default settings."""
     media_type: str = "TV Show"
-    provider: str = "TMDB (The Movie Database)"
-    pattern: str = "{title} - {season}{episode} - {quality}"
+    provider: str = "auto"
+    pattern: str = "{title} - S{season:02d}E{episode:02d} - {episode_title}"
     replace_spaces: bool = False
     lowercase: bool = False
     remove_special: bool = False
@@ -147,7 +147,7 @@ class SettingsManager:
             'ui': asdict(self.ui),
             'application': asdict(self.application),
             'conversion': asdict(self.conversion),
-            'version': '0.5.0-alpha-1',
+            'version': '0.5.0-alpha-2',
         }
     
     def from_dict(self, data: Dict[str, Any]):

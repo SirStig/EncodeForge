@@ -84,12 +84,12 @@ It's built on PySide6 with a modern Fluent Design interface, GPU-accelerated enc
 
 ### Pre-Built Binaries (Recommended)
 
-Download the latest release: **[v0.5.0-alpha-1](https://github.com/SirStig/EncodeForge/releases/latest)**
+Download the latest release: **[v0.5.0-alpha-2](https://github.com/SirStig/EncodeForge/releases/latest)**
 
 | Platform | Format | Download |
 |----------|--------|----------|
-| **Windows** | `.exe` | [EncodeForge.exe](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/EncodeForge.exe) |
-| **macOS** (Apple Silicon) | `.zip` | [encodeforge-macos-arm.zip](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-1/encodeforge-macos-arm.zip) |
+| **Windows** | `.exe` | [EncodeForge.exe](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/EncodeForge.exe) |
+| **macOS** (Apple Silicon) | `.zip` | [encodeforge-macos-arm.zip](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/encodeforge-macos-arm.zip) |
 | **macOS** (Intel) | — | Use [from source](#from-source) for now |
 | **Linux** | `.deb` / `.rpm` / AppImage | Coming soon — use [from source](#from-source) |
 

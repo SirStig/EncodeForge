@@ -292,7 +292,7 @@ class RenamingHandler:
         ]
         
         # First pass: Look for results from providers known to give English titles
-        preferred_sources = ['anidb', 'kitsu', 'jikan/mal', 'tmdb']
+        preferred_sources = ['tvdb', 'tvmaze', 'tmdb', 'trakt', 'omdb', 'anidb', 'kitsu', 'jikan']
         for result in results_list:
             source = result.get('source', '').lower()
             title = result.get('show_title', '') or result.get('title', '')
@@ -375,8 +375,8 @@ class RenamingHandler:
             logger.info(f"Providers: TMDB={'✓' if has_tmdb else '✗'}, TVDB={'✓' if has_tvdb else '✗'}, OMDB={'✓' if has_omdb else '✗'}, Trakt={'✓' if has_trakt else '✗'}, AniDB=✓, Kitsu=✓, Jikan=✓, TVmaze=✓")
             
             # Use parallel processing for metadata lookups
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-            from resource_manager import get_resource_manager
+            from concurrent.futures import ThreadPoolExecutor
+            from core.resource_manager import get_resource_manager
             
             # Get optimal worker count for metadata operations
             rm = get_resource_manager()
@@ -436,9 +436,7 @@ class RenamingHandler:
                             providers_to_try = []
                             
                             if selected_provider == "automatic":
-                                # Try ALL providers - anime could be misdetected as TV
-                                # Order: Try anime providers first (usually better metadata), then general TV
-                                providers_to_try = ["anidb", "kitsu", "jikan/mal", "tmdb", "tvdb", "tvmaze", "omdb"]
+                                providers_to_try = ["tvdb", "tvmaze", "tmdb", "trakt", "omdb", "anidb", "kitsu", "jikan"]
                             else:
                                 # Use specific provider
                                 providers_to_try = [selected_provider]
@@ -466,7 +464,8 @@ class RenamingHandler:
                                         prov_info = self.renamer.search_tv_show(
                                             title,
                                             season,
-                                            episode
+                                            episode,
+                                            provider="tmdb",
                                         )
                                         if prov_info:
                                             prov_name = "TMDB"
@@ -497,15 +496,15 @@ class RenamingHandler:
                                         )
                                         if prov_info:
                                             prov_name = "Kitsu"
-                                    elif prov == "jikan/mal" or prov == "jikan":
+                                    elif prov == "jikan":
                                         prov_info = self.renamer.search_tv_show(
                                             title,
                                             season,
                                             episode,
-                                            provider="jikan"
+                                            provider="jikan",
                                         )
                                         if prov_info:
-                                            prov_name = "Jikan/MAL"
+                                            prov_name = "Jikan"
                                     elif prov == "tvmaze":
                                         prov_info = self.renamer.search_tv_show(
                                             title,
@@ -531,19 +530,13 @@ class RenamingHandler:
                                         file_provider_results[prov_name] = {}
                                 except Exception as e:
                                     logger.error(f"{prov} lookup failed: {e}")
-                                    # Track failed provider with empty result
-                                    if prov == "tmdb":
-                                        file_provider_results["TMDB"] = {}
-                                    elif prov == "tvdb":
-                                        file_provider_results["TVDB"] = {}
-                                    elif prov == "anidb":
-                                        file_provider_results["AniDB"] = {}
-                                    elif prov == "kitsu":
-                                        file_provider_results["Kitsu"] = {}
-                                    elif prov == "jikan/mal" or prov == "jikan":
-                                        file_provider_results["Jikan/MAL"] = {}
-                                    elif prov == "tvmaze":
-                                        file_provider_results["TVmaze"] = {}
+                                    name_map = {
+                                        "tmdb": "TMDB", "tvdb": "TVDB", "tvmaze": "TVmaze",
+                                        "trakt": "Trakt", "omdb": "OMDB",
+                                        "anidb": "AniDB", "kitsu": "Kitsu", "jikan": "Jikan",
+                                    }
+                                    if prov in name_map:
+                                        file_provider_results[name_map[prov]] = {}
                             
                             # Store results from ALL providers for THIS file (including empty ones for alignment)
                             for prov_name, prov_info in file_provider_results.items():
@@ -669,39 +662,30 @@ class RenamingHandler:
                                 year_str = f" ({parsed.get('year')})" if parsed.get('year') else ""
                                 logger.info(f"  No metadata found for movie '{parsed['title']}'{year_str}")
                 
-                    # Store raw metadata (not formatted name) - Java will format using user's pattern
-                    suggested_metadata.append(info if info else {})
-                    providers.append(provider if provider else "None")
-                    errors.append(error if error else "")
-                    
                     if info:
                         logger.info(f"  ✓ Metadata found [via {provider}]")
                     elif error:
                         logger.warning(f"  {error}")
                     else:
                         logger.info("  No metadata found - leaving blank")
+                    return info if info else {}, provider if provider else "None", error if error else ""
                 except Exception as e:
                     logger.error(f"Error processing {file_path}: {e}", exc_info=True)
-                    suggested_metadata.append({})
-                    providers.append("Error")
-                    errors.append(str(e))
+                    return {}, "Error", str(e)
             
-            # Actually process the files using ThreadPoolExecutor
+            # Process files in parallel, preserving submission order
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit all files for parallel processing
-                future_to_file = {executor.submit(process_single_file, fp): fp for fp in file_paths}
-                
-                # Collect results as they complete
-                for future in as_completed(future_to_file):
-                    file_path = future_to_file[future]
-                    try:
-                        # The function already appends to the shared lists
-                        future.result()
-                    except Exception as e:
-                        logger.error(f"Error processing {file_path}: {e}", exc_info=True)
-                        suggested_metadata.append({})
-                        providers.append("Error")
-                        errors.append(str(e))
+                futures = [executor.submit(process_single_file, fp) for fp in file_paths]
+
+            for fp, future in zip(file_paths, futures):
+                try:
+                    meta, prov, err = future.result()
+                except Exception as e:
+                    logger.error(f"Error processing {fp}: {e}", exc_info=True)
+                    meta, prov, err = {}, "Error", str(e)
+                suggested_metadata.append(meta)
+                providers.append(prov)
+                errors.append(err)
             
             logger.info(f"=== Preview Complete: {len(suggested_metadata)} file(s) processed ===")
             logger.info(f"Provider results: {list(provider_metadata.keys())}")
@@ -888,7 +872,7 @@ class RenamingHandler:
         # Create backup file if requested and not dry run
         if create_backup and not dry_run and backup_data:
             try:
-                from path_manager import get_backups_dir
+                from core.path_manager import get_backups_dir
                 backup_dir = get_backups_dir()
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 
@@ -925,55 +909,20 @@ class RenamingHandler:
         
         Args:
             metadata: Metadata dictionary from provider
-            pattern: Naming pattern (e.g., "{title} - S{season}E{episode} - {episodeTitle}")
+            pattern: Naming pattern (e.g., "{title} - S{season:02d}E{episode:02d} - {episode_title}")
         
         Returns:
             Formatted filename or None if formatting fails
         """
-        try:
-            import re
-            
-            if not metadata:
-                return None
-            
-            # Create a copy to avoid modifying original
-            format_dict = metadata.copy()
-            
-            # Ensure required fields have default values
-            format_dict.setdefault('title', 'Unknown')
-            format_dict.setdefault('show_title', format_dict.get('title', 'Unknown'))
-            format_dict.setdefault('season', 1)
-            format_dict.setdefault('episode', 1)
-            format_dict.setdefault('episodeTitle', format_dict.get('episode_title', ''))
-            format_dict.setdefault('year', '')
-            
-            # Format season and episode with zero padding
-            if 'season' in format_dict and format_dict['season']:
-                format_dict['season'] = f"{int(format_dict['season']):02d}"
-            if 'episode' in format_dict and format_dict['episode']:
-                format_dict['episode'] = f"{int(format_dict['episode']):02d}"
-            
-            # Use show_title as title for TV shows if available
-            if format_dict.get('show_title'):
-                format_dict['title'] = format_dict['show_title']
-            
-            # Format the filename
-            result = pattern.format(**format_dict)
-            
-            # Clean up the result
-            result = result.strip()
-            
-            # Remove multiple spaces
-            result = re.sub(r'\s+', ' ', result)
-            
-            # Remove invalid filename characters (cross-platform)
-            result = self._sanitize_filename(result)
-            
-            return result if result else None
-            
-        except Exception as e:
-            logger.error(f"Error formatting filename: {e}")
+        from core.rename_pattern import format_filename_stem
+
+        if not metadata:
             return None
+        stem = format_filename_stem(metadata, pattern, file_stem="")
+        if not stem:
+            return None
+        result = self._sanitize_filename(stem)
+        return result if result else None
     
     def _sanitize_filename(self, filename: str) -> str:
         """Sanitize filename for cross-platform compatibility"""

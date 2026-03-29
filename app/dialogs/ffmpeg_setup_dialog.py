@@ -71,8 +71,8 @@ class FFmpegSetupDialog(QDialog):
         self._apply_theme()
         self._connect_signals()
         self._check_existing_ffmpeg()
-        # Auto-run detection so users see a result immediately
-        self._auto_detect()
+        if required:
+            self._auto_detect()
     
     def _apply_theme(self):
         """Apply glassmorphism theme to dialog."""
@@ -283,11 +283,19 @@ class FFmpegSetupDialog(QDialog):
             
             if ffmpeg_manager.detect_ffmpeg(force_refresh=True):
                 ffmpeg_path = ffmpeg_manager.get_ffmpeg_path()
+                if not ffmpeg_path:
+                    return None
                 ffprobe_path = ffmpeg_manager.get_ffprobe_path()
-                
+                if not ffprobe_path:
+                    ffprobe_exe = (
+                        "ffprobe.exe" if platform.system() == "Windows" else "ffprobe"
+                    )
+                    cand = ffmpeg_path.parent / ffprobe_exe
+                    if cand.exists():
+                        ffprobe_path = cand
                 return {
                     "ffmpeg": str(ffmpeg_path),
-                    "ffprobe": str(ffprobe_path) if ffprobe_path else str(ffmpeg_path)
+                    "ffprobe": str(ffprobe_path) if ffprobe_path else str(ffmpeg_path),
                 }
             
             return None

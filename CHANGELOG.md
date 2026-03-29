@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0-alpha-2] — 2026-03-28
+
+Renamer overhaul, smarter provider selection, a cleaner Settings experience, and stability/layout improvements on top of the first PySide6 alpha.
+
+### Added
+
+- **Auto & All Providers mode** — Two new options sit at the top of the provider picker. *Auto* tries providers in priority order and returns the first good match (fast). *All Providers* queries every source in parallel and picks the most complete result — best episode title, air date, and overview wins.
+- **API key test buttons** — Each key field in Settings → Accounts now has a **Test** button. Click it and a live ✓ / ✗ status appears next to the field without leaving the dialog.
+- **Direct links to API key sign-up pages** — Every provider field shows a small “Get free API key →” link that opens the registration page directly in your browser (TMDB, TVDB, OMDb, Trakt, Fanart.tv, AniDB, OpenSubtitles).
+
+### Improved
+
+- **Provider picker only shows what you have set up** — Providers that require an API key are hidden from the dropdown until you add that key in Settings. Free providers (TVmaze, AniDB, Kitsu, Jikan) are always available.
+- **Episode titles from all providers** — OMDB and Trakt previously returned a placeholder like “Episode 3” instead of the real title. Both now fetch the actual episode name from their APIs.
+- **Settings dialog is wider** — The window opens at a more comfortable size so input fields aren’t cramped, and form fields now stretch to fill the available space.
+- **Smaller, less crowded input fields** — Text and placeholder font in dropdowns and text boxes is slightly smaller, reducing visual noise across the whole app.
+- **No more inline API key field on the Renamer tab** — Keys are managed once in Settings → Accounts, not duplicated on each tab.
+- **Multi-file rename order fixed** — When renaming several files at once, each file now always gets the metadata that belongs to it. A background-thread ordering bug could previously apply the wrong name to the wrong file.
+- **Metadata / rename tab** — Dropped the extra preview area so the before/after columns get the room. After fetch, each suggested name stays on the correct row.
+- **Naming patterns** — **Format / Templates** offers ready-made layouts, one-tap building blocks, saved custom templates, and a live sample so the final filenames match what you set.
+- **Subtitles tab** — Searching and applying subtitles now keeps you informed: you see status text while providers are checked, and you get clear messages when nothing turns up or when a step fails (instead of only finding out in the log).
+- **Download and apply errors** — If a subtitle cannot be downloaded or applied (for example access denied or daily limits), the app shows a dialog, a notification, and updates the main status bar so failures are obvious.
+- **OpenSubtitles sign-in** — When OpenSubtitles is in play but you have not added your account in Settings, the app shows a short tip and disables **Apply** / **Batch apply** where an account is needed, so you are guided to add your username and password or choose other providers.
+- **Preview** — Picking a search result now shows either a text preview (if the file is already local) or a plain explanation that you still need to use **Apply** to fetch it.
+
+### Fixed
+
+- **TMDB genre crash** — Fetching TV show metadata could silently fail due to an internal type error in the genre field. Fixed.
+- **TVDB API calls updated** — The app was using outdated v3-style endpoints. All TVDB lookups now use the correct v4 API paths.
+- **Year pattern mis-detecting resolutions as movie years** — A file named `Show.1920x1080.mkv` was classified as a movie because `1920` looked like a year. The detection now only matches valid year ranges (1900–2099) and ignores resolution strings.
+- **Encoder: Add Files / Add Folder** — Those buttons could error right after clicking them. They work reliably again.
+- **FFmpeg vs FFprobe** — If FFmpeg was installed in a custom folder (for example the one the app downloads for you), video info sometimes still looked for “ffprobe” on the system path and failed. The app now looks for FFprobe next to your FFmpeg executable and remembers both paths when you save setup.
+- **FFmpeg setup window** — Opening FFmpeg setup from the main window no longer runs auto-setup in the background and closes the window on its own. You stay in the dialog until you finish or cancel.
+- **Starting an encode** — Starting encoding could crash because the conversion engine wasn’t fully initialized yet. That path is initialized before encoding runs.
+- **Subtitles tab layout** — The Whisper status line no longer stretches the top section and shoves the file list, results, and preview to the bottom. The main subtitle workspace uses the window height as expected.
+
+### Release Links
+
+- **Compare** — [v0.5.0-alpha-1...v0.5.0-alpha-2](https://github.com/SirStig/EncodeForge/compare/v0.5.0-alpha-1...v0.5.0-alpha-2)
+
+---
+
 ## [0.5.0-alpha-1] — 2026-03-25
 
 > **First PySide6 pre-release on GitHub Releases.** Installers for **macOS (Apple Silicon)** and **Windows** are published; **Linux** packages (.deb, .rpm, AppImage) are not uploaded yet. The previous **[v0.4.1](https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1)** line was JavaFX (deprecated).
@@ -123,7 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.1] — 2025-10-24
 
-> **Note:** Final **JavaFX** release (deprecated). Current binaries are the **PySide6** line; see **[v0.5.0-alpha-1](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-1)**.
+> **Note:** Final **JavaFX** release (deprecated). Current binaries are the **PySide6** line; see **[v0.5.0-alpha-2](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2)**.
 
 ### Highlights
 

@@ -7,7 +7,7 @@ APP_BUNDLE="EncodeForge.app"
 DIST="$ROOT/dist"
 DIST_PKG="$ROOT/dist-packages"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-IDENTITY="${CODESIGN_IDENTITY:?Set CODESIGN_IDENTITY, e.g. 'Developer ID Application: Your Name (TEAM_ID)'}"
+IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Project Yoked LLC (2XK2CQX4AS)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-AC_PASSWORD}"
 
 echo "Installing build dependencies..."

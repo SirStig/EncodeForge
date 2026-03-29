@@ -109,7 +109,7 @@ class AutoResizeTable(QTableWidget):
 class GlassmorphicCard(QFrame):
     """
     Section title above a single rounded surface (styled in theme_base.css).
-    Add children via content_layout() or QFormLayout(body()).
+    Add children via content_layout() or add a QFormLayout with content_layout().addLayout(...).
     """
 
     def __init__(self, title="", parent=None):

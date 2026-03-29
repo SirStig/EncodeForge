@@ -60,43 +60,64 @@ class TVDBProvider(BaseMetadataProvider):
         return None
 
     def search_tv(self, title: str, season: int = 1, episode: int = 1) -> Optional[Dict]:
-        """Search TV show using TVDB"""
+        """Search TV show using TVDB v4 API"""
         if not self.token and not self.login():
             return None
-        
+
         try:
-            # Search for series
-            search_url = f"{self.API_URL}/search/series?name={urllib.parse.quote(title)}"
             headers = {"Authorization": f"Bearer {self.token}"}
-            
+
+            # v4 search endpoint
+            search_url = f"{self.API_URL}/search?query={urllib.parse.quote(title)}&type=series"
             request = urllib.request.Request(search_url, headers=headers)
             with urllib.request.urlopen(request, timeout=10) as response:
                 data = json.loads(response.read().decode())
-            
-            if data.get("data"):
-                series = data["data"][0]
-                series_id = series["id"]
-                
-                # Get episode info
-                episode_url = f"{self.API_URL}/series/{series_id}/episodes/default?season={season}&episodeNumber={episode}"
-                request = urllib.request.Request(episode_url, headers=headers)
-                
+
+            results = data.get("data") or []
+            if not results:
+                return None
+
+            series = results[0]
+            # v4 search returns tvdb_id for the numeric ID
+            series_id = series.get("tvdb_id") or series.get("id")
+            if not series_id:
+                return None
+
+            show_title = series.get("name", "")
+            show_year = str(series.get("year", ""))
+
+            # Fetch episodes for the requested season
+            ep_url = f"{self.API_URL}/series/{series_id}/episodes/official?season={season}&page=0"
+            request = urllib.request.Request(ep_url, headers=headers)
+
+            episode_title = ""
+            episode_airdate = ""
+            overview = ""
+            try:
                 with urllib.request.urlopen(request, timeout=10) as ep_response:
-                    episode_data = json.loads(ep_response.read().decode())
-                
-                if episode_data.get("data", {}).get("episodes"):
-                    ep = episode_data["data"]["episodes"][0]
-                    return {
-                        "show_title": series.get("name", ""),
-                        "show_year": series.get("firstAired", "")[:4] if series.get("firstAired") else "",
-                        "season": season,
-                        "episode": episode,
-                        "episode_title": ep.get("name", ""),
-                        "overview": ep.get("overview", ""),
-                        "source": "tvdb"
-                    }
+                    ep_data = json.loads(ep_response.read().decode())
+
+                episodes = (ep_data.get("data") or {}).get("episodes") or []
+                ep = next((e for e in episodes if e.get("number") == episode), None)
+                if ep:
+                    episode_title = ep.get("name", "")
+                    episode_airdate = ep.get("aired", "")
+                    overview = ep.get("overview", "")
+            except Exception as e:
+                logger.error(f"TVDB episode detail error: {e}")
+
+            return {
+                "show_title": show_title,
+                "show_year": show_year,
+                "season": season,
+                "episode": episode,
+                "episode_title": episode_title,
+                "episode_airdate": episode_airdate,
+                "overview": overview,
+                "source": "tvdb",
+            }
         except Exception as e:
             logger.error(f"TVDB search error: {e}")
-        
+
         return None
 

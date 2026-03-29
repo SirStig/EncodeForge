@@ -85,37 +85,57 @@ class TraktProvider(BaseMetadataProvider):
         """Search TV show using Trakt API"""
         if not self.api_key:
             return None
-        
+
         try:
             self._rate_limit()
-            
+
             # Search for show
             params = {"query": title, "type": "show", "limit": "1"}
             url = f"{self.API_URL}/search/show?{urllib.parse.urlencode(params)}"
             headers = {
                 "Content-Type": "application/json",
                 "trakt-api-version": "2",
-                "trakt-api-key": self.api_key
+                "trakt-api-key": self.api_key,
             }
-            
+
             request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=10) as response:
                 data = json.loads(response.read().decode())
-            
-            if data and len(data) > 0:
-                show = data[0].get("show", {})
-                
-                return {
-                    "show_title": show.get("title", ""),
-                    "show_year": str(show.get("year", "")),
-                    "season": season,
-                    "episode": episode,
-                    "episode_title": f"Episode {episode}",  # Trakt doesn't provide episode details easily
-                    "overview": show.get("overview", ""),
-                    "source": "trakt"
-                }
+
+            if not data:
+                return None
+
+            show = data[0].get("show", {})
+            slug = (show.get("ids") or {}).get("slug", "")
+
+            # Fetch episode details via slug
+            episode_title = ""
+            episode_airdate = ""
+            if slug:
+                try:
+                    self._rate_limit()
+                    ep_url = f"{self.API_URL}/shows/{slug}/seasons/{season}/episodes/{episode}"
+                    ep_request = urllib.request.Request(ep_url, headers=headers)
+                    with urllib.request.urlopen(ep_request, timeout=10) as ep_response:
+                        ep_data = json.loads(ep_response.read().decode())
+                    episode_title = ep_data.get("title", "")
+                    first_aired = ep_data.get("first_aired", "")
+                    episode_airdate = first_aired[:10] if first_aired else ""
+                except Exception as e:
+                    logger.warning(f"Trakt episode detail fetch failed: {e}")
+
+            return {
+                "show_title": show.get("title", ""),
+                "show_year": str(show.get("year", "")),
+                "season": season,
+                "episode": episode,
+                "episode_title": episode_title,
+                "episode_airdate": episode_airdate,
+                "overview": show.get("overview", ""),
+                "source": "trakt",
+            }
         except Exception as e:
             logger.error(f"Trakt TV search error: {e}")
-        
+
         return None
 

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QSizePolicy,
@@ -75,10 +76,12 @@ class SubtitleTab(QWidget):
         self.notifier = get_notification_manager()
         self.active_workers: Dict[str, SubtitleWorker] = {}
         self._splitter_initialized = False
+        self._subtitle_bg_tasks = 0
 
         self._setup_ui()
         self._connect_signals()
         self._update_whisper_status()
+        self._update_subtitle_action_buttons()
         logger.debug("Subtitle tab initialized - using base glassmorphism theme")
 
     def showEvent(self, event):
@@ -105,6 +108,10 @@ class SubtitleTab(QWidget):
         # --- Quick Settings Bar (Top) ---
         quick_host = QWidget()
         quick_host.setObjectName("tab_toolbar_strip")
+        quick_host.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Maximum,
+        )
         quick_outer = QVBoxLayout(quick_host)
         quick_outer.setContentsMargins(10, 6, 10, 4)
         quick_outer.setSpacing(6)
@@ -141,6 +148,10 @@ class SubtitleTab(QWidget):
                 item.setSelected(True)
         self.language_list.setMaximumHeight(60)
         self.language_list.setMinimumWidth(160)
+        self.language_list.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
+        )
         lists_grid.addWidget(self.language_list, 0, 1)
         lists_grid.addWidget(StyledLabel("Providers:"), 0, 2, Qt.AlignmentFlag.AlignTop)
         self.provider_list = QListWidget()
@@ -153,6 +164,10 @@ class SubtitleTab(QWidget):
                 item.setSelected(True)
         self.provider_list.setMaximumHeight(60)
         self.provider_list.setMinimumWidth(200)
+        self.provider_list.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
+        )
         lists_grid.addWidget(self.provider_list, 0, 3)
         lists_grid.setColumnStretch(1, 1)
         lists_grid.setColumnStretch(3, 1)
@@ -160,12 +175,18 @@ class SubtitleTab(QWidget):
 
         status_row = QHBoxLayout()
         self.whisper_status = StyledLabel("Whisper: checking…")
+        self.whisper_status.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Preferred,
+        )
         self.whisper_status.setCursor(Qt.CursorShape.PointingHandCursor)
         self.whisper_status.setToolTip("Click to open Whisper AI setup")
         self.whisper_status.mousePressEvent = lambda _: self._open_whisper_setup()
         self.opensubs_status = StyledLabel("")
+        self.opensubs_status.setMinimumWidth(120)
+        self.opensubs_status.setWordWrap(True)
         status_row.addWidget(self.whisper_status)
-        status_row.addWidget(self.opensubs_status)
+        status_row.addWidget(self.opensubs_status, 1)
         status_row.addStretch()
         quick_outer.addLayout(status_row)
 
@@ -189,7 +210,7 @@ class SubtitleTab(QWidget):
         )
         quick_outer.addWidget(self._whisper_banner)
 
-        main_layout.addWidget(quick_host)
+        main_layout.addWidget(quick_host, 0)
 
         # --- Main Content Splitter ---
         self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -258,7 +279,7 @@ class SubtitleTab(QWidget):
         self._main_splitter.setStretchFactor(1, 2)
         self._main_splitter.setStretchFactor(2, 1)
 
-        main_layout.addWidget(self._main_splitter)
+        main_layout.addWidget(self._main_splitter, 1)
 
         # --- Bottom Bar: Apply/Batch Apply ---
         bottom_bar = QHBoxLayout()
@@ -275,7 +296,7 @@ class SubtitleTab(QWidget):
         bottom_bar.addWidget(StyledLabel("Mode:"))
         bottom_bar.addWidget(self.apply_mode_combo)
         bottom_bar.addStretch()
-        main_layout.addLayout(bottom_bar)
+        main_layout.addLayout(bottom_bar, 0)
 
         # Connect signals for mode/provider/language changes
         self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
@@ -290,6 +311,128 @@ class SubtitleTab(QWidget):
         # Remove sync, encoding, format, and other legacy options
 
         self._subtitle_rows: List[Dict[str, Any]] = []
+        self._show_idle_subtitle_banner()
+
+    def _inc_subtitle_bg(self) -> None:
+        self._subtitle_bg_tasks += 1
+        self._update_subtitle_action_buttons()
+
+    def _dec_subtitle_bg(self) -> None:
+        self._subtitle_bg_tasks = max(0, self._subtitle_bg_tasks - 1)
+        self._update_subtitle_action_buttons()
+
+    def _opensubtitles_logged_in(self) -> bool:
+        try:
+            from utils.settings_manager import get_settings_manager
+
+            c = get_settings_manager().get_merged_conversion_settings()
+            return bool(
+                (c.opensubtitles_username or "").strip()
+                and (c.opensubtitles_password or "").strip()
+            )
+        except Exception:
+            return False
+
+    def _providers_include_opensubtitles(self) -> bool:
+        if not hasattr(self, "provider_list"):
+            return False
+        for i in range(self.provider_list.count()):
+            item = self.provider_list.item(i)
+            if not item or not item.isSelected():
+                continue
+            t = item.text().lower()
+            if t == "all" or "opensubtitle" in t:
+                return True
+        return False
+
+    def _selected_subtitle_is_remote_opensubtitles(self) -> bool:
+        items = self.subs_table.selectedItems()
+        if not items:
+            return False
+        row = items[0].row()
+        lang_item = self.subs_table.item(row, 0)
+        sub = lang_item.data(Qt.ItemDataRole.UserRole) if lang_item else None
+        if not isinstance(sub, dict) or sub.get("local_path"):
+            return False
+        prov = (sub.get("provider") or "").lower()
+        return "opensubtitle" in prov
+
+    def _show_idle_subtitle_banner(self) -> None:
+        if not hasattr(self, "opensubs_status"):
+            return
+        if self._providers_include_opensubtitles() and not self._opensubtitles_logged_in():
+            self.opensubs_status.setText(
+                "OpenSubtitles: add username & password in Settings for downloads (reduces 403 / quota issues)."
+            )
+            self.opensubs_status.setStyleSheet("color: #e8a040;")
+        else:
+            self.opensubs_status.setText("")
+            self.opensubs_status.setStyleSheet("")
+
+    def _set_subtitle_activity(self, text: str, level: str = "") -> None:
+        if not hasattr(self, "opensubs_status"):
+            return
+        self.opensubs_status.setText(text)
+        if level == "error":
+            self.opensubs_status.setStyleSheet("color: #e05050;")
+        elif level == "ok":
+            self.opensubs_status.setStyleSheet("color: #3fc66d;")
+        elif level == "busy":
+            self.opensubs_status.setStyleSheet("color: #6eb5ff;")
+        else:
+            self.opensubs_status.setStyleSheet("")
+
+    def _update_subtitle_action_buttons(self) -> None:
+        if not hasattr(self, "apply_btn"):
+            return
+        busy = self._subtitle_bg_tasks > 0
+        os_remote_block = (
+            self._selected_subtitle_is_remote_opensubtitles()
+            and not self._opensubtitles_logged_in()
+        )
+        batch_os_block = (
+            self._providers_include_opensubtitles() and not self._opensubtitles_logged_in()
+        )
+        if hasattr(self, "search_btn"):
+            self.search_btn.setEnabled(not busy)
+        self.apply_btn.setEnabled((not busy) and (not os_remote_block))
+        self.batch_apply_btn.setEnabled((not busy) and (not batch_os_block))
+        if os_remote_block:
+            self.apply_btn.setToolTip(
+                "This subtitle is from OpenSubtitles and must be downloaded with an account. "
+                "Add your opensubtitles.com username and password in Settings."
+            )
+        else:
+            self.apply_btn.setToolTip("")
+        if batch_os_block:
+            self.batch_apply_btn.setToolTip(
+                "Your provider list includes OpenSubtitles. Add an OpenSubtitles account in Settings, "
+                "or deselect OpenSubtitles / choose specific providers without it."
+            )
+        else:
+            self.batch_apply_btn.setToolTip("")
+
+    def _report_subtitle_failure(self, file_path: str, message: str) -> None:
+        hint = ""
+        low = (message or "").lower()
+        if "403" in message or "forbidden" in low or "access forbidden" in low:
+            hint = (
+                " OpenSubtitles often returns 403 without a logged-in account or when the daily "
+                "download limit is reached — add credentials in Settings or try again tomorrow."
+            )
+        full = f"{message}{hint}"
+        self._set_subtitle_activity(full, "error")
+        self.subtitle_error.emit(file_path, full)
+        QMessageBox.warning(
+            self,
+            "Subtitles",
+            full[:800] + ("…" if len(full) > 800 else ""),
+        )
+        self.notifier.show_notification(
+            title="Subtitle error",
+            message=f"{Path(file_path).name}: {full[:200]}",
+            notification_type="error",
+        )
 
     def _current_video_path(self) -> Optional[Path]:
         row = self.file_table.currentRow()
@@ -315,6 +458,8 @@ class SubtitleTab(QWidget):
         if all_item and all_item.isSelected():
             for i in range(1, self.provider_list.count()):
                 self.provider_list.item(i).setSelected(True)
+        self._show_idle_subtitle_banner()
+        self._update_subtitle_action_buttons()
 
     def _on_language_changed(self):
         pass
@@ -340,9 +485,14 @@ class SubtitleTab(QWidget):
 
         worker = Worker(job)
         worker.signals.result.connect(self._on_search_result)
-        worker.signals.error.connect(lambda e: self._on_search_error(e))
+        worker.signals.error.connect(self._on_search_error)
+        worker.signals.progress.connect(self._on_search_worker_progress)
+        worker.signals.started.connect(
+            lambda: self._set_subtitle_activity("Searching subtitle providers…", "busy")
+        )
+        worker.signals.finished.connect(self._on_search_worker_finished)
+        self._inc_subtitle_bg()
         self.thread_pool.start(worker)
-        self.search_btn.setEnabled(False)
 
     def _run_whisper_or_search(self, path: Path, subs: Dict[str, Any], prefer_whisper: bool):
         if prefer_whisper:
@@ -354,19 +504,56 @@ class SubtitleTab(QWidget):
 
             worker = Worker(gen_job)
             worker.signals.result.connect(self._on_generate_result)
-            worker.signals.error.connect(lambda e: self._on_search_error(e))
+            worker.signals.error.connect(self._on_search_error)
+            worker.signals.started.connect(
+                lambda: self._set_subtitle_activity("Generating subtitles with Whisper…", "busy")
+            )
+            worker.signals.finished.connect(self._on_search_worker_finished)
+            self._inc_subtitle_bg()
             self.thread_pool.start(worker)
-            self.search_btn.setEnabled(False)
             return
         self._run_search_only(path, subs)
 
+    def _on_search_worker_progress(self, _cur: int, _tot: int, message: str) -> None:
+        if message:
+            self._set_subtitle_activity(message, "busy")
+        self.subtitle_progress.emit("", _cur, _tot, message)
+
+    def _on_search_worker_finished(self) -> None:
+        self._dec_subtitle_bg()
+
     def _on_search_result(self, result: Any):
-        self.search_btn.setEnabled(True)
         self.subs_table.setRowCount(0)
         self._subtitle_rows = []
-        if not isinstance(result, dict) or result.get("status") != "success":
+        if not isinstance(result, dict):
+            self._set_subtitle_activity("Search returned an unexpected response.", "error")
+            QMessageBox.warning(self, "Subtitles", "Search returned an unexpected response.")
+            self._update_subtitle_action_buttons()
             return
-        for sub in result.get("subtitles", []):
+        if result.get("status") == "error":
+            msg = result.get("message", "Search failed.")
+            self._set_subtitle_activity(msg, "error")
+            QMessageBox.warning(self, "Subtitles", msg)
+            self._update_subtitle_action_buttons()
+            return
+        if result.get("status") != "success":
+            self._set_subtitle_activity("Search did not complete successfully.", "error")
+            QMessageBox.warning(self, "Subtitles", "Search did not complete successfully.")
+            self._update_subtitle_action_buttons()
+            return
+        subs_list = result.get("subtitles") or []
+        if not subs_list:
+            self._set_subtitle_activity("No subtitles found for this file and language selection.", "error")
+            QMessageBox.information(
+                self,
+                "Subtitles",
+                "No subtitles were found. Try other languages or providers.",
+            )
+            self._update_subtitle_action_buttons()
+            return
+        n = len(subs_list)
+        self._set_subtitle_activity(f"Found {n} subtitle(s). Select one and click Apply.", "ok")
+        for sub in subs_list:
             r = self.subs_table.rowCount()
             self.subs_table.insertRow(r)
             lang = sub.get("language", "")
@@ -381,9 +568,9 @@ class SubtitleTab(QWidget):
             if it:
                 it.setData(Qt.ItemDataRole.UserRole, sub)
             self._subtitle_rows.append(sub)
+        self._update_subtitle_action_buttons()
 
     def _on_generate_result(self, result: Any):
-        self.search_btn.setEnabled(True)
         self.subs_table.setRowCount(0)
         self._subtitle_rows = []
         if isinstance(result, dict) and result.get("status") == "success":
@@ -399,20 +586,30 @@ class SubtitleTab(QWidget):
                 it = self.subs_table.item(0, 0)
                 if it:
                     it.setData(Qt.ItemDataRole.UserRole, sub)
+                self._set_subtitle_activity("Whisper generated subtitles. Click Apply to save next to the video.", "ok")
+            else:
+                self._set_subtitle_activity("Generation finished but no subtitle path was returned.", "error")
+                QMessageBox.warning(self, "Subtitles", "Generation finished but no subtitle file was produced.")
+        else:
+            msg = (result or {}).get("message", "Subtitle generation failed.") if isinstance(result, dict) else "Subtitle generation failed."
+            self._set_subtitle_activity(msg, "error")
+            QMessageBox.warning(self, "Subtitles", msg)
+        self._update_subtitle_action_buttons()
 
     def _on_search_error(self, error: tuple):
-        self.search_btn.setEnabled(True)
         logger.error("Subtitle search/generate error: %s", error)
+        err_msg = str(error[1]) if len(error) > 1 else "Unknown error"
+        self._set_subtitle_activity(err_msg, "error")
+        QMessageBox.warning(self, "Subtitles", f"Search or generation failed:\n{err_msg}")
+        self._update_subtitle_action_buttons()
 
     def _on_apply_clicked(self):
         path = self._current_video_path()
         if not path:
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Subtitles", "Select a video file.")
             return
         items = self.subs_table.selectedItems()
         if not items:
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Subtitles", "Select a subtitle row first.")
             return
         row = items[0].row()
@@ -422,6 +619,7 @@ class SubtitleTab(QWidget):
             return
         mode = self._apply_mode_to_core(self.apply_mode_combo.currentText())
         subs = self._get_subtitle_settings()
+        fp = str(path)
 
         def job(progress_callback=None):
             core = _subtitle_core_from_settings(subs)
@@ -431,7 +629,7 @@ class SubtitleTab(QWidget):
                 dl = core.download_subtitle(
                     sub.get("file_id", ""),
                     sub.get("provider", ""),
-                    str(path),
+                    fp,
                     sub.get("language", "eng"),
                     sub.get("download_url", ""),
                 )
@@ -439,44 +637,86 @@ class SubtitleTab(QWidget):
                     return dl
                 paths = [dl.get("subtitle_path") or dl.get("path", "")]
             return core.apply_subtitles(
-                str(path), [p for p in paths if p], output_path=None, mode=mode,
+                fp, [p for p in paths if p], output_path=None, mode=mode,
                 language=sub.get("language", "eng"), progress_callback=progress_callback
             )
 
         worker = Worker(job)
-        worker.signals.finished.connect(lambda: None)
-        worker.signals.result.connect(lambda r: self._on_apply_done(r, str(path)))
-        worker.signals.error.connect(lambda e: self._on_subtitle_error(0, str(path), e))
+        worker.signals.result.connect(lambda r, p=fp: self._on_single_apply_result(r, p))
+        worker.signals.error.connect(lambda e, p=fp: self._on_single_apply_exc(p, e))
+        worker.signals.started.connect(
+            lambda: self._set_subtitle_activity("Downloading / applying subtitle…", "busy")
+        )
+        worker.signals.finished.connect(self._dec_subtitle_bg)
+        self._inc_subtitle_bg()
         self.thread_pool.start(worker)
+
+    def _on_single_apply_result(self, result: Any, file_path: str) -> None:
+        if isinstance(result, dict) and result.get("status") == "success":
+            self._set_subtitle_activity(result.get("message", "Subtitle applied."), "ok")
+            self._on_apply_done(result, file_path)
+        else:
+            msg = result.get("message", "Apply or download failed.") if isinstance(result, dict) else str(result)
+            self._report_subtitle_failure(file_path, msg)
+
+    def _on_single_apply_exc(self, file_path: str, error: tuple) -> None:
+        err_msg = str(error[1]) if len(error) > 1 else "Unknown error"
+        self._report_subtitle_failure(file_path, err_msg)
 
     def _on_apply_done(self, result: Any, file_path: str):
         if isinstance(result, dict) and result.get("status") == "success":
             self.subtitle_completed.emit(file_path)
 
     def _on_batch_apply_clicked(self):
-        from PySide6.QtWidgets import QMessageBox
         if self.file_table.rowCount() == 0:
             QMessageBox.warning(self, "Subtitles", "No files in the list.")
             return
+        if self._providers_include_opensubtitles() and not self._opensubtitles_logged_in():
+            QMessageBox.warning(
+                self,
+                "Subtitles",
+                "Batch apply uses your selected providers. OpenSubtitles is included but no account "
+                "is configured in Settings.\n\n"
+                "Add your opensubtitles.com username and password, or deselect OpenSubtitles.",
+            )
+            return
         subs = self._get_subtitle_settings()
         mode = self._apply_mode_to_core(self.apply_mode_combo.currentText())
+        self._set_subtitle_activity("Batch: searching and downloading…", "busy")
 
         for row in range(self.file_table.rowCount()):
             item = self.file_table.item(row, 0)
             if not item:
                 continue
             fp = Path(item.data(Qt.ItemDataRole.UserRole))
+            vp = str(fp)
+
+            def make_connectors(video_path: str):
+                def on_res(res: Any) -> None:
+                    self._on_batch_download_result(res, video_path, mode)
+
+                def on_err(err: tuple) -> None:
+                    em = str(err[1]) if len(err) > 1 else "Unknown error"
+                    self._report_subtitle_failure(video_path, em)
+
+                return on_res, on_err
+
+            on_res, on_err = make_connectors(vp)
+            self._inc_subtitle_bg()
             worker = SubtitleWorker(fp, subs)
-            worker.signals.result.connect(
-                lambda res, p=str(fp): self._on_batch_download_then_apply(res, p, mode)
-            )
-            worker.signals.error.connect(
-                lambda err, p=str(fp): self._on_subtitle_error(0, p, err)
-            )
+            worker.signals.result.connect(on_res)
+            worker.signals.error.connect(on_err)
+            worker.signals.finished.connect(self._dec_subtitle_bg)
             self.thread_pool.start(worker)
 
-    def _on_batch_download_then_apply(self, result: Any, video_path: str, mode: str):
+    def _on_batch_download_result(self, result: Any, video_path: str, mode: str) -> None:
         if not isinstance(result, dict) or result.get("status") != "success":
+            msg = (
+                (result or {}).get("message", "No subtitle could be downloaded for this file.")
+                if isinstance(result, dict)
+                else "Batch download failed."
+            )
+            self._report_subtitle_failure(video_path, msg)
             return
         downloaded = result.get("subtitles_downloaded") or []
         paths = []
@@ -485,6 +725,10 @@ class SubtitleTab(QWidget):
             if p:
                 paths.append(p)
         if not paths:
+            self._report_subtitle_failure(
+                video_path,
+                "Download reported success but no subtitle paths were returned.",
+            )
             return
         subs = self._get_subtitle_settings()
 
@@ -496,8 +740,19 @@ class SubtitleTab(QWidget):
             )
 
         w = Worker(job)
-        w.signals.result.connect(lambda r: self._on_apply_done(r, video_path))
+        w.signals.result.connect(lambda r, p=video_path: self._on_batch_apply_stage_result(r, p))
+        w.signals.error.connect(lambda e, p=video_path: self._on_single_apply_exc(p, e))
+        w.signals.finished.connect(self._dec_subtitle_bg)
+        self._inc_subtitle_bg()
         self.thread_pool.start(w)
+
+    def _on_batch_apply_stage_result(self, result: Any, video_path: str) -> None:
+        if isinstance(result, dict) and result.get("status") == "success":
+            self._set_subtitle_activity(f"Batch: applied — {Path(video_path).name}", "ok")
+            self._on_apply_done(result, video_path)
+        else:
+            msg = result.get("message", "Apply failed.") if isinstance(result, dict) else str(result)
+            self._report_subtitle_failure(video_path, msg)
 
     def _create_file_panel(self) -> QWidget:
         """Create file list and queue management panel."""
@@ -746,20 +1001,32 @@ class SubtitleTab(QWidget):
         """Show subtitle preview when user selects a subtitle in the results table."""
         selected = self.subs_table.selectedItems()
         if not selected:
+            self._update_subtitle_action_buttons()
             return
         row = selected[0].row()
         item = self.subs_table.item(row, 0)
         if not item:
             return
-        subtitle_path = item.data(Qt.ItemDataRole.UserRole)
-        if subtitle_path and Path(subtitle_path).exists():
-            try:
-                with open(subtitle_path, 'r', encoding='utf-8', errors='replace') as f:
-                    lines = f.readlines()
-                preview = ''.join(lines[:50])
-                self.preview_text.setPlainText(preview)
-            except Exception as e:
-                self.preview_text.setPlainText(f"Error loading preview: {e}")
+        sub = item.data(Qt.ItemDataRole.UserRole)
+        if isinstance(sub, dict):
+            subtitle_path = sub.get("local_path") or sub.get("path")
+            if subtitle_path and Path(subtitle_path).exists():
+                try:
+                    with open(subtitle_path, "r", encoding="utf-8", errors="replace") as f:
+                        lines = f.readlines()
+                    preview = "".join(lines[:50])
+                    self.preview_text.setPlainText(preview)
+                except Exception as e:
+                    self.preview_text.setPlainText(f"Error loading preview: {e}")
+            else:
+                name = sub.get("filename") or ""
+                prov = sub.get("provider") or ""
+                self.preview_text.setPlainText(
+                    f"Provider: {prov}\n"
+                    f"File: {name or '(unknown)'}\n\n"
+                    "No local file yet — use Apply to download and attach this subtitle."
+                )
+        self._update_subtitle_action_buttons()
 
     def _drag_enter_event(self, event: QDragEnterEvent):
         """Handle drag enter event."""

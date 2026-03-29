@@ -46,7 +46,26 @@ class FFmpegManager:
         self._embedded_ffmpeg_checked = False
         self._embedded_ffmpeg_path = None
         self._embedded_ffprobe_path = None
-    
+
+    def get_ffmpeg_path(self) -> Optional[Path]:
+        central = get_ffmpeg_manager()
+        p = central.get_ffmpeg_path()
+        if p is None:
+            self.detect_ffmpeg(use_cache=True)
+            p = central.get_ffmpeg_path()
+        if p:
+            self.ffmpeg_path = str(p)
+        return p
+
+    def get_ffprobe_path(self) -> Optional[Path]:
+        central = get_ffmpeg_manager()
+        if central.get_ffmpeg_path() is None:
+            self.detect_ffmpeg(use_cache=True)
+        p = central.get_ffprobe_path()
+        if p:
+            self.ffprobe_path = str(p)
+        return p
+
     def _check_embedded_ffmpeg(self) -> bool:
         """Check if embedded FFmpeg is available from Java runtime"""
         if self._embedded_ffmpeg_checked:
@@ -113,7 +132,14 @@ class FFmpegManager:
             if ffmpeg_path:
                 logger.info(f"Using centralized FFmpeg detection: {ffmpeg_path}")
                 self.ffmpeg_path = str(ffmpeg_path)
-                self.ffprobe_path = str(ffprobe_path) if ffprobe_path else str(ffmpeg_path).replace("ffmpeg", "ffprobe")
+                if ffprobe_path:
+                    self.ffprobe_path = str(ffprobe_path)
+                else:
+                    ffprobe_exe = (
+                        "ffprobe.exe" if platform.system() == "Windows" else "ffprobe"
+                    )
+                    cand = ffmpeg_path.parent / ffprobe_exe
+                    self.ffprobe_path = str(cand) if cand.exists() else ""
                 
                 # Get version info and encoders
                 success, version_info = self._get_version_info(self.ffmpeg_path)

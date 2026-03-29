@@ -29,10 +29,9 @@ class FileHandler:
             if not os.path.exists(file_path):
                 return {"status": "error", "message": "File not found", "duration": 0}
             
-            # Get ffprobe path from manager (it's detected and stored there)
-            ffprobe_path = self.ffmpeg_mgr.ffprobe_path if self.ffmpeg_mgr.ffprobe_path else "ffprobe"
-            
-            # Use ffprobe to get basic info
+            probe = self.ffmpeg_mgr.get_ffprobe_path()
+            ffprobe_path = str(probe) if probe else "ffprobe"
+
             cmd = [
                 ffprobe_path,
                 "-v", "quiet",
@@ -77,10 +76,9 @@ class FileHandler:
             except Exception as e:
                 return {"status": "error", "message": f"File not readable: {e}"}
             
-            # Get ffprobe path from manager (it's detected and stored there)
-            ffprobe_path = self.ffmpeg_mgr.ffprobe_path if self.ffmpeg_mgr.ffprobe_path else "ffprobe"
-            
-            # Use ffprobe to get media info - properly quote file path
+            probe = self.ffmpeg_mgr.get_ffprobe_path()
+            ffprobe_path = str(probe) if probe else "ffprobe"
+
             cmd = [
                 ffprobe_path,
                 "-v", "quiet",

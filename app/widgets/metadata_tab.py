@@ -1,6 +1,6 @@
 """
 EncodeForge Metadata Tab
-Metadata fetching, pattern-based renaming, and preview
+Metadata fetching and pattern-based renaming
 """
 
 import logging
@@ -10,41 +10,30 @@ from typing import Any, Dict, List, Optional
 from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
-    QAbstractItemView,
-    QCheckBox,
-    QComboBox,
     QFileDialog,
-    QFormLayout,
     QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QListWidget,
-    QListWidgetItem,
-    QProgressBar,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
-    QSplitter,
     QStyle,
     QTableWidgetItem,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from app.dialogs.rename_pattern_dialog import RenamePatternDialog
 from app.widgets.custom_widgets import (
     AutoResizeTable,
-    GlassmorphicButton,
     StyledCheckBox,
     StyledComboBox,
     StyledLabel,
     StyledLineEdit,
-    StyledTextEdit,
 )
+from core.rename_pattern import apply_filename_options, format_filename_stem
 from utils.notifications import get_notification_manager
+from utils.settings_manager import get_settings_manager
 from utils.workers import RenamerWorker
 
 logger = logging.getLogger(__name__)
@@ -72,6 +61,9 @@ class MetadataTab(QWidget):
         self._rename_history: Dict[str, str] = {}
         self._setup_ui()
         self._connect_signals()
+        sm = get_settings_manager()
+        self.pattern_input.setText(sm.renamer.pattern)
+        self.refresh_providers()
         logger.debug("Metadata tab initialized - using base glassmorphism theme")
 
     def _setup_ui(self):
@@ -123,16 +115,6 @@ class MetadataTab(QWidget):
         grid.setVerticalSpacing(8)
         grid.addWidget(StyledLabel("Provider:"), 0, 0, align_right)
         self.provider_combo = StyledComboBox()
-        self.provider_combo.addItems([
-            "TMDB (The Movie Database)",
-            "TVDB (TheTVDB)",
-            "AniDB (Anime)",
-            "Kitsu (Anime)",
-            "Jikan (MyAnimeList)",
-            "TVmaze",
-            "Trakt",
-            "OMDB"
-        ])
         self.provider_combo.setMinimumContentsLength(26)
         grid.addWidget(self.provider_combo, 0, 1)
         grid.addWidget(StyledLabel("Language:"), 0, 2, align_right)
@@ -140,15 +122,15 @@ class MetadataTab(QWidget):
         self.language_combo.addItems(["English", "Japanese", "Spanish", "French", "German", "Other"])
         self.language_combo.setMinimumContentsLength(10)
         grid.addWidget(self.language_combo, 0, 3)
-        grid.addWidget(StyledLabel("API Key:"), 1, 0, align_right)
-        self.api_key_input = StyledLineEdit()
-        self.api_key_input.setPlaceholderText("API Key (if required)")
-        grid.addWidget(self.api_key_input, 1, 1, 1, 3)
         grid.addWidget(StyledLabel("Pattern:"), 2, 0, align_right)
+        pat_row = QHBoxLayout()
         self.pattern_input = StyledLineEdit()
-        self.pattern_input.setPlaceholderText("Naming pattern, e.g. {title} - {season}{episode}")
-        self.pattern_input.setText("{title} - {season}{episode} - {quality}")
-        grid.addWidget(self.pattern_input, 2, 1, 1, 3)
+        self.pattern_input.setPlaceholderText("{title} - S{season:02d}E{episode:02d} - {episode_title}")
+        self.pattern_btn = QPushButton("Format / Templates…")
+        self.pattern_btn.setToolTip("Edit pattern, built-in templates, and saved custom templates.")
+        pat_row.addWidget(self.pattern_input, 1)
+        pat_row.addWidget(self.pattern_btn)
+        grid.addLayout(pat_row, 2, 1, 1, 3)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
         inner_layout.addLayout(grid)
@@ -188,131 +170,18 @@ class MetadataTab(QWidget):
         self.metadata_table.setColumns(headers=["Metadata Result"])  # Single column auto-stretches
         self.metadata_table.setAlternatingRowColors(True)
         self.comparison_layout.addWidget(self.metadata_table, 1)  # Add stretch factor
-        content_layout.addLayout(self.comparison_layout, 1)  # Give whole layout stretch
-
-        # --- Preview panel below comparison lists ---
-        self.preview_group = QGroupBox("Preview")
-        preview_layout = QVBoxLayout(self.preview_group)
-        self.preview_text = StyledTextEdit()
-        self.preview_text.setReadOnly(True)
-        self.preview_text.setPlaceholderText("Select a file to see details or preview output here.")
-        preview_layout.addWidget(self.preview_text)
-        content_layout.addWidget(self.preview_group, 0)  # No stretch for preview
+        content_layout.addLayout(self.comparison_layout, 1)
 
         main_layout.addWidget(content_widget, 1)
 
-        # Connect selection change to update preview
-        self.file_table.itemSelectionChanged.connect(self._update_preview_panel)
-        self.metadata_table.itemSelectionChanged.connect(self._update_preview_panel)
-
-    def _update_preview_panel(self):
-        # Show details for selected file or metadata
-        file_row = self.file_table.currentRow()
-        meta_row = self.metadata_table.currentRow()
-        text = ""
-        if file_row >= 0:
-            file_item = self.file_table.item(file_row, 0)
-            if file_item:
-                text += f"Original: {file_item.text()}\n"
-        if meta_row >= 0:
-            meta_item = self.metadata_table.item(meta_row, 0)
-            if meta_item:
-                text += f"Suggested: {meta_item.text()}\n"
-        if not text:
-            text = "Select a file to see details or preview output here."
-        self.preview_text.setPlainText(text)
-
-    def _create_settings_panel(self) -> QWidget:
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        type_group = QGroupBox("Media Type")
-        type_layout = QVBoxLayout()
-        self.type_combo = StyledComboBox()
-        self.type_combo.addItems(["TV Show", "Movie", "Anime"])
-        type_layout.addWidget(self.type_combo)
-        type_group.setLayout(type_layout)
-        layout.addWidget(type_group)
-        provider_group = QGroupBox("Metadata Provider")
-        provider_layout = QVBoxLayout()
-        self.provider_combo = StyledComboBox()
-        self.provider_combo.addItems([
-            "TMDB (The Movie Database)",
-            "TVDB (TheTVDB)",
-            "AniDB (Anime)",
-            "Kitsu (Anime)",
-            "Jikan (MyAnimeList)",
-            "TVmaze",
-            "Trakt",
-            "OMDB"
-        ])
-        provider_layout.addWidget(self.provider_combo)
-        api_key_layout = QHBoxLayout()
-        api_key_label = StyledLabel("API Key:")
-        api_key_label.setObjectName("api_key_label")
-        self.api_key_input = StyledLineEdit()
-        self.api_key_input.setPlaceholderText("Enter API key if required...")
-        api_key_layout.addWidget(api_key_label)
-        api_key_layout.addWidget(self.api_key_input)
-        provider_layout.addLayout(api_key_layout)
-        provider_group.setLayout(provider_layout)
-        layout.addWidget(provider_group)
-        pattern_group = QGroupBox("Naming Pattern")
-        pattern_layout = QVBoxLayout()
-        pattern_help = StyledLabel("Available variables:")
-        pattern_help.setObjectName("pattern_help")
-        pattern_layout.addWidget(pattern_help)
-        variables_text = StyledTextEdit()
-        variables_text.setReadOnly(True)
-        variables_text.setMaximumHeight(120)
-        variables_text.setPlainText(
-            "{title} - Title\n"
-            "{year} - Release year\n"
-            "{season} - Season number (S01)\n"
-            "{episode} - Episode number (E01)\n"
-            "{resolution} - Video resolution\n"
-            "{quality} - Quality (1080p, 720p)\n"
-            "{codec} - Video codec\n"
-            "{audio} - Audio codec\n"
-            "{group} - Release group"
-        )
-        pattern_layout.addWidget(variables_text)
-        self.pattern_input = StyledLineEdit()
-        self.pattern_input.setText("{title} - {season}{episode} - {quality}")
-        self.pattern_input.setPlaceholderText("Enter naming pattern...")
-        pattern_layout.addWidget(self.pattern_input)
-        presets_label = StyledLabel("Presets:")
-        presets_label.setObjectName("presets_label")
-        pattern_layout.addWidget(presets_label)
-        self.preset_list = QListWidget()
-        self.preset_list.setMaximumHeight(150)
-        presets = [
-            "{title} {season}{episode}",
-            "{title} - {season}{episode}",
-            "{title} {year}",
-            "{title} ({year})",
-            "[{group}] {title} - {season}{episode}",
-            "{title} {season}{episode} [{quality}]"
-        ]
-        for preset in presets:
-            self.preset_list.addItem(preset)
-        pattern_layout.addWidget(self.preset_list)
-        pattern_group.setLayout(pattern_layout)
-        layout.addWidget(pattern_group)
-        options_group = QGroupBox("Options")
-        options_layout = QVBoxLayout()
-        self.replace_spaces_check = StyledCheckBox("Replace spaces with dots")
-        self.lowercase_check = StyledCheckBox("Convert to lowercase")
-        self.remove_special_check = StyledCheckBox("Remove special characters")
-        self.preserve_extension_check = StyledCheckBox("Preserve file extension")
-        self.preserve_extension_check.setChecked(True)
-        options_layout.addWidget(self.replace_spaces_check)
-        options_layout.addWidget(self.lowercase_check)
-        options_layout.addWidget(self.remove_special_check)
-        options_layout.addWidget(self.preserve_extension_check)
-        options_group.setLayout(options_layout)
-        layout.addWidget(options_group)
-        layout.addStretch()
-        return panel
+    def _open_pattern_dialog(self) -> None:
+        dlg = RenamePatternDialog(self, self.pattern_input.text())
+        if dlg.exec():
+            pat = dlg.selected_pattern()
+            self.pattern_input.setText(pat)
+            sm = get_settings_manager()
+            sm.renamer.pattern = pat
+            sm.save()
 
     def _connect_signals(self):
         self.remove_btn.clicked.connect(self._remove_selected)
@@ -321,9 +190,15 @@ class MetadataTab(QWidget):
         self.preview_btn.clicked.connect(self._preview_names)
         self.rename_btn.clicked.connect(self._apply_rename)
         self.undo_btn.clicked.connect(self._undo_rename)
-        # Only connect preset_list if it exists (for future pattern dialog)
-        if hasattr(self, 'preset_list'):
-            self.preset_list.itemClicked.connect(self._on_preset_selected)
+        self.pattern_btn.clicked.connect(self._open_pattern_dialog)
+        self.pattern_input.editingFinished.connect(self._persist_pattern_from_field)
+
+    def _persist_pattern_from_field(self) -> None:
+        sm = get_settings_manager()
+        t = self.pattern_input.text().strip()
+        if t and t != sm.renamer.pattern:
+            sm.renamer.pattern = t
+            sm.save()
 
     def _undo_rename(self):
         """Undo the last batch of renames."""
@@ -344,9 +219,6 @@ class MetadataTab(QWidget):
         self.undo_btn.setEnabled(False)
         if errors == 0:
             self.notifier.show_notification(title="Undo Complete", message="Renames undone successfully", notification_type="success")
-
-    def _on_preset_selected(self, item: QListWidgetItem):
-        self.pattern_input.setText(item.text())
 
     def _drag_enter_event(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
@@ -428,15 +300,15 @@ class MetadataTab(QWidget):
         
         logger.info("Fetching metadata for files")
         
-        # Clear metadata table
-        self.metadata_table.setRowCount(0)
-        
-        # Get provider and settings
+        n = self.file_table.rowCount()
+        self.metadata_table.setRowCount(n)
+        for i in range(n):
+            self.metadata_table.setItem(i, 0, QTableWidgetItem("Fetching…"))
+
         provider = self._get_selected_provider()
-        api_key = self.api_key_input.text() if hasattr(self, 'api_key_input') else ""
-        
-        # Process each file
-        for row in range(self.file_table.rowCount()):
+        api_key = ""
+
+        for row in range(n):
             file_item = self.file_table.item(row, 0)
             if not file_item:
                 continue
@@ -448,7 +320,7 @@ class MetadataTab(QWidget):
                 'provider': provider,
                 'api_key': api_key,
                 'preview_only': True,
-                'pattern': self.pattern_input.text() if hasattr(self, 'pattern_input') else '{title} - {season}{episode}'
+                'pattern': self.pattern_input.text() if hasattr(self, 'pattern_input') else ''
             }
             
             worker = RenamerWorker(file_path, settings)
@@ -473,137 +345,132 @@ class MetadataTab(QWidget):
     def _on_metadata_fetched(self, row: int, result: Dict[str, Any]):
         """Handle metadata fetch result."""
         logger.debug(f"Metadata fetched for row {row}: {result}")
-        
-        # Add to metadata table
-        meta_row = self.metadata_table.rowCount()
-        self.metadata_table.insertRow(meta_row)
-        
+        if row < 0 or row >= self.metadata_table.rowCount():
+            return
+
         meta_dict: Dict[str, Any] = {}
         if isinstance(result, dict) and result.get("status") == "success":
             md = result.get("metadata") or []
             if md and isinstance(md[0], dict):
                 meta_dict = md[0]
-        
+
         if isinstance(result, dict) and result.get("status") == "success" and not meta_dict:
-            meta_item = QTableWidgetItem("No metadata found")
-            self.metadata_table.setItem(meta_row, 0, meta_item)
+            self.metadata_table.setItem(row, 0, QTableWidgetItem("No metadata found"))
             return
-        
+
         if isinstance(result, dict) and meta_dict:
-            title = meta_dict.get('title', 'Unknown')
-            year = meta_dict.get('year', '')
-            season = meta_dict.get('season', '')
-            episode = meta_dict.get('episode', '')
-            
-            meta_text = f"{title}"
-            if year:
-                meta_text += f" ({year})"
-            try:
-                if season != '' and episode != '':
-                    meta_text += f" - S{int(season):02d}E{int(episode):02d}"
-            except (TypeError, ValueError):
-                if season and episode:
-                    meta_text += f" - S{season}E{episode}"
-            
+            file_item = self.file_table.item(row, 0)
+            fp = Path(file_item.data(Qt.ItemDataRole.UserRole)) if file_item else None
+            stem = fp.stem if fp else ""
+            pat = self.pattern_input.text().strip()
+            preview = format_filename_stem(meta_dict, pat, file_stem=stem) if pat else None
+            if preview:
+                preview = apply_filename_options(
+                    preview,
+                    replace_spaces=self.replace_spaces_check.isChecked(),
+                    lowercase=self.lowercase_check.isChecked(),
+                    remove_special=self.remove_special_check.isChecked(),
+                )
+                ext = fp.suffix if fp and self.preserve_extension_check.isChecked() else ""
+                meta_text = f"{preview}{ext}"
+            else:
+                meta_text = self._metadata_fallback_label(meta_dict)
             meta_item = QTableWidgetItem(meta_text)
             meta_item.setData(Qt.ItemDataRole.UserRole, meta_dict)
+            self.metadata_table.setItem(row, 0, meta_item)
         elif isinstance(result, dict) and result.get("status") == "error":
-            meta_item = QTableWidgetItem(f"Error: {result.get('message', 'unknown')}")
+            self.metadata_table.setItem(
+                row, 0, QTableWidgetItem(f"Error: {result.get('message', 'unknown')}")
+            )
         else:
-            meta_item = QTableWidgetItem(str(result))
-        
-        self.metadata_table.setItem(meta_row, 0, meta_item)
+            self.metadata_table.setItem(row, 0, QTableWidgetItem(str(result)))
     
     def _on_metadata_error(self, row: int, error: tuple):
         """Handle metadata fetch error."""
         error_msg = str(error[1]) if len(error) > 1 else "Unknown error"
         logger.error(f"Metadata fetch error for row {row}: {error_msg}")
-        
-        # Add error to metadata table
-        meta_row = self.metadata_table.rowCount()
-        self.metadata_table.insertRow(meta_row)
-        meta_item = QTableWidgetItem(f"Error: {error_msg}")
-        self.metadata_table.setItem(meta_row, 0, meta_item)
+        if 0 <= row < self.metadata_table.rowCount():
+            self.metadata_table.setItem(row, 0, QTableWidgetItem(f"Error: {error_msg}"))
+
+    @staticmethod
+    def _metadata_fallback_label(meta_dict: Dict[str, Any]) -> str:
+        title = meta_dict.get("show_title") or meta_dict.get("title", "Unknown")
+        year = meta_dict.get("year", "") or meta_dict.get("show_year", "")
+        season = meta_dict.get("season", "")
+        episode = meta_dict.get("episode", "")
+        parts = [title]
+        if year:
+            parts.append(f"({year})")
+        try:
+            if season != "" and episode != "":
+                parts.append(f"S{int(season):02d}E{int(episode):02d}")
+        except (TypeError, ValueError):
+            if season and episode:
+                parts.append(f"S{season}E{episode}")
+        return " ".join(parts)
     
+    def refresh_providers(self) -> None:
+        """Rebuild the provider combo from current settings."""
+        sm = get_settings_manager()
+        c = sm.conversion
+
+        self.provider_combo.blockSignals(True)
+        current = self.provider_combo.currentData() or sm.renamer.provider or "auto"
+        self.provider_combo.clear()
+
+        self.provider_combo.addItem("Auto (Best Match)", "auto")
+        self.provider_combo.addItem("All Providers", "all")
+        self.provider_combo.insertSeparator(self.provider_combo.count())
+        self.provider_combo.addItem("TVmaze  (free)", "tvmaze")
+        self.provider_combo.addItem("AniDB  (free)", "anidb")
+        self.provider_combo.addItem("Kitsu  (free)", "kitsu")
+        self.provider_combo.addItem("Jikan / MyAnimeList  (free)", "jikan")
+
+        keyed = [
+            (getattr(c, "tmdb_api_key", ""), "TMDB (The Movie Database)", "tmdb"),
+            (getattr(c, "tvdb_api_key", ""), "TVDB (TheTVDB)", "tvdb"),
+            (getattr(c, "omdb_api_key", ""), "OMDb", "omdb"),
+            (getattr(c, "trakt_api_key", ""), "Trakt", "trakt"),
+        ]
+        has_keyed = any(k.strip() for k, _, _ in keyed)
+        if has_keyed:
+            self.provider_combo.insertSeparator(self.provider_combo.count())
+            for key, label, data in keyed:
+                if key and key.strip():
+                    self.provider_combo.addItem(label, data)
+
+        idx = self.provider_combo.findData(current)
+        self.provider_combo.setCurrentIndex(max(0, idx))
+        self.provider_combo.blockSignals(False)
+
     def _get_selected_provider(self) -> str:
-        """Get the currently selected metadata provider."""
-        if hasattr(self, 'provider_combo'):
-            provider_text = self.provider_combo.currentText()
-            # Map display names to provider keys
-            provider_map = {
-                'TMDB (The Movie Database)': 'tmdb',
-                'TVDB (TheTVDB)': 'tvdb',
-                'AniDB (Anime)': 'anidb',
-                'Kitsu (Anime)': 'kitsu',
-                'Jikan (MyAnimeList)': 'jikan',
-                'TVmaze': 'tvmaze',
-                'Trakt': 'trakt',
-                'OMDB': 'omdb'
-            }
-            return provider_map.get(provider_text, 'tmdb')
-        return 'tmdb'
+        return self.provider_combo.currentData() or "auto"
 
     def _preview_names(self):
         pattern = self.pattern_input.text()
-        self.metadata_table.setRowCount(0)
-        for row in range(self.file_table.rowCount()):
+        n = self.file_table.rowCount()
+        self.metadata_table.setRowCount(n)
+        for row in range(n):
             file_item = self.file_table.item(row, 0)
             if file_item:
                 file_path = Path(file_item.data(Qt.ItemDataRole.UserRole))
-                new_name = self._generate_new_name(file_path, pattern)
-                meta_row = self.metadata_table.rowCount()
-                self.metadata_table.insertRow(meta_row)
-                meta_item = QTableWidgetItem(new_name)
-                self.metadata_table.setItem(meta_row, 0, meta_item)
+                new_name = self._generate_new_name(file_path, pattern, None)
+                self.metadata_table.setItem(row, 0, QTableWidgetItem(new_name))
         self.rename_btn.setEnabled(True)
         logger.info("Generated name previews")
 
-    def _generate_new_name(self, file_path: Path, pattern: str, metadata: dict = None) -> str:
-        name = file_path.stem
+    def _generate_new_name(self, file_path: Path, pattern: str, metadata: Optional[dict] = None) -> str:
         ext = file_path.suffix
-        new_name = pattern
-        if metadata and isinstance(metadata, dict):
-            title = metadata.get('title', name)
-            year = metadata.get('year', '')
-            season = metadata.get('season', '')
-            episode = metadata.get('episode', '')
-            resolution = metadata.get('resolution', '')
-            codec = metadata.get('codec', '')
-            audio = metadata.get('audio', '')
-            group = metadata.get('group', '')
-
-            season_str = f"S{int(season):02d}" if season else "S01"
-            episode_str = f"E{int(episode):02d}" if episode else "E01"
-
-            new_name = new_name.replace("{title}", str(title))
-            new_name = new_name.replace("{year}", str(year) if year else "")
-            new_name = new_name.replace("{season}", season_str)
-            new_name = new_name.replace("{episode}", episode_str)
-            new_name = new_name.replace("{quality}", resolution or "")
-            new_name = new_name.replace("{resolution}", resolution or "")
-            new_name = new_name.replace("{codec}", codec or "")
-            new_name = new_name.replace("{audio}", audio or "")
-            new_name = new_name.replace("{group}", group or "")
-        else:
-            new_name = new_name.replace("{title}", name)
-            new_name = new_name.replace("{season}", "S01")
-            new_name = new_name.replace("{episode}", "E01")
-            new_name = new_name.replace("{quality}", "")
-            new_name = new_name.replace("{year}", "")
-            new_name = new_name.replace("{codec}", "")
-            new_name = new_name.replace("{audio}", "")
-            new_name = new_name.replace("{group}", "")
-            new_name = new_name.replace("{resolution}", "")
-
-        if hasattr(self, 'replace_spaces_check') and self.replace_spaces_check.isChecked():
-            new_name = new_name.replace(" ", ".")
-        if hasattr(self, 'lowercase_check') and self.lowercase_check.isChecked():
-            new_name = new_name.lower()
-        if hasattr(self, 'remove_special_check') and self.remove_special_check.isChecked():
-            new_name = "".join(c for c in new_name if c.isalnum() or c in ".-_ ")
-        if hasattr(self, 'preserve_extension_check') and self.preserve_extension_check.isChecked():
-            new_name += ext
-        return new_name
+        stem = format_filename_stem(metadata, pattern, file_stem=file_path.stem) or file_path.stem
+        stem = apply_filename_options(
+            stem,
+            replace_spaces=self.replace_spaces_check.isChecked(),
+            lowercase=self.lowercase_check.isChecked(),
+            remove_special=self.remove_special_check.isChecked(),
+        )
+        if self.preserve_extension_check.isChecked():
+            return f"{stem}{ext}"
+        return stem
 
     def _apply_rename(self):
         """Apply renaming to all files based on metadata."""
@@ -615,8 +482,8 @@ class MetadataTab(QWidget):
         
         # Get settings
         provider = self._get_selected_provider()
-        api_key = self.api_key_input.text() if hasattr(self, 'api_key_input') else ""
-        pattern = self.pattern_input.text() if hasattr(self, 'pattern_input') else '{title} - {season}{episode}'
+        api_key = ""
+        pattern = self.pattern_input.text() if hasattr(self, 'pattern_input') else ''
         
         renamed_count = 0
         error_count = 0
@@ -637,11 +504,12 @@ class MetadataTab(QWidget):
             if not meta_item or meta_item.text().startswith("Error:"):
                 logger.warning(f"Skipping {file_path.name}: No valid metadata")
                 continue
-            
-            # Get metadata
-            metadata = meta_item.data(Qt.ItemDataRole.UserRole) if meta_item else {}
-            
-            # Generate new name using metadata and pattern
+
+            metadata = meta_item.data(Qt.ItemDataRole.UserRole)
+            if not isinstance(metadata, dict) or not metadata:
+                logger.warning(f"Skipping {file_path.name}: No structured metadata for rename")
+                continue
+
             new_name = self._generate_new_name(file_path, pattern, metadata)
 
             # Try to rename
@@ -675,25 +543,3 @@ class MetadataTab(QWidget):
             logger.info(f"Batch rename complete: {renamed_count} files, {error_count} errors")
 
         self.rename_btn.setEnabled(False)
-    
-    def _apply_pattern(self, file_path: Path, pattern: str, metadata: Dict[str, Any]) -> str:
-        """Apply naming pattern with metadata."""
-        result = pattern
-        
-        # Replace pattern variables with metadata values
-        replacements = {
-            '{title}': metadata.get('title', file_path.stem),
-            '{year}': str(metadata.get('year', '')),
-            '{season}': f"S{metadata.get('season', 1):02d}",
-            '{episode}': f"E{metadata.get('episode', 1):02d}",
-            '{quality}': metadata.get('quality', '1080p'),
-            '{codec}': metadata.get('codec', 'x264'),
-            '{audio}': metadata.get('audio', 'AAC'),
-            '{group}': metadata.get('group', 'EncodeForge'),
-            '{resolution}': metadata.get('resolution', '1920x1080'),
-        }
-        
-        for key, value in replacements.items():
-            result = result.replace(key, value)
-        
-        return result

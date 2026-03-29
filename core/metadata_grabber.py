@@ -142,190 +142,164 @@ class MetadataGrabber:
     
     def search_tv_show(self, title: str, season: int = 1, episode: int = 1, provider: str = "auto") -> Optional[Dict]:
         """
-        Search for TV show - tries multiple providers
-        
-        Args:
-            title: Show title to search
-            season: Season number
-            episode: Episode number
-            provider: Specific provider to use, or "auto" for automatic selection
-        
-        Provider Priority:
-            - Anime: AniDB, Kitsu, Jikan -> TMDB
-            - TV: TVDB, TVmaze, Trakt -> TMDB -> OMDB
+        Search for TV show metadata across all available providers.
+        Providers are tried in priority order; no anime vs. TV detection.
+
+        Provider priority: TVDB → TVmaze → TMDB → Trakt → OMDB → AniDB → Kitsu → Jikan
         """
-        # Detect if anime
-        is_anime = self.anidb.is_anime(title)
-        
-        # Try specific provider if requested
+        # Specific provider requested
         if provider != "auto":
             if provider == "tvdb" and self.tvdb:
                 return self.tvdb.search_tv(title, season, episode)
             elif provider == "tvmaze":
                 return self.tvmaze.search_tv(title, season, episode)
+            elif provider == "tmdb" and self.tmdb:
+                return self.tmdb.search_tv(title, season, episode)
+            elif provider == "trakt" and self.trakt:
+                return self.trakt.search_tv(title, season, episode)
+            elif provider == "omdb" and self.omdb:
+                return self.omdb.search_tv(title, season, episode)
             elif provider == "anidb":
                 return self.anidb.search_tv(title, season, episode)
             elif provider == "kitsu":
                 return self.kitsu.search_tv(title, season, episode)
             elif provider == "jikan":
                 return self.jikan.search_tv(title, season, episode)
-            elif provider == "trakt" and self.trakt:
-                return self.trakt.search_tv(title, season, episode)
-            elif provider == "omdb" and self.omdb:
-                return self.omdb.search_tv(title, season, episode)
-            elif provider == "tmdb" and self.tmdb:
-                pass  # Fall through to TMDB below
-        
-        # Auto mode - try providers based on content type
-        if is_anime:
-            # Try anime providers first (all free)
-            for provider_obj in [self.anidb, self.kitsu, self.jikan]:
-                try:
-                    result = provider_obj.search_tv(title, season, episode)
-                    if result:
-                        return result
-                except Exception as e:
-                    logger.error(f"Error with anime provider: {e}")
-        
-        # Try general TV show providers
-        # TVDB (requires key)
-        if self.tvdb:
-            result = self.tvdb.search_tv(title, season, episode)
-            if result:
-                return result
-        
-        # TVmaze (free, no key)
-        result = self.tvmaze.search_tv(title, season, episode)
-        if result:
-            return result
-        
-        # Trakt (requires key)
-        if self.trakt:
-            result = self.trakt.search_tv(title, season, episode)
-            if result:
-                return result
-        
-        # Try TMDB
-        if self.tmdb:
-            result = self.tmdb.search_tv(title, season, episode)
-            if result:
-                return result
-        
-        # Last resort: OMDB
-        if self.omdb:
-            result = self.omdb.search_tv(title, season, episode)
-            if result:
-                return result
-        
-        logger.warning(f"No results found for TV show: {title}")
+            elif provider == "all":
+                from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+                ordered = [
+                    ("tvdb", self.tvdb), ("tvmaze", self.tvmaze), ("tmdb", self.tmdb),
+                    ("trakt", self.trakt), ("omdb", self.omdb),
+                    ("anidb", self.anidb), ("kitsu", self.kitsu), ("jikan", self.jikan),
+                ]
+                results = []
+                with ThreadPoolExecutor(max_workers=4) as _ex:
+                    future_map = {
+                        _ex.submit(prov.search_tv, title, season, episode): name
+                        for name, prov in ordered if prov is not None
+                    }
+                    for fut in _as_completed(future_map, timeout=20):
+                        try:
+                            res = fut.result()
+                            if res:
+                                results.append(res)
+                        except Exception:
+                            pass
+                return max(results, key=self._score_result) if results else None
+            return None
+
+        # Auto: try all providers in priority order
+        ordered = [
+            ("tvdb", self.tvdb),
+            ("tvmaze", self.tvmaze),
+            ("tmdb", self.tmdb),
+            ("trakt", self.trakt),
+            ("omdb", self.omdb),
+            ("anidb", self.anidb),
+            ("kitsu", self.kitsu),
+            ("jikan", self.jikan),
+        ]
+        for name, prov in ordered:
+            if prov is None:
+                continue
+            try:
+                result = prov.search_tv(title, season, episode)
+                if result:
+                    return result
+            except Exception as e:
+                logger.error(f"Provider {name} TV search error: {e}")
+
+        logger.warning(f"No TV results found for: {title} S{season:02d}E{episode:02d}")
         return None
     
     def search_movie(self, title: str, year: Optional[int] = None, provider: str = "auto") -> Optional[Dict]:
         """
-        Search for movie information using multiple providers
-        
-        Args:
-            title: Movie title to search
-            year: Release year (optional, helps accuracy)
-            provider: Specific provider to use, or "auto" for automatic selection
-        
-        Provider Priority:
-            - Anime Movies: AniDB, Kitsu, Jikan -> TMDB
-            - Regular Movies: TMDB, Trakt, OMDB
-        
-        Returns dict with movie information or None
+        Search for movie metadata across all available providers.
+        Providers are tried in priority order; no anime vs. movie detection.
+
+        Provider priority: TMDB → Trakt → OMDB → AniDB → Kitsu → Jikan
         """
-        # Detect if anime movie
-        is_anime = self.anidb.is_anime(title)
-        
-        # Try specific provider if requested
+        # Specific provider requested
         if provider != "auto":
-            if provider == "anidb":
+            if provider == "tmdb" and self.tmdb:
+                return self.tmdb.search_movie(title, year)
+            elif provider == "trakt" and self.trakt:
+                return self.trakt.search_movie(title, year)
+            elif provider == "omdb" and self.omdb:
+                return self.omdb.search_movie(title, year)
+            elif provider == "anidb":
                 return self.anidb.search_movie(title, year)
             elif provider == "kitsu":
                 return self.kitsu.search_movie(title, year)
             elif provider == "jikan":
                 return self.jikan.search_movie(title, year)
-            elif provider == "tmdb" and self.tmdb:
-                pass  # Fall through to TMDB below
-            elif provider == "trakt" and self.trakt:
-                return self.trakt.search_movie(title, year)
-            elif provider == "omdb" and self.omdb:
-                return self.omdb.search_movie(title, year)
-        
-        # Auto mode - try providers based on content type
-        if is_anime:
-            # Try anime providers first (all free)
-            for provider_obj in [self.anidb, self.kitsu, self.jikan]:
-                try:
-                    result = provider_obj.search_movie(title, year)
-                    if result:
-                        return result
-                except Exception as e:
-                    logger.error(f"Error with anime movie provider: {e}")
-        
-        # Try TMDB first (best quality for regular movies)
-        if self.tmdb:
-            result = self.tmdb.search_movie(title, year)
-            if result:
-                return result
-        
-        # Try Trakt
-        if self.trakt:
-            result = self.trakt.search_movie(title, year)
-            if result:
-                return result
-        
-        # Try OMDB
-        if self.omdb:
-            result = self.omdb.search_movie(title, year)
-            if result:
-                return result
-        
-        logger.warning(f"No results found for movie: {title}")
+            elif provider == "all":
+                from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+                ordered = [
+                    ("tmdb", self.tmdb), ("trakt", self.trakt), ("omdb", self.omdb),
+                    ("anidb", self.anidb), ("kitsu", self.kitsu), ("jikan", self.jikan),
+                ]
+                results = []
+                with ThreadPoolExecutor(max_workers=4) as _ex:
+                    future_map = {
+                        _ex.submit(prov.search_movie, title, year): name
+                        for name, prov in ordered if prov is not None
+                    }
+                    for fut in _as_completed(future_map, timeout=20):
+                        try:
+                            res = fut.result()
+                            if res:
+                                results.append(res)
+                        except Exception:
+                            pass
+                return max(results, key=self._score_result) if results else None
+            return None
+
+        # Auto: try all providers in priority order
+        ordered = [
+            ("tmdb", self.tmdb),
+            ("trakt", self.trakt),
+            ("omdb", self.omdb),
+            ("anidb", self.anidb),
+            ("kitsu", self.kitsu),
+            ("jikan", self.jikan),
+        ]
+        for name, prov in ordered:
+            if prov is None:
+                continue
+            try:
+                result = prov.search_movie(title, year)
+                if result:
+                    return result
+            except Exception as e:
+                logger.error(f"Provider {name} movie search error: {e}")
+
+        logger.warning(f"No movie results found for: {title}")
         return None
     
+    def _score_result(self, result: Dict) -> int:
+        """Score a metadata result by completeness. Higher = better."""
+        score = 0
+        if result.get("show_title") or result.get("title"):
+            score += 1
+        if result.get("episode_title"):
+            score += 3
+        if result.get("episode_airdate"):
+            score += 2
+        if result.get("overview"):
+            score += 1
+        if result.get("year") or result.get("show_year"):
+            score += 1
+        return score
+
     def format_filename(self, info: Dict, pattern: str) -> str:
-        """
-        Format filename using a pattern
-        
-        Pattern tokens:
-            {title} - Show/Movie title
-            {year} - Year
-            {season} - Season number (padded)
-            {episode} - Episode number (padded)
-            {episodeTitle} - Episode title
-            {S} - Season (S01)
-            {E} - Episode (E01)
-        
-        Example patterns:
-            TV: "{title} - S{season}E{episode} - {episodeTitle}"
-            Movie: "{title} ({year})"
-        """
-        # Start with pattern
-        result = pattern
-        
-        # Replace tokens
-        replacements = {
-            "{title}": info.get("show_title", info.get("title", "")),
-            "{year}": str(info.get("year", info.get("show_year", ""))),
-            "{season}": f"{info.get('season', 1):02d}",
-            "{episode}": f"{info.get('episode', 1):02d}",
-            "{episodeTitle}": info.get("episode_title", ""),
-            "{S}": f"S{info.get('season', 1):02d}",
-            "{E}": f"E{info.get('episode', 1):02d}",
-        }
-        
-        for token, value in replacements.items():
-            result = result.replace(token, value)
-        
-        # Clean up multiple spaces
-        result = re.sub(r'\s+', ' ', result).strip()
-        
-        # Remove invalid filename characters (cross-platform)
-        result = self._sanitize_filename(result)
-        
-        return result
+        """Format filename stem; patterns match core.rename_pattern (Python format syntax)."""
+        from core.rename_pattern import format_filename_stem
+
+        stem = format_filename_stem(info, pattern, file_stem="") or ""
+        if not stem:
+            return ""
+        return self._sanitize_filename(stem)
     
     def _sanitize_filename(self, filename: str) -> str:
         """Sanitize filename for cross-platform compatibility"""

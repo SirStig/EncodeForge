@@ -91,8 +91,8 @@ class BaseMetadataProvider(ABC):
             if re.search(pattern, filename):
                 return "tv"
         
-        # Movie year pattern
-        if re.search(r'\(?\d{4}\)?', filename):
+        # Movie year pattern — match 1900-2099 not followed by resolution suffixes
+        if re.search(r'(?<!\d)((?:19|20)\d{2})(?!\d)(?![px])', filename, re.IGNORECASE):
             return "movie"
         
         return "unknown"

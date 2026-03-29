@@ -167,6 +167,10 @@ class Worker(QRunnable):
                 return  # Don't emit if stopped
                 
             if isinstance(progress_data, dict):
+                if progress_data.get("status") == "searching" and progress_data.get("provider"):
+                    prov = progress_data["provider"]
+                    self.signals.progress.emit(0, 1, f"Searching {prov}…")
+                    return
                 current = progress_data.get('progress', 0)
                 total = progress_data.get('total', 100)
                 message = progress_data.get('message', '')
@@ -309,6 +313,7 @@ class EncoderWorker(Worker):
         )
 
         core = EncodeForgeCore(settings=settings)
+        core._ensure_handlers_initialized()
         self.conversion_handler = core.conversion_handler
         
         super().__init__(
