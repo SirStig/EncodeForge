@@ -9,7 +9,7 @@
 *A free, open-source desktop app built with Python & PySide6*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://github.com/SirStig/EncodeForge/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://sirstig.github.io/EncodeForge/downloads.html)
 [![GitHub release](https://img.shields.io/github/v/release/SirStig/EncodeForge)](https://github.com/SirStig/EncodeForge/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
@@ -84,14 +84,10 @@ It's built on PySide6 with a modern Fluent Design interface, GPU-accelerated enc
 
 ### Pre-Built Binaries (Recommended)
 
-Download the latest release: **[v0.5.0-alpha-2](https://github.com/SirStig/EncodeForge/releases/latest)**
+**Download links and version history live on the [EncodeForge website](https://sirstig.github.io/EncodeForge/)** so they stay accurate without editing this README for every release.
 
-| Platform | Format | Download |
-|----------|--------|----------|
-| **Windows** | `.exe` | [EncodeForge.exe](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/EncodeForge.exe) |
-| **macOS** (Apple Silicon) | `.zip` | [encodeforge-macos-arm.zip](https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/encodeforge-macos-arm.zip) |
-| **macOS** (Intel) | — | Use [from source](#from-source) for now |
-| **Linux** | `.deb` / `.rpm` / AppImage | Coming soon — use [from source](#from-source) |
+- **[Downloads](https://sirstig.github.io/EncodeForge/downloads.html)** — pick **v0.5.0-alpha-2** (current PySide6 line; binaries show as “coming soon” until that GitHub release is published), **v0.5.0-alpha-1**, or legacy **0.4.x** JavaFX builds. The page pulls live data from [GitHub Releases](https://github.com/SirStig/EncodeForge/releases) where possible.
+- **[Changelog](https://sirstig.github.io/EncodeForge/changelog.html)** — web version of `CHANGELOG.md`. Add a hash to jump to a version section when it exists, e.g. [`changelog.html#release-0-5-0-alpha-2`](https://sirstig.github.io/EncodeForge/changelog.html#release-0-5-0-alpha-2), [`#release-0-4-1`](https://sirstig.github.io/EncodeForge/changelog.html#release-0-4-1).
 
 > FFmpeg is required but not bundled. EncodeForge will prompt you to set it up on first launch.
 

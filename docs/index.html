@@ -80,6 +80,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/release-config.js"></script>
 </head>
 <body>
 
@@ -105,13 +106,13 @@
       <h1>Encode, subtitle,<br>and organize your media</h1>
       <p class="hero-sub">
         A PySide6 FFmpeg GUI for hardware-accelerated batch encoding, smart renaming, and local AI subtitles with <strong>faster-whisper</strong>.
-        <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2">v0.5.0-alpha-2</a> — Apple Silicon &amp; Windows; Linux packages soon. Legacy <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">v0.4.1</a> (JavaFX).
+        Latest line: <strong>v0.5.x</strong> (PySide6) — Apple Silicon &amp; Windows; Linux packages soon. Older <strong>v0.4.x</strong> (JavaFX) and earlier are still on <a href="https://github.com/SirStig/EncodeForge/releases">GitHub Releases</a>; use the <a href="downloads.html">download page</a> to pick a version.
       </p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" id="download-btn" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/EncodeForge.exe">Download for Windows</a>
+        <a class="btn btn-primary" id="download-btn" href="downloads.html">Download for Windows</a>
         <a class="btn btn-ghost" href="downloads.html">All platforms</a>
         <a class="btn btn-ghost" href="guide.html">Guide</a>
-        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2">Release notes</a>
+        <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge/releases">Release notes</a>
         <a class="btn btn-ghost" href="https://github.com/SirStig/EncodeForge" target="_blank" rel="noopener">GitHub ↗</a>
       </div>
     </section>
@@ -245,12 +246,18 @@
   <script src="assets/site.js"></script>
   <script>
     (function () {
-      const ua = navigator.userAgent.toLowerCase();
-      const dl = document.getElementById('download-btn');
-      if (!dl) return;
-      const winExe = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/EncodeForge.exe';
-      const macArmZip = 'https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/encodeforge-macos-arm.zip';
-      const downloadsPage = 'downloads.html';
+      var cfg = window.EncodeForgeReleaseConfig;
+      var ua = navigator.userAgent.toLowerCase();
+      var dl = document.getElementById('download-btn');
+      if (!dl || !cfg) return;
+      var tag = cfg.defaultTag;
+      var previews = cfg.previewReleases || [];
+      var pendingDefault = previews.some(function (p) {
+        return p.tag_name === tag && p.pending;
+      });
+      var winExe = cfg.downloadUrl(tag, 'EncodeForge.exe');
+      var macArmZip = cfg.downloadUrl(tag, 'encodeforge-macos-arm.zip');
+      var downloadsPage = 'downloads.html';
 
       if (/linux/.test(ua)) {
         dl.textContent = 'Linux downloads';
@@ -258,20 +265,25 @@
         return;
       }
       if (/mac|darwin/.test(ua)) {
-        dl.href = macArmZip;
-        dl.textContent = 'Download for macOS (Apple Silicon)';
-        if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
-          navigator.userAgentData.getHighEntropyValues(['architecture']).then(function (h) {
-            if (h.architecture && h.architecture !== 'arm') {
-              dl.textContent = 'macOS Intel — downloads';
-              dl.href = downloadsPage;
-            }
-          }).catch(function () {});
+        if (pendingDefault) {
+          dl.textContent = 'Download for macOS';
+          dl.href = downloadsPage;
+        } else {
+          dl.href = macArmZip;
+          dl.textContent = 'Download for macOS (Apple Silicon)';
+          if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+            navigator.userAgentData.getHighEntropyValues(['architecture']).then(function (h) {
+              if (h.architecture && h.architecture !== 'arm') {
+                dl.textContent = 'macOS Intel — downloads';
+                dl.href = downloadsPage;
+              }
+            }).catch(function () {});
+          }
         }
         return;
       }
       dl.textContent = 'Download for Windows';
-      dl.href = winExe;
+      dl.href = pendingDefault ? downloadsPage : winExe;
     })();
     function openModal(id) {
       const m = document.getElementById(id);

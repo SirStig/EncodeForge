@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Download — EncodeForge</title>
-  <meta name="description" content="Download EncodeForge v0.5.0-alpha-2 for macOS (Apple Silicon) and Windows. Linux packages coming soon.">
+  <meta name="description" content="Download EncodeForge — pick a version (PySide6 0.5.x or legacy JavaFX). Links track GitHub Releases.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://sirstig.github.io/EncodeForge/downloads.html">
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -13,7 +13,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sirstig.github.io/EncodeForge/downloads.html">
   <meta property="og:title" content="Download — EncodeForge">
-  <meta property="og:description" content="Direct downloads for EncodeForge v0.5.0-alpha-2.">
+  <meta property="og:description" content="Version picker and direct GitHub release downloads for EncodeForge.">
   <meta property="og:image" content="https://sirstig.github.io/EncodeForge/assets/og-image.png">
   <meta property="og:site_name" content="EncodeForge">
   <meta name="twitter:card" content="summary_large_image">
@@ -41,43 +41,18 @@
   <div class="doc-standalone">
     <section class="download-section">
       <h1 class="doc-page-title">Download EncodeForge</h1>
-      <p class="doc-page-lead">
-        <strong>v0.5.0-alpha-2</strong> — direct links to GitHub release assets. FFmpeg is not bundled; the app walks you through setup on first launch.
-      </p>
-      <div class="download-grid">
-        <div class="download-column">
-          <h2 class="download-os">macOS</h2>
-          <ul class="download-list">
-            <li>
-              <a class="dl-btn dl-btn-primary" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/encodeforge-macos-arm.zip">Apple Silicon (.zip)</a>
-            </li>
-            <li>
-              <span class="dl-btn dl-btn-soon">Intel 64-bit (.zip) — coming soon</span>
-            </li>
-          </ul>
-        </div>
-        <div class="download-column">
-          <h2 class="download-os">Windows</h2>
-          <ul class="download-list">
-            <li>
-              <a class="dl-btn dl-btn-primary" href="https://github.com/SirStig/EncodeForge/releases/download/v0.5.0-alpha-2/EncodeForge.exe">Executable (.exe)</a>
-            </li>
-          </ul>
-        </div>
-        <div class="download-column">
-          <h2 class="download-os">Linux</h2>
-          <ul class="download-list">
-            <li><span class="dl-btn dl-btn-soon">.deb (Debian / Ubuntu) — coming soon</span></li>
-            <li><span class="dl-btn dl-btn-soon">.rpm (Fedora / RHEL) — coming soon</span></li>
-            <li><span class="dl-btn dl-btn-soon">AppImage — coming soon</span></li>
-          </ul>
-        </div>
+      <div class="download-version-row">
+        <label class="download-version-label" for="versionSelect">Version</label>
+        <select class="download-version-select" id="versionSelect" aria-label="EncodeForge release version"></select>
       </div>
+      <p class="doc-page-lead" id="downloadVersionLead">Loading release…</p>
+      <p class="download-fetch-status" id="downloadFetchStatus" role="status"></p>
+      <div class="download-grid" id="downloadGrid"></div>
       <p class="download-foot">
-        <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2">All assets on GitHub</a>
-        · <a href="https://github.com/SirStig/EncodeForge/releases/tag/v0.4.1">Legacy v0.4.1 (JavaFX)</a>
+        <a href="https://github.com/SirStig/EncodeForge/releases" target="_blank" rel="noopener">All releases on GitHub</a>
         · <a href="https://github.com/SirStig/EncodeForge/blob/HEAD/README.md#installation">Build from source</a>
       </p>
+      <p class="download-foot download-foot-note">FFmpeg is not bundled; the app walks you through setup on first launch.</p>
     </section>
 
     <footer class="doc-footer" style="margin-top:2.5rem">
@@ -88,6 +63,8 @@
     </footer>
   </div>
 
+  <script src="assets/release-config.js"></script>
   <script src="assets/site.js"></script>
+  <script src="assets/downloads-page.js"></script>
 </body>
 </html>

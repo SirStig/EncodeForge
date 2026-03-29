@@ -472,6 +472,56 @@ pre code { background: none; border: none; padding: 0; font-size: inherit; }
   line-height: 1.6;
 }
 
+.download-version-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin: 0 0 0.85rem;
+}
+
+.download-version-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.download-version-select {
+  min-width: min(100%, 22rem);
+  max-width: 100%;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px solid var(--border-md);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.download-version-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.download-fetch-status {
+  font-size: 0.8rem;
+  color: var(--faint);
+  margin: -0.5rem 0 1rem;
+  max-width: 720px;
+  line-height: 1.5;
+}
+
+.download-fetch-status a { font-weight: 500; }
+
+.download-foot-note {
+  margin-top: 0.35rem;
+  opacity: 0.92;
+}
+
 .download-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -775,6 +825,7 @@ a.dl-btn:hover { text-decoration: none; }
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
   color: var(--text);
+  scroll-margin-top: calc(var(--header-h) + 12px);
 }
 #changelog-body h3 {
   font-size: 0.85rem;

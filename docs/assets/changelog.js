@@ -42,6 +42,27 @@
       } else {
         throw new Error("marked not loaded");
       }
+      var h2s = body.querySelectorAll("h2");
+      h2s.forEach(function (h) {
+        var m = /\[([^\]]+)\]/.exec(h.textContent || "");
+        if (!m) return;
+        var slug = "release-" + m[1].replace(/\./g, "-").toLowerCase();
+        h.id = slug;
+      });
+      function scrollToHash() {
+        var raw = location.hash.replace(/^#/, "");
+        if (!raw) return;
+        var id = decodeURIComponent(raw);
+        var el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+      window.addEventListener("hashchange", scrollToHash);
+      requestAnimationFrame(function () {
+        scrollToHash();
+        setTimeout(scrollToHash, 80);
+      });
       status.textContent =
         pack.source === "deploy"
           ? "Source: changelog.md (shipped with this site)."
