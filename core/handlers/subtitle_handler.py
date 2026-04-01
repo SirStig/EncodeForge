@@ -398,9 +398,9 @@ class SubtitleHandler:
                     "subtitles_downloaded": []
                 }
             
-            # Try to download the best subtitle for each language
             downloaded = []
-            for subtitle in search_results["subtitles"]:
+            max_attempts = 5
+            for subtitle in search_results["subtitles"][:max_attempts]:
                 result = self.download_subtitle(
                     subtitle["file_id"],
                     subtitle["provider"],
@@ -408,10 +408,10 @@ class SubtitleHandler:
                     subtitle["language"],
                     subtitle.get("download_url", "")
                 )
-                
+
                 if result["status"] == "success":
                     downloaded.append(result)
-                    break  # Successfully downloaded, stop
+                    break
             
             if downloaded:
                 return {

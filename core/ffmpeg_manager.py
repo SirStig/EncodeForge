@@ -141,8 +141,8 @@ class FFmpegManager:
                     cand = ffmpeg_path.parent / ffprobe_exe
                     self.ffprobe_path = str(cand) if cand.exists() else ""
                 
-                # Get version info and encoders
-                success, version_info = self._get_version_info(self.ffmpeg_path)
+                version_info = self._get_version_info()
+                success = bool(version_info.get("version"))
                 if success:
                     self.version_info = version_info
                     

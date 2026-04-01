@@ -5,6 +5,7 @@ OpenSubtitles Manager - Handles subtitle download from OpenSubtitles.com API
 
 import json
 import logging
+import shutil
 import struct
 import urllib.error
 import urllib.parse
@@ -459,10 +460,16 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
             if not download_url:
                 return False, "No download link received"
             
-            # Download the file
             logger.info(f"Downloading from: {download_url}")
-            urllib.request.urlretrieve(download_url, output_path)
-            
+            dl_req = urllib.request.Request(
+                download_url,
+                headers={"User-Agent": self.USER_AGENT},
+            )
+            with urllib.request.urlopen(dl_req, timeout=90) as dl_resp, open(
+                output_path, "wb"
+            ) as out_f:
+                shutil.copyfileobj(dl_resp, out_f)
+
             logger.info(f"✅ Downloaded subtitle to {output_path}")
             return True, output_path
         
