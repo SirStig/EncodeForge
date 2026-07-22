@@ -165,7 +165,18 @@ class RenamingHandler:
                 show_name = embedded_info.get('embedded_show') or embedded_info.get('embedded_title')
             if not episode_title:
                 episode_title = embedded_info.get('embedded_episode_name')
-            
+
+            # Last resort: identify by OSDB file hash — filename-independent,
+            # for scene/hash releases the parsers above have nothing to read
+            # from at all (garbage or numeric-only names).
+            if not show_name:
+                hash_info = self._identify_by_hash(file_path)
+                if hash_info:
+                    show_name = hash_info.get('title')
+                    season = hash_info.get('season') or season
+                    episode = hash_info.get('episode') or episode
+                    episode_title = hash_info.get('episode_title') or episode_title
+
             # Return whatever we found
             if show_name or season or episode or episode_title:
                 result = {
@@ -298,7 +309,23 @@ class RenamingHandler:
         except Exception as e:
             logger.error(f"Error inferring from folder context: {e}")
             return None
-    
+
+    def _identify_by_hash(self, file_path: str) -> Optional[Dict]:
+        """
+        Last-resort media identification via the OpenSubtitles OSDB file
+        hash, for filenames the parsers above can't read anything from at
+        all. Best-effort and silent on failure — this must never turn a
+        "couldn't identify" case into a crash, and never touches the
+        download quota (it's a search-only lookup).
+        """
+        try:
+            from core.providers.subtitle.opensubtitles_manager import OpenSubtitlesManager
+            mgr = OpenSubtitlesManager()
+            return mgr.identify_by_hash(file_path)
+        except Exception as e:
+            logger.debug(f"Hash-based identification unavailable: {e}")
+            return None
+
     def _prefer_english_title(self, results_list: List[Dict]) -> Optional[Dict]:
         """
         Given multiple provider results, prefer English titles over Japanese/Romaji

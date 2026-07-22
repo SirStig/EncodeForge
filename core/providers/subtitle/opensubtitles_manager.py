@@ -181,11 +181,82 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
                     hash_value &= 0xFFFFFFFFFFFFFFFF
             
             return "%016x" % hash_value
-        
+
         except Exception as e:
             logger.error(f"Error calculating hash: {e}")
             return None
-    
+
+    def identify_by_hash(self, file_path: str) -> Optional[Dict]:
+        """
+        Best-effort media identification via the OSDB file hash — a last
+        resort for the renamer when a filename gives the S##E##/year
+        parsers nothing to work with at all (garbage scene names, hash-only
+        release naming). Unlike search_subtitles(), this is identification
+        only: it reads the matched entry's feature_details and returns a
+        dict shaped like the renamer's metadata dicts, or None if the hash
+        doesn't match anything.
+
+        The consumer API key is required (same as any OpenSubtitles search);
+        this is a read-only search call, not a download, so it doesn't
+        touch the daily download quota.
+        """
+        if not self.consumer_api_key:
+            return None
+
+        file_hash = self.calculate_file_hash(file_path)
+        if not file_hash:
+            return None
+
+        try:
+            params = {"languages": "en", "moviehash": file_hash}
+            url = f"{self.API_URL}/subtitles?{urllib.parse.urlencode(params)}"
+            headers = {
+                "User-Agent": self.USER_AGENT,
+                "Accept": "application/json",
+                "Api-Key": self.consumer_api_key,
+            }
+            request = urllib.request.Request(url, headers=headers, method='GET')
+            with urllib.request.urlopen(request, timeout=15) as response:
+                data = json.loads(response.read().decode())
+        except Exception as e:
+            logger.debug(f"Hash identification request failed for {file_path}: {e}")
+            return None
+
+        for item in data.get("data", []):
+            feature = (item.get("attributes", {}) or {}).get("feature_details", {}) or {}
+            if not feature:
+                continue
+
+            is_episode = str(feature.get("feature_type", "")).lower() == "episode"
+            result = {"source": "opensubtitles_hash"}
+
+            if is_episode:
+                show_title = feature.get("parent_title")
+                if not show_title:
+                    continue
+                result["show_title"] = show_title
+                result["title"] = show_title
+                if feature.get("title"):
+                    result["episode_title"] = feature["title"]
+                if feature.get("season_number") is not None:
+                    result["season"] = feature["season_number"]
+                if feature.get("episode_number") is not None:
+                    result["episode"] = feature["episode_number"]
+            else:
+                title = feature.get("title")
+                if not title:
+                    continue
+                result["title"] = title
+                result["show_title"] = title
+
+            if feature.get("year") is not None:
+                result["year"] = str(feature["year"])
+
+            logger.info(f"Identified {Path(file_path).name} via OSDB hash: {result.get('show_title')}")
+            return result
+
+        return None
+
     def search_subtitles(
         self,
         file_path: str,
