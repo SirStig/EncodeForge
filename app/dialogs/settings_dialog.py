@@ -589,8 +589,54 @@ class SettingsPanel(QWidget):
         renamer_layout.addRow("", self.preserve_extension_check)
 
         layout.addWidget(renamer_group)
+
+        library_group = QGroupBox("Library Layout")
+        library_layout = _settings_form(library_group)
+
+        self.destination_root_edit = QLineEdit()
+        self.destination_root_edit.setPlaceholderText("(leave blank to rename in place, same folder)")
+        self.destination_root_edit.setToolTip(
+            "Root folder to move/copy renamed files into. When set, a pattern's '/'\n"
+            "describes subfolders under this root — e.g.\n"
+            "{title}/Season {season:02d}/{title} - S{season:02d}E{episode:02d}\n\n"
+            "Left blank, files are renamed in their current folder as before."
+        )
+        dest_row = QHBoxLayout()
+        dest_row.addWidget(self.destination_root_edit, 1)
+        dest_browse_btn = QPushButton("Browse…")
+        dest_browse_btn.clicked.connect(self._browse_destination_root)
+        dest_row.addWidget(dest_browse_btn)
+        library_layout.addRow("Destination Folder:", dest_row)
+
+        self.rename_action_combo = QComboBox()
+        self.rename_action_combo.addItem("Rename in place / move", "rename")
+        self.rename_action_combo.addItem("Copy (keep the original)", "copy")
+        self.rename_action_combo.addItem("Hardlink (same filesystem only)", "hardlink")
+        self.rename_action_combo.addItem("Symlink", "symlink")
+        self.rename_action_combo.setToolTip(
+            "What to do with each file once its new name/location is known.\n\n"
+            "Rename/move — the default; moves across filesystems if a destination\n"
+            "  folder on a different drive is set.\n"
+            "Copy — leaves the original file untouched.\n"
+            "Hardlink/Symlink — link the target to the original instead of duplicating it."
+        )
+        library_layout.addRow("Action:", self.rename_action_combo)
+
+        self.include_sidecars_check = QCheckBox("Carry along matching .srt/.ass/.nfo files")
+        self.include_sidecars_check.setToolTip(
+            "When a video is renamed, sibling subtitle/companion files that share its\n"
+            "exact filename (before the extension) are renamed/moved alongside it."
+        )
+        library_layout.addRow("", self.include_sidecars_check)
+
+        layout.addWidget(library_group)
         layout.addStretch()
         return widget
+
+    def _browse_destination_root(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "Select Destination Folder", self.destination_root_edit.text())
+        if folder:
+            self.destination_root_edit.setText(folder)
 
     def _make_api_key_row(self, key_edit: QLineEdit, provider: str, url: str = ""):
         """Return a widget containing [key_field | Test btn | status label] + optional link."""
@@ -1106,6 +1152,10 @@ class SettingsPanel(QWidget):
         self.lowercase_check.setChecked(self.settings.renamer.lowercase)
         self.remove_special_check.setChecked(self.settings.renamer.remove_special)
         self.preserve_extension_check.setChecked(self.settings.renamer.preserve_extension)
+        self.destination_root_edit.setText(self.settings.renamer.destination_root)
+        _action_idx = self.rename_action_combo.findData(self.settings.renamer.action)
+        self.rename_action_combo.setCurrentIndex(max(0, _action_idx))
+        self.include_sidecars_check.setChecked(self.settings.renamer.include_sidecars)
 
         # Paths
         self.ffmpeg_path_edit.setText(self.settings.application.ffmpeg_path)
@@ -1178,6 +1228,9 @@ class SettingsPanel(QWidget):
         self.settings.renamer.lowercase = self.lowercase_check.isChecked()
         self.settings.renamer.remove_special = self.remove_special_check.isChecked()
         self.settings.renamer.preserve_extension = self.preserve_extension_check.isChecked()
+        self.settings.renamer.destination_root = self.destination_root_edit.text().strip()
+        self.settings.renamer.action = self.rename_action_combo.currentData() or "rename"
+        self.settings.renamer.include_sidecars = self.include_sidecars_check.isChecked()
 
         # Paths
         self.settings.application.ffmpeg_path = self.ffmpeg_path_edit.text()
