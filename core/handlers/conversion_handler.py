@@ -1017,18 +1017,38 @@ class ConversionHandler:
                                         speed_str = progress_buffer.get('speed', '0x').replace('x', '').strip()
                                         encoding_speed = float(speed_str) if speed_str and speed_str != 'N/A' else 0.0
                                         
+                                        # Elapsed media position, reported by FFmpeg in microseconds.
+                                        out_time_str = progress_buffer.get('out_time_us', '0')
+                                        try:
+                                            out_time_seconds = (
+                                                int(out_time_str) / 1_000_000
+                                                if out_time_str and out_time_str != 'N/A'
+                                                else 0.0
+                                            )
+                                        except ValueError:
+                                            out_time_seconds = 0.0
+
                                         # Calculate progress percentage from frames (most reliable)
                                         # This works even when other metrics are N/A
                                         if current_frame > 0 and video_info["total_frames"] > 0:
                                             progress_pct = (current_frame / video_info["total_frames"]) * 100
+                                        elif out_time_seconds > 0 and video_info.get("duration", 0) > 0:
+                                            # Fall back to elapsed time / duration. Sources such as .ts
+                                            # captures report neither nb_frames nor a usable r_frame_rate,
+                                            # so a frames-only calculation left the bar at 0% for the
+                                            # entire encode and fired no progress callbacks at all.
+                                            progress_pct = (out_time_seconds / video_info["duration"]) * 100
                                         else:
                                             progress_pct = 0
-                                        
+
                                         progress_pct = min(99.9, progress_pct)  # Cap at 99.9% until complete
-                                        
+
                                         # Calculate current time from frames and source fps
                                         # This gives us accurate time even when out_time_us freezes
-                                        current_time_seconds = current_frame / video_info["fps"] if video_info["fps"] > 0 else 0
+                                        if video_info["fps"] > 0 and current_frame > 0:
+                                            current_time_seconds = current_frame / video_info["fps"]
+                                        else:
+                                            current_time_seconds = out_time_seconds
                                         
                                         # Calculate ETA from frames and encoding fps
                                         if encoding_fps > 0 and video_info["total_frames"] > 0 and current_frame > 0:

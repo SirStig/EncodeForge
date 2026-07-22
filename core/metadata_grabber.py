@@ -178,13 +178,25 @@ class MetadataGrabber:
                         _ex.submit(prov.search_tv, title, season, episode): name
                         for name, prov in ordered if prov is not None
                     }
-                    for fut in _as_completed(future_map, timeout=20):
-                        try:
-                            res = fut.result()
-                            if res:
-                                results.append(res)
-                        except Exception:
-                            pass
+                    # as_completed() raises TimeoutError from the *iterator*, so
+                    # a per-future try/except cannot catch it — the exception
+                    # escaped to the caller and discarded the results the other
+                    # providers had already returned.
+                    try:
+                        for fut in _as_completed(future_map, timeout=20):
+                            try:
+                                res = fut.result()
+                                if res:
+                                    results.append(res)
+                            except Exception as e:
+                                logger.debug(
+                                    f"Provider {future_map.get(fut, '?')} failed: {e}"
+                                )
+                    except TimeoutError:
+                        logger.warning(
+                            f"Metadata lookup timed out after 20s; "
+                            f"using {len(results)} result(s) that did arrive"
+                        )
                 return max(results, key=self._score_result) if results else None
             return None
 
@@ -245,13 +257,25 @@ class MetadataGrabber:
                         _ex.submit(prov.search_movie, title, year): name
                         for name, prov in ordered if prov is not None
                     }
-                    for fut in _as_completed(future_map, timeout=20):
-                        try:
-                            res = fut.result()
-                            if res:
-                                results.append(res)
-                        except Exception:
-                            pass
+                    # as_completed() raises TimeoutError from the *iterator*, so
+                    # a per-future try/except cannot catch it — the exception
+                    # escaped to the caller and discarded the results the other
+                    # providers had already returned.
+                    try:
+                        for fut in _as_completed(future_map, timeout=20):
+                            try:
+                                res = fut.result()
+                                if res:
+                                    results.append(res)
+                            except Exception as e:
+                                logger.debug(
+                                    f"Provider {future_map.get(fut, '?')} failed: {e}"
+                                )
+                    except TimeoutError:
+                        logger.warning(
+                            f"Metadata lookup timed out after 20s; "
+                            f"using {len(results)} result(s) that did arrive"
+                        )
                 return max(results, key=self._score_result) if results else None
             return None
 

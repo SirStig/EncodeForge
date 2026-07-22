@@ -122,9 +122,28 @@ class WhisperManager:
         for model_name in self.MODELS:
             folder_name = f"models--Systran--faster-whisper-{model_name}"
             model_dir = cache_dir / folder_name
-            # Check for snapshots subdirectory (HuggingFace hub format)
-            if model_dir.exists() and any(model_dir.iterdir()):
+            # A HuggingFace cache directory gains blobs/refs/snapshots as soon
+            # as a download *starts*, so "directory is non-empty" reported a
+            # cancelled 15%-complete download as installed — the Download button
+            # disappeared and loading later failed with an opaque cache error.
+            # Require the actual weights to be present.
+            if not model_dir.is_dir():
+                continue
+
+            snapshots = model_dir / "snapshots"
+            has_weights = any(
+                snapshots.glob("*/model.bin")
+            ) or any(
+                snapshots.glob("*/model.safetensors")
+            ) if snapshots.is_dir() else False
+
+            if has_weights:
                 installed.append(model_name)
+            elif any(model_dir.iterdir()):
+                logger.debug(
+                    "Ignoring incomplete Whisper model cache for '%s' (no weights present)",
+                    model_name,
+                )
 
         return installed
 
@@ -172,10 +191,23 @@ class WhisperManager:
             _cb(10, "Installing faster-whisper…")
             logger.info("Running: pip install faster-whisper")
 
+            # A frozen (Nuitka one-file) build has no importable pip and
+            # sys.executable is the app itself, so "-m pip" would just relaunch
+            # the GUI. Detect that and tell the user what to do instead.
+            if getattr(sys, "frozen", False) or "__compiled__" in globals():
+                return False, (
+                    "Automatic installation is not available in the packaged build. "
+                    "Install faster-whisper into a Python environment and launch "
+                    "EncodeForge from source, or use a pre-built model bundle."
+                )
+
             result = subprocess.run(
                 [sys.executable, "-m", "pip", "install", "-U", "faster-whisper"],
                 capture_output=True,
                 text=True,
+                # Without a timeout a stalled package index blocks the worker
+                # thread forever with the UI stuck at "Installing… 10%".
+                timeout=900,
             )
 
             if result.returncode != 0:
@@ -200,6 +232,12 @@ class WhisperManager:
             logger.info("faster-whisper installed successfully, device=%s", self.device)
             return True, f"faster-whisper installed successfully!\nCompute device: {device_hint}"
 
+        except subprocess.TimeoutExpired:
+            logger.error("faster-whisper install timed out after 15 minutes")
+            return False, (
+                "Installation timed out after 15 minutes. Check your network "
+                "connection and try again."
+            )
         except Exception as exc:
             logger.exception("Error installing faster-whisper")
             return False, f"Installation error: {exc}"
@@ -298,14 +336,40 @@ class WhisperManager:
             logger.info("Loading faster-whisper model: %s on %s", model_name, self.device)
 
             cache_dir = self._get_model_cache_dir()
-            compute_type = "float16" if self.device == "cuda" else "int8"
 
-            model = WhisperModel(
-                model_name,
-                device=self.device,
-                compute_type=compute_type,
-                download_root=str(cache_dir),
-            )
+            # _detect_device() reports what the CTranslate2 *wheel* was built
+            # with, not whether a usable GPU and runtime are actually present.
+            # A CUDA-enabled wheel on a machine with no driver (or a missing
+            # cuDNN) throws here, so fall back to CPU rather than making the
+            # whole feature unusable.
+            attempts = [(self.device, "float16" if self.device == "cuda" else "int8")]
+            if self.device != "cpu":
+                attempts.append(("cpu", "int8"))
+
+            model = None
+            last_error = None
+            for device, compute_type in attempts:
+                try:
+                    model = WhisperModel(
+                        model_name,
+                        device=device,
+                        compute_type=compute_type,
+                        download_root=str(cache_dir),
+                    )
+                    if device != self.device:
+                        logger.warning(
+                            "Could not initialise Whisper on '%s' (%s); using CPU instead",
+                            self.device, last_error,
+                        )
+                        _cb(2, "GPU unavailable — falling back to CPU (slower)…")
+                        self.device = device
+                    break
+                except Exception as e:
+                    last_error = e
+                    logger.warning("Whisper model load failed on '%s': %s", device, e)
+
+            if model is None:
+                return False, f"Could not load Whisper model '{model_name}': {last_error}"
 
             lang_arg = self._convert_language_code(language) if language else None
             _cb(5, f"Transcribing with {model_name}…")
@@ -318,9 +382,26 @@ class WhisperManager:
                 vad_filter=True,          # skip silent sections — faster
             )
 
-            # Materialise the generator and write SRT
-            _cb(10, "Writing subtitles…")
-            segments = list(segments_gen)
+            # Consume the generator segment by segment so progress reflects real
+            # position in the media. Materialising it with list() did all the
+            # work inside one call, leaving the bar frozen at 10% for what can
+            # be hours on CPU.
+            total_duration = getattr(info, "duration", 0) or 0
+            segments = []
+            last_reported = 10
+
+            for segment in segments_gen:
+                segments.append(segment)
+                if total_duration > 0:
+                    # Map media position onto the 10–95% band; the remaining 5%
+                    # covers writing the file out.
+                    pct = 10 + int((getattr(segment, "end", 0) / total_duration) * 85)
+                    pct = max(10, min(95, pct))
+                    if pct > last_reported:
+                        last_reported = pct
+                        _cb(pct, f"Transcribing… {pct}%")
+
+            _cb(96, "Writing subtitles…")
             srt_content = self._segments_to_srt(segments)
 
             with open(output_path, "w", encoding="utf-8") as f:

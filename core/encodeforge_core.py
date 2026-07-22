@@ -22,10 +22,14 @@ from core.metadata_grabber import MetadataGrabber
 from core.profile_manager import ProfileManager
 from core.subtitle_manager import SubtitleProviders
 
-# Setup logging
+# Logging is configured by the entry point (main.py / cli.py), not here.
+# Reconfiguring it from a library module tore down and re-created the root
+# handlers on import, leaking file descriptors and duplicating output. A
+# minimal fallback is kept for anyone importing this module standalone.
 try:
-    from utils.logging_config import setup_logging
-    setup_logging()
+    from utils.logging_config import setup_logging  # noqa: F401 (public re-export)
+    if not logging.getLogger().handlers:
+        setup_logging()
 except ImportError:
     logging.basicConfig(
         level=logging.INFO,
@@ -383,19 +387,19 @@ class EncodeForgeCore:
                 "message": f"Profile '{name}' not found"
             }
 
-        if isinstance(profile, dict):
-            applied = profile
-        else:
-            applied = asdict(profile)
+        applied = profile if isinstance(profile, dict) else asdict(profile)
 
         for key, value in applied.items():
             if hasattr(self.settings, key):
                 setattr(self.settings, key, value)
 
-        # Return a JSON-serialisable view rather than the dataclass itself.
+        # `profile` stays the ConversionSettings instance callers already expect;
+        # `profile_dict` is the JSON-serialisable view for the CLI and any
+        # future API surface.
         return {
             "status": "success",
-            "profile": applied,
+            "profile": profile,
+            "profile_dict": applied,
         }
     
     def list_profiles(self) -> Dict:

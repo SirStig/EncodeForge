@@ -122,10 +122,18 @@ def setup_logging(
     """
     # Get root logger
     root_logger = logging.getLogger()
-    
-    # Clear any existing handlers
-    root_logger.handlers.clear()
-    
+
+    # Close existing handlers before discarding them. handlers.clear() alone
+    # orphaned the open file objects, leaking descriptors on every call — and on
+    # Windows the retained locks made the next doRollover() raise PermissionError
+    # when it tried to rename a file that was still held open.
+    for handler in list(root_logger.handlers):
+        try:
+            handler.close()
+        except Exception:
+            pass
+        root_logger.removeHandler(handler)
+
     # Set log level
     level = getattr(logging, log_level.upper(), logging.INFO)
     root_logger.setLevel(level)

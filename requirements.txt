@@ -1,19 +1,15 @@
-# EncodeForge Requirements
+# EncodeForge Runtime Requirements
 # Python 3.10+ required
+#
+# Only packages actually imported by the application belong here. Build and
+# development tooling lives in requirements-dev.txt, so `pip install .` does not
+# drag a compiler toolchain onto end-user machines.
 
 # ==================== UI Framework ====================
 PySide6>=6.6.0
 PySide6-Addons>=6.6.0
 PySide6-Essentials>=6.6.0
-
-# Modern Qt Widgets (Free version only)
-PyQt-Fluent-Widgets>=1.5.0
 qtawesome>=1.3.0
-
-# ==================== Build & Compilation ====================
-Nuitka>=2.4.9
-ordered-set>=4.1.0
-zstandard>=0.22.0
 
 # ==================== Notifications ====================
 desktop-notifier>=3.5.0
@@ -21,51 +17,32 @@ desktop-notifier>=3.5.0
 # ==================== HTTP & Web Scraping ====================
 requests>=2.31.0
 beautifulsoup4>=4.12.0
-lxml>=4.9.0
-curl-cffi>=0.6.0
-httpx>=0.25.0
-
-# ==================== Video/Audio Processing ====================
-ffmpeg-python>=0.2.0
-mutagen>=1.47.0
 
 # ==================== AI/ML - Subtitle Generation ====================
 # faster-whisper: CTranslate2 backend — much faster than openai-whisper,
 # no manual PyTorch/CUDA wheel selection required.
+# The app can also install this on demand via Tools > Setup AI Subtitles.
 faster-whisper>=1.2.1
 
-# ==================== Data Processing ====================
-pandas>=2.0.0
-numpy>=1.24.0
-
-# ==================== File Operations ====================
-pathlib>=1.0.1
-chardet>=5.2.0
-python-magic-bin>=0.4.14; platform_system=="Windows"
-
-# ==================== Concurrency ====================
-concurrent-log-handler>=0.9.24
-
-# ==================== Configuration ====================
-python-dotenv>=1.0.0
-pyyaml>=6.0
-
-# ==================== Logging ====================
-colorlog>=6.8.0
-
-# ==================== API Clients ====================
-tmdbv3api>=1.9.0
-# Note: TVDB, OpenSubtitles, etc. use requests directly
+# ==================== CLI ====================
+click>=8.1.7
 
 # ==================== Utilities ====================
-tqdm>=4.66.0
-click>=8.1.7
 packaging>=23.0
 
-# ==================== Development (Optional) ====================
-# black>=23.0.0
-# flake8>=6.0.0
-# mypy>=1.0.0
-# pytest>=7.0.0
-# pytest-qt>=4.2.0
-
+# ==================== Deliberately removed ====================
+# The packages below were declared here but are not imported anywhere in
+# app/, core/, utils/, main.py or cli.py. Two were actively harmful:
+#
+#   pathlib             - abandoned Python 2 backport that SHADOWS the stdlib
+#                         module on Python 3 and is a known Nuitka breaker
+#   PyQt-Fluent-Widgets - unused, and pulls PyQt5 into a PySide6 application,
+#                         putting two Qt bindings in one process
+#
+# Merely unused: pandas, numpy (~100 MB), lxml (every BeautifulSoup call uses
+# 'html.parser'), chardet, python-magic-bin, python-dotenv, pyyaml, colorlog,
+# tqdm, tmdbv3api, curl-cffi, httpx, ffmpeg-python, mutagen,
+# concurrent-log-handler.
+#
+# Build tooling (Nuitka, ordered-set, zstandard) moved to requirements-dev.txt.
+# Re-add any of these in the same commit as the code that imports them.

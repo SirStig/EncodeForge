@@ -6,6 +6,7 @@ Cross-platform GPU detection for selecting appropriate PyTorch builds
 import logging
 import platform
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
@@ -23,57 +24,74 @@ class GPUInfo:
     vram_mb: Optional[int] = None
 
 
-def get_gpu_info() -> List[GPUInfo]:
+# Detection spawns several subprocesses, each with a 5 s timeout — and on a
+# machine with a wedged NVIDIA driver nvidia-smi hangs rather than failing, so
+# an uncached call can block for 10 s. Results are stable for the life of the
+# process, so they are computed once behind a lock.
+_gpu_cache: Optional[List[GPUInfo]] = None
+_gpu_cache_lock = threading.Lock()
+
+
+def get_gpu_info(force_refresh: bool = False) -> List[GPUInfo]:
     """
     Detect all GPUs in the system.
-    
+
+    Results are cached for the process lifetime; pass force_refresh=True after
+    a driver change.
+
     Returns:
         List of GPUInfo objects for each detected GPU
     """
-    gpus = []
-    
-    # Try NVIDIA detection
-    nvidia_gpus = _detect_nvidia()
-    gpus.extend(nvidia_gpus)
-    
-    # Try AMD detection
-    amd_gpus = _detect_amd()
-    gpus.extend(amd_gpus)
-    
-    # Try Apple Silicon detection
-    apple_gpu = _detect_apple_silicon()
-    if apple_gpu:
-        gpus.append(apple_gpu)
-    
-    # Try Intel detection (optional)
-    intel_gpus = _detect_intel()
-    gpus.extend(intel_gpus)
-    
-    if not gpus:
-        logger.info("No discrete GPUs detected, will use CPU")
-    else:
-        logger.info(f"Detected {len(gpus)} GPU(s): {[gpu.model for gpu in gpus]}")
-    
-    return gpus
+    global _gpu_cache
+
+    if _gpu_cache is not None and not force_refresh:
+        return list(_gpu_cache)
+
+    with _gpu_cache_lock:
+        # Another thread may have populated the cache while we waited.
+        if _gpu_cache is not None and not force_refresh:
+            return list(_gpu_cache)
+
+        gpus = []
+
+        # Try NVIDIA detection
+        gpus.extend(_detect_nvidia())
+
+        # Try AMD detection
+        gpus.extend(_detect_amd())
+
+        # Try Apple Silicon detection
+        apple_gpu = _detect_apple_silicon()
+        if apple_gpu:
+            gpus.append(apple_gpu)
+
+        # Try Intel detection (optional)
+        gpus.extend(_detect_intel())
+
+        if not gpus:
+            logger.info("No discrete GPUs detected, will use CPU")
+        else:
+            logger.info(f"Detected {len(gpus)} GPU(s): {[gpu.model for gpu in gpus]}")
+
+        _gpu_cache = gpus
+        return list(_gpu_cache)
 
 
 def has_cuda() -> bool:
     """Check if NVIDIA CUDA is available"""
-    nvidia_gpus = _detect_nvidia()
-    return len(nvidia_gpus) > 0
+    return any(g.vendor.lower() == "nvidia" for g in get_gpu_info())
 
 
 def has_rocm() -> bool:
     """Check if AMD ROCm is available (Linux only)"""
     if platform.system().lower() != "linux":
         return False
-    amd_gpus = _detect_amd()
-    return len(amd_gpus) > 0
+    return any(g.vendor.lower() == "amd" for g in get_gpu_info())
 
 
 def has_mps() -> bool:
     """Check if Apple Metal Performance Shaders is available"""
-    return _detect_apple_silicon() is not None
+    return any(g.vendor.lower() == "apple" for g in get_gpu_info())
 
 
 def recommend_torch_variant() -> str:

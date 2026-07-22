@@ -124,6 +124,15 @@ output/
 processed/
 temp_media/
 
+# Test fixtures must survive the media patterns above, otherwise subtitle
+# parsing tests pass locally and fail in CI with a missing-file error.
+!tests/**/*.srt
+!tests/**/*.ass
+!tests/**/*.ssa
+!tests/**/*.vtt
+!tests/**/*.sub
+!tests/**/*.idx
+
 # Application logs
 *.log
 logs/

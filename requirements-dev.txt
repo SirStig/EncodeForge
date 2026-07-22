@@ -24,3 +24,11 @@ sphinx-rtd-theme>=1.3.0
 build>=1.0.0
 wheel>=0.41.0
 setuptools>=68.0.0
+
+# ==================== Standalone Executable (Nuitka) ====================
+# Moved here from requirements.txt: end users installing the application do not
+# need a compiler toolchain. Upper-bounded because build_nuitka.py passes
+# --show-progress, which 2.x deprecates and a future 3.x may remove.
+Nuitka>=2.4.9,<3
+ordered-set>=4.1.0
+zstandard>=0.22.0

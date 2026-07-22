@@ -34,6 +34,10 @@ setup(
         "Documentation": "https://github.com/SirStig/EncodeForge/wiki",
     },
     packages=find_packages(exclude=["tests*", "docs*", "EncodeForge*"]),
+    # main.py and cli.py are top-level modules, not packages, so find_packages()
+    # never ships them. Without this every console script installed below fails
+    # with ModuleNotFoundError on a non-source-tree install.
+    py_modules=["main", "cli"],
     python_requires=">=3.10",
     install_requires=requirements,
     entry_points={

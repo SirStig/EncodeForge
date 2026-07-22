@@ -1,339 +1,66 @@
-name: Build macOS DMG
+name: Build macOS App
+
+# Replaces a stale JavaFX/Maven workflow that referenced a pom.xml and an
+# EncodeForge/ subdirectory which no longer exist — it failed at the mvn step on
+# every run. This drives packaging/macos/build-release-macos.sh, the script that
+# actually produces the current PySide6 app bundle.
+#
+# Signing and notarisation are skipped unless the corresponding secrets are set;
+# the script already degrades gracefully when notarytool is unconfigured.
 
 on:
+  push:
+    branches: [ '**' ]
+  pull_request:
+    branches: [ '**' ]
   workflow_dispatch:
-    inputs:
-      architecture:
-        description: 'Target architecture (ARM64=Apple Silicon M1/M2/M3, x64=Intel Macs)'
-        required: true
-        default: 'both'
-        type: choice
-        options:
-          - both
-          - x64
-          - arm64
 
 jobs:
-  build-x64:
-    runs-on: macos-14
-    if: github.event.inputs.architecture == 'both' || github.event.inputs.architecture == 'x64'
-    
+  build-macos:
+    name: macOS (Nuitka .app + DMG)
+    runs-on: macos-latest
+    timeout-minutes: 120
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Display build info
-        run: |
-          echo "🚀 Building EncodeForge for macOS"
-          echo "Target Architecture: x64 (Intel Macs)"
-          echo "JavaFX Architecture: x64"
-          echo ""
-          echo "Architecture Info:"
-          echo "- x64: Intel-based Macs (all Intel Macs)"
-          echo "- ARM64: Apple Silicon Macs (M1, M2, M3, M4)"
-          echo ""
-      
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          architecture: x64
-      
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-      
-      - name: Download JavaFX SDK
-        run: |
-          echo "Downloading JavaFX SDK 17.0.17 for macOS (x64)..."
-          mkdir -p javafx-sdk
-          curl -L -o javafx-sdk.zip "https://download2.gluonhq.com/openjfx/17.0.17/openjfx-17.0.17_osx-x64_bin-sdk.zip"
-          
-          # Verify download succeeded
-          if [ ! -f javafx-sdk.zip ] || [ ! -s javafx-sdk.zip ]; then
-            echo "❌ Failed to download JavaFX SDK"
-            exit 1
-          fi
-          
-          # Check if it's a valid zip file
-          if ! unzip -t javafx-sdk.zip > /dev/null 2>&1; then
-            echo "❌ Downloaded file is not a valid zip file"
-            echo "File size: $(ls -lh javafx-sdk.zip | awk '{print $5}')"
-            head -20 javafx-sdk.zip
-            exit 1
-          fi
-          
-          echo "✓ Download successful, extracting..."
-          unzip -q javafx-sdk.zip -d javafx-sdk
-          rm javafx-sdk.zip
-          JAVAFX_HOME=$(find javafx-sdk -type d -name "javafx-sdk-*" | head -n 1)
-          echo "JAVAFX_HOME=${JAVAFX_HOME}" >> $GITHUB_ENV
-          echo "JavaFX SDK installed at: ${JAVAFX_HOME}"
-      
-      - name: Verify JavaFX installation
-        run: |
-          echo "JavaFX SDK location: $JAVAFX_HOME"
-          ls -la "$JAVAFX_HOME/lib"
-          echo "Modules available:"
-          ls "$JAVAFX_HOME/lib"/*.jar | grep -o 'javafx-[^/]*' | sort
-      
-      - name: Configure Maven JavaFX property
-        run: |
-          # Update pom.xml to use the correct JavaFX home path
-          # The pom.xml has a hardcoded Windows path, we need to override it
-          echo "Setting JavaFX home to: $JAVAFX_HOME"
-      
-      - name: Build JAR
-        working-directory: EncodeForge
-        run: |
-          echo "Building EncodeForge JAR..."
-          echo "JavaFX Home: $JAVAFX_HOME"
-          mvn clean package -DskipTests -P mac-dmg-x64 \
-            -Djavafx.home="$JAVAFX_HOME" \
-            -Dmaven.javadoc.skip=true
-      
-      - name: Verify JAR build
-        run: |
-          if [ -f "EncodeForge/target/encodeforge-0.4.0.jar" ]; then
-            echo "✓ JAR build successful"
-            ls -lh EncodeForge/target/encodeforge-0.4.0.jar
-          else
-            echo "✗ JAR build failed"
-            exit 1
-          fi
-      
-      - name: Build macOS DMG
-        working-directory: EncodeForge
-        run: |
-          echo "Building macOS DMG installer for x64..."
-          echo "JavaFX Home: $JAVAFX_HOME"
-          mvn package -P mac-dmg-x64 \
-            -Djavafx.home="$JAVAFX_HOME" \
-            -Dmaven.javadoc.skip=true
-      
-      - name: Verify DMG build
-        run: |
-          DMG_FILE=$(find EncodeForge/target/dist/mac -name "*.dmg" 2>/dev/null || true)
-          if [ -n "$DMG_FILE" ]; then
-            echo "✓ DMG build successful"
-            ls -lh "$DMG_FILE"
-            echo "DMG_FILE=$DMG_FILE" >> $GITHUB_ENV
-          else
-            echo "✗ DMG build failed"
-            ls -la EncodeForge/target/dist/mac/ || true
-            exit 1
-          fi
-      
-      - name: Get DMG info
-        run: |
-          if [ -n "$DMG_FILE" ]; then
-            echo "DMG Details:"
-            hdiutil info "$DMG_FILE" || true
-            file "$DMG_FILE"
-          fi
-      
-      - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: encodeforge-macos-x64-${{ github.run_number }}
-          path: |
-            EncodeForge/target/dist/mac/*.dmg
-            EncodeForge/target/encodeforge-0.4.1.jar
-          retention-days: 7
-      
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: encodeforge-jar-x64
-          path: EncodeForge/target/encodeforge-0.4.1.jar
-          retention-days: 30
-      
-      - name: Build summary
-        run: |
-          echo "## Build Summary - x64 (Intel Macs)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- ✓ JDK 17 installed" >> $GITHUB_STEP_SUMMARY
-          echo "- ✓ JavaFX SDK 17.0.17 installed" >> $GITHUB_STEP_SUMMARY
-          echo "- ✓ JAR built successfully" >> $GITHUB_STEP_SUMMARY
-          echo "- ✓ DMG installer created" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -n "$DMG_FILE" ]; then
-            DMG_SIZE=$(ls -lh "$DMG_FILE" | awk '{print $5}')
-            echo "**DMG Size:** $DMG_SIZE" >> $GITHUB_STEP_SUMMARY
-          fi
 
-  build-arm64:
-    runs-on: macos-14
-    if: github.event.inputs.architecture == 'both' || github.event.inputs.architecture == 'arm64'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Display build info
-        run: |
-          echo "🚀 Building EncodeForge for macOS"
-          echo "Target Architecture: ARM64 (Apple Silicon)"
-          echo "JavaFX Architecture: aarch64"
-          echo ""
-          echo "Architecture Info:"
-          echo "- x64: Intel-based Macs (all Intel Macs)"
-          echo "- ARM64: Apple Silicon Macs (M1, M2, M3, M4)"
-          echo ""
-      
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          architecture: arm64
-      
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-      
-      - name: Download JavaFX SDK
-        run: |
-          echo "Downloading JavaFX SDK 17.0.17 for macOS (aarch64)..."
-          mkdir -p javafx-sdk
-          curl -L -o javafx-sdk.zip "https://download2.gluonhq.com/openjfx/17.0.17/openjfx-17.0.17_osx-aarch64_bin-sdk.zip"
-          
-          # Verify download succeeded
-          if [ ! -f javafx-sdk.zip ] || [ ! -s javafx-sdk.zip ]; then
-            echo "❌ Failed to download JavaFX SDK"
-            exit 1
-          fi
-          
-          # Check if it's a valid zip file
-          if ! unzip -t javafx-sdk.zip > /dev/null 2>&1; then
-            echo "❌ Downloaded file is not a valid zip file"
-            echo "File size: $(ls -lh javafx-sdk.zip | awk '{print $5}')"
-            head -20 javafx-sdk.zip
-            exit 1
-          fi
-          
-          echo "✓ Download successful, extracting..."
-          unzip -q javafx-sdk.zip -d javafx-sdk
-          rm javafx-sdk.zip
-          JAVAFX_HOME=$(find javafx-sdk -type d -name "javafx-sdk-*" | head -n 1)
-          echo "JAVAFX_HOME=${JAVAFX_HOME}" >> $GITHUB_ENV
-          echo "JavaFX SDK installed at: ${JAVAFX_HOME}"
-      
-      - name: Verify JavaFX installation
-        run: |
-          echo "JavaFX SDK location: $JAVAFX_HOME"
-          ls -la "$JAVAFX_HOME/lib"
-          echo "Modules available:"
-          ls "$JAVAFX_HOME/lib"/*.jar | grep -o 'javafx-[^/]*' | sort
-      
-      - name: Configure Maven JavaFX property
-        run: |
-          # Update pom.xml to use the correct JavaFX home path
-          # The pom.xml has a hardcoded Windows path, we need to override it
-          echo "Setting JavaFX home to: $JAVAFX_HOME"
-      
-      - name: Build JAR
-        working-directory: EncodeForge
-        run: |
-          echo "Building EncodeForge JAR..."
-          echo "JavaFX Home: $JAVAFX_HOME"
-          mvn clean package -DskipTests -P mac-dmg-arm64 \
-            -Djavafx.home="$JAVAFX_HOME" \
-            -Dmaven.javadoc.skip=true
-      
-      - name: Verify JAR build
-        run: |
-          if [ -f "EncodeForge/target/encodeforge-0.4.1.jar" ]; then
-            echo "✓ JAR build successful"
-            ls -lh EncodeForge/target/encodeforge-0.4.1.jar
-          else
-            echo "✗ JAR build failed"
-            exit 1
-          fi
-      
-      - name: Build macOS DMG
-        working-directory: EncodeForge
-        run: |
-          echo "Building macOS DMG installer for ARM64..."
-          echo "JavaFX Home: $JAVAFX_HOME"
-          mvn package -P mac-dmg-arm64 \
-            -Djavafx.home="$JAVAFX_HOME" \
-            -Dmaven.javadoc.skip=true
-      
-      - name: Verify JAR build
-        run: |
-          if [ -f "EncodeForge/target/encodeforge-0.4.1.jar" ]; then
-            echo "✓ JAR build successful"
-            ls -lh EncodeForge/target/encodeforge-0.4.1.jar
-          else
-            echo "✗ JAR build failed"
-            exit 1
-          fi
-      
-      - name: Build macOS DMG
-        working-directory: EncodeForge
-        run: |
-          echo "Building macOS DMG installer for ARM64..."
-          echo "JavaFX Home: $JAVAFX_HOME"
-          mvn package -P mac-dmg-arm64 \
-            -Djavafx.home="$JAVAFX_HOME" \
-            -Dmaven.javadoc.skip=true
-      
-      - name: Verify DMG build
-        run: |
-          DMG_FILE=$(find EncodeForge/target/dist/mac -name "*.dmg" 2>/dev/null || true)
-          if [ -n "$DMG_FILE" ]; then
-            echo "✓ DMG build successful"
-            ls -lh "$DMG_FILE"
-            echo "DMG_FILE=$DMG_FILE" >> $GITHUB_ENV
-          else
-            echo "✗ DMG build failed"
-            ls -la EncodeForge/target/dist/mac/ || true
-            exit 1
-          fi
-      
-      - name: Get DMG info
-        run: |
-          if [ -n "$DMG_FILE" ]; then
-            echo "DMG Details:"
-            hdiutil info "$DMG_FILE" || true
-            file "$DMG_FILE"
-          fi
-      
-      - name: Upload DMG artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: encodeforge-macos-arm64-${{ github.run_number }}
-          path: |
-            EncodeForge/target/dist/mac/*.dmg
-            EncodeForge/target/encodeforge-0.4.1.jar
-          retention-days: 30
-      
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: encodeforge-jar-arm64
-          path: EncodeForge/target/encodeforge-0.4.1.jar
-          retention-days: 30
-      
-      - name: Build summary
-        run: |
-          echo "## Build Summary - ARM64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- ✓ JDK 17 installed" >> $GITHUB_STEP_SUMMARY
-          echo "- ✓ JavaFX SDK 17.0.17 installed" >> $GITHUB_STEP_SUMMARY
-          echo "- ✓ JAR built successfully" >> $GITHUB_STEP_SUMMARY
-          echo "- ✓ DMG installer created" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -n "$DMG_FILE" ]; then
-            DMG_SIZE=$(ls -lh "$DMG_FILE" | awk '{print $5}')
-            echo "**DMG Size:** $DMG_SIZE" >> $GITHUB_STEP_SUMMARY
-          fi
+          python-version: '3.11'
+          cache: 'pip'
 
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install nuitka ordered-set zstandard
+
+      - name: Run unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          pip install pytest pytest-mock
+          pytest -m "not integration and not requires_network and not requires_ffmpeg" -q
+
+      - name: Build app bundle and DMG
+        env:
+          # An empty identity makes sign-macos-app.sh fall back to ad-hoc
+          # signing, which is enough for CI artifacts.
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
+        run: bash packaging/macos/build-release-macos.sh
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: encodeforge-macos-${{ github.run_number }}
+          path: |
+            dist-packages/*.dmg
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          echo "### macOS build complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- DMG: artifact encodeforge-macos-${{ github.run_number }}" >> "$GITHUB_STEP_SUMMARY"
