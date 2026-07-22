@@ -8,6 +8,7 @@ Updated to use latest API structure with web scraping fallback
 import gzip
 import json
 import logging
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -23,7 +24,7 @@ except ImportError:
     BS4_AVAILABLE = False
     logging.getLogger(__name__).warning("BeautifulSoup not available for SubDL web scraping fallback")
 
-from .base_provider import BaseSubtitleProvider
+from .base_provider import BaseSubtitleProvider, looks_like_subtitle
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,23 @@ class SubDLProvider(BaseSubtitleProvider):
     def __init__(self):
         super().__init__()
         self.provider_name = "SubDL"
-        # SubDL provides free API keys without login (no rate limits on free keys)
-        # This key was obtained from their website and works without authentication
-        self.api_key = "0kzwwW12CndUyeuPru5DtdRwpIXfH9H9"
+        # SubDL provides free API keys without login (no rate limits on free keys).
+        # The bundled key is public in the repository history and shipped in every
+        # build, so ENCODEFORGE_SUBDL_KEY overrides it for anyone who wants their
+        # own quota.
+        self.api_key = (
+            os.environ.get("ENCODEFORGE_SUBDL_KEY", "").strip()
+            or "0kzwwW12CndUyeuPru5DtdRwpIXfH9H9"
+        )
+
+    def _redact(self, url: str) -> str:
+        """
+        Remove the API key from a URL before logging it.
+
+        Debug logs get attached to bug reports; the key travels in the query
+        string, so logging the raw URL published the credential.
+        """
+        return url.replace(self.api_key, "***REDACTED***") if self.api_key else url
     
     def search(self, video_path: str, languages: List[str]) -> List[Dict]:
         """Search SubDL (subdl.com) - improved API integration"""
@@ -138,7 +153,7 @@ class SubDLProvider(BaseSubtitleProvider):
             for search in searches:
                 try:
                     logger.info(f"SubDL search attempt: {search['desc']}")
-                    logger.debug(f"SubDL URL: {search['url']}")
+                    logger.debug(f"SubDL URL: {self._redact(search['url'])}")
                     
                     headers = {
                         'User-Agent': self.session_headers['User-Agent'],
@@ -391,6 +406,13 @@ class SubDLProvider(BaseSubtitleProvider):
                         # Continue with raw content
                 
                 # Write to output file
+                if not looks_like_subtitle(content):
+                    logger.error(
+                        "SubDL: downloaded data is not subtitle text "
+                        "(archive extraction failed or an error page was served)"
+                    )
+                    return False, "SubDL: Downloaded file is not a valid subtitle"
+
                 with open(output_path, 'wb') as f:
                     f.write(content)
                 

@@ -35,7 +35,31 @@ def merge_encoder_ui_into_conversion_settings(settings, encoder_settings: Dict[s
             cq_value = int(quality_str.split("CQ")[1].strip().rstrip(")"))
             settings.video_crf = cq_value
     if "hw_accel" in encoder_settings:
-        settings.use_nvenc = encoder_settings["hw_accel"]
+        enabled = bool(encoder_settings["hw_accel"])
+        backend = (encoder_settings.get("hw_accel_backend") or "Auto").strip()
+
+        # "Auto" (or an unset backend) enables every vendor and lets
+        # _select_best_encoder pick whichever one this machine reports. Naming a
+        # backend restricts it to that vendor.
+        backend_flags = {
+            "nvenc": "use_nvenc",
+            "amf": "use_amf",
+            "qsv": "use_qsv",
+            "videotoolbox": "use_videotoolbox",
+        }
+        selected = next(
+            (attr for token, attr in backend_flags.items() if token in backend.lower()),
+            None,
+        )
+
+        for attr in backend_flags.values():
+            if not enabled or backend.lower() == "none":
+                setattr(settings, attr, False)
+            elif selected is None:
+                setattr(settings, attr, True)
+            else:
+                setattr(settings, attr, attr == selected)
+
     if encoder_settings.get("hw_accel") and "codec" in encoder_settings:
         codec = encoder_settings["codec"]
         if codec == "H.265/HEVC":
@@ -89,10 +113,20 @@ def _subtitle_core_from_settings(subtitle_settings: Dict[str, Any]):
     cs = sm.get_merged_conversion_settings()
     langs = subtitle_settings.get("languages") or ["eng"]
     cs.subtitle_languages = list(langs)
+
     wm = subtitle_settings.get("whisper_model", "medium")
     if isinstance(wm, str):
         cs.whisper_model = wm.split()[0].strip().lower() if wm else "medium"
     core = EncodeForgeCore(settings=cs)
+
+    # Honour the provider selection made in the Subtitles tab. It was being
+    # built by the UI and then dropped here, so deselecting providers had no
+    # effect and every configured provider was queried regardless.
+    providers = subtitle_settings.get("providers")
+    if providers and getattr(core, "subtitle_providers", None) is not None:
+        core.subtitle_providers.enabled_providers = list(providers)
+        logger.info(f"Subtitle providers restricted to: {providers}")
+
     return core
 
 
@@ -182,8 +216,35 @@ class Worker(QRunnable):
                 # Handle old-style progress callbacks
                 self.signals.progress.emit(progress_data, 100, "")
         
-        self.kwargs['progress_callback'] = progress_callback_wrapper
-    
+        # Only inject the callback if the target actually accepts it. Adding it
+        # unconditionally makes every zero-argument callable raise TypeError —
+        # which is why the API-key "Test" buttons could only ever report failure.
+        if self._accepts_progress_callback(fn):
+            self.kwargs['progress_callback'] = progress_callback_wrapper
+
+    @staticmethod
+    def _accepts_progress_callback(fn) -> bool:
+        """
+        Report whether `fn` can be passed a `progress_callback` keyword.
+
+        True when the parameter is declared explicitly or the signature has a
+        **kwargs catch-all. Unintrospectable callables (some builtins and C
+        extensions) are treated as not accepting it, which is the safe default.
+        """
+        import inspect
+
+        try:
+            signature = inspect.signature(fn)
+        except (TypeError, ValueError):
+            return False
+
+        for param in signature.parameters.values():
+            if param.kind is inspect.Parameter.VAR_KEYWORD:
+                return True
+            if param.name == 'progress_callback':
+                return True
+        return False
+
     @Slot()
     def run(self):
         """
@@ -203,10 +264,17 @@ class Worker(QRunnable):
         result = None
         
         try:
+            # A runnable sitting in the QThreadPool queue when Stop is pressed
+            # must not start. Without this check, cancelling a 10-file batch
+            # still runs every file that had not been dequeued yet.
+            if self._should_stop:
+                logger.info(f"Worker skipped (cancelled before start): {self.fn.__name__}")
+                return
+
             self._is_running = True
             self.signals.started.emit()
             logger.info(f"Worker started: {self.fn.__name__}")
-            
+
             # Execute the function
             result = self.fn(*self.args, **self.kwargs)
             

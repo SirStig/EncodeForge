@@ -21,7 +21,7 @@ try:
 except ImportError:
     BS4_AVAILABLE = False
 
-from .base_provider import BaseSubtitleProvider
+from .base_provider import BaseSubtitleProvider, looks_like_subtitle, languages_match, to_iso639_1
 
 logger = logging.getLogger(__name__)
 
@@ -120,12 +120,15 @@ class Subf2mProvider(BaseSubtitleProvider):
                                 elif 'german' in lang_text or 'deutsch' in lang_text:
                                     found_lang = 'de'
                             
-                            # Check if this language is requested
-                            lang_requested = False
-                            for req_lang in languages:
-                                if req_lang.lower().startswith(found_lang) or found_lang.startswith(req_lang.lower()[:2]):
-                                    lang_requested = True
-                                    break
+                            # Check if this language is requested.
+                            # The previous prefix test failed for every code
+                            # whose 3-letter form is not an extension of the
+                            # 2-letter one, so 'spa' vs 'es' and 'ger' vs 'de'
+                            # silently discarded all Spanish and German results.
+                            lang_requested = any(
+                                languages_match(req_lang, found_lang)
+                                for req_lang in languages
+                            )
                             
                             if not lang_requested:
                                 continue
@@ -285,6 +288,13 @@ class Subf2mProvider(BaseSubtitleProvider):
                     except Exception as e:
                         logger.debug(f"Subf2m: Gzip decompression failed: {e}")
                 
+                if not looks_like_subtitle(content):
+                    logger.error(
+                        "Subf2m: downloaded data is not subtitle text "
+                        "(archive extraction failed or an error page was served)"
+                    )
+                    return False, "Subf2m: Downloaded file is not a valid subtitle"
+
                 with open(output_path, 'wb') as f:
                     f.write(content)
                 

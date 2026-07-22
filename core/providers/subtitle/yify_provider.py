@@ -21,7 +21,7 @@ try:
 except ImportError:
     BS4_AVAILABLE = False
 
-from .base_provider import BaseSubtitleProvider
+from .base_provider import BaseSubtitleProvider, looks_like_subtitle, languages_match, to_iso639_1
 
 logger = logging.getLogger(__name__)
 
@@ -209,8 +209,10 @@ class YifyProvider(BaseSubtitleProvider):
                     if lang_cell:
                         row_lang = lang_cell.get_text(strip=True).lower()
                         
-                        # Match language
-                        if lang_code.lower() in row_lang or row_lang[:2] == lang_code[:2]:
+                        # Match language. A substring test made 'en' match
+                        # 'slovenian' and 'french', so the wrong subtitle was
+                        # downloaded and saved under the requested language.
+                        if languages_match(lang_code, row_lang):
                             # Find download link in this row
                             download_link = row.find('a', href=re.compile(r'/subtitle/'))
                             if download_link:
@@ -270,6 +272,13 @@ class YifyProvider(BaseSubtitleProvider):
                     except Exception as e:
                         logger.debug(f"YIFY: Gzip decompression failed: {e}")
                 
+                if not looks_like_subtitle(content):
+                    logger.error(
+                        "YIFY: downloaded data is not subtitle text "
+                        "(archive extraction failed or an error page was served)"
+                    )
+                    return False, "YIFY: Downloaded file is not a valid subtitle"
+
                 with open(output_path, 'wb') as f:
                     f.write(content)
                 

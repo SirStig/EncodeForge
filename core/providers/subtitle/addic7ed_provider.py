@@ -21,7 +21,7 @@ except ImportError:
     logger = logging.getLogger(__name__)
     logger.warning("BeautifulSoup4 not available, Addic7ed provider will use regex fallback")
 
-from .base_provider import BaseSubtitleProvider
+from .base_provider import BaseSubtitleProvider, looks_like_subtitle, languages_match
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,27 @@ class Addic7edProvider(BaseSubtitleProvider):
         super().__init__()
         self.provider_name = "Addic7ed"
     
+    @staticmethod
+    def _row_matches_episode(row, season: int, episode: int) -> bool:
+        """
+        Check that an Addic7ed season-page row belongs to the wanted episode.
+
+        Rows carry the season and episode in their first two cells. When they
+        cannot be parsed the row is rejected: returning a subtitle for the wrong
+        episode is worse than returning none.
+        """
+        cells = row.find_all('td')
+        if len(cells) < 2:
+            return False
+
+        try:
+            row_season = int(cells[0].get_text(strip=True))
+            row_episode = int(cells[1].get_text(strip=True))
+        except (ValueError, AttributeError):
+            return False
+
+        return row_season == season and row_episode == episode
+
     def search(self, video_path: str, languages: List[str]) -> List[Dict]:
         """Search Addic7ed (addic7ed.com) - improved web scraping"""
         results = []
@@ -167,17 +188,25 @@ class Addic7edProvider(BaseSubtitleProvider):
                         subtitle_rows = soup.find_all('tr', class_=re.compile(r'ep(even|odd)'))
                         
                         for row in subtitle_rows[:20]:
+                            # The season page lists EVERY episode of the season.
+                            # Without this check the first matching-language row
+                            # (usually episode 1) was returned and then labelled
+                            # with the requested episode number, so users got a
+                            # completely desynced subtitle with no error.
+                            if not self._row_matches_episode(row, season, episode):
+                                continue
+
                             # Find language cell
                             lang_cell = row.find('td', class_='language')
                             if not lang_cell:
                                 continue
-                            
+
                             language_name = lang_cell.get_text(strip=True)
                             lang_code = self.lang_name_to_code(language_name)
-                            
-                            if lang_code not in languages:
+
+                            if not any(languages_match(req, lang_code) for req in languages):
                                 continue
-                            
+
                             # Find download link
                             download_link = row.find('a', href=re.compile(r'/(original|updated)/\d+/\d+'))
                             if not download_link:
@@ -271,6 +300,13 @@ class Addic7edProvider(BaseSubtitleProvider):
                 content = dl_response.read()
                 if content[:2] == b'\x1f\x8b':
                     content = gzip.decompress(content)
+
+                if not looks_like_subtitle(content):
+                    logger.error(
+                        "Addic7ed: downloaded data is not subtitle text "
+                        "(archive extraction failed or an error page was served)"
+                    )
+                    return False, "Addic7ed: Downloaded file is not a valid subtitle"
 
                 with open(output_path, 'wb') as f:
                     f.write(content)

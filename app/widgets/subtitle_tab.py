@@ -77,6 +77,9 @@ class SubtitleTab(QWidget):
         self.active_workers: Dict[str, SubtitleWorker] = {}
         self._splitter_initialized = False
         self._subtitle_bg_tasks = 0
+        # Failures collected during a batch run, shown as one summary dialog
+        # rather than one modal per file.
+        self._batch_failures: List[tuple] = []
 
         self._setup_ui()
         self._connect_signals()
@@ -321,6 +324,10 @@ class SubtitleTab(QWidget):
         self._subtitle_bg_tasks = max(0, self._subtitle_bg_tasks - 1)
         self._update_subtitle_action_buttons()
 
+        # Once the queue has drained, surface everything that failed in one go.
+        if self._subtitle_bg_tasks == 0 and self._batch_failures:
+            self._show_batch_failure_summary()
+
     def _opensubtitles_logged_in(self) -> bool:
         try:
             from utils.settings_manager import get_settings_manager
@@ -412,7 +419,17 @@ class SubtitleTab(QWidget):
         else:
             self.batch_apply_btn.setToolTip("")
 
-    def _report_subtitle_failure(self, file_path: str, message: str) -> None:
+    def _report_subtitle_failure(self, file_path: str, message: str, quiet: bool = False) -> None:
+        """
+        Report a subtitle failure.
+
+        Args:
+            file_path: The video that failed
+            message: Failure detail
+            quiet: Collect the failure instead of opening a dialog. Batch runs
+                set this so 40 failed episodes do not mean 40 modal dialogs to
+                dismiss one at a time; the caller shows one summary at the end.
+        """
         hint = ""
         low = (message or "").lower()
         if "403" in message or "forbidden" in low or "access forbidden" in low:
@@ -423,6 +440,11 @@ class SubtitleTab(QWidget):
         full = f"{message}{hint}"
         self._set_subtitle_activity(full, "error")
         self.subtitle_error.emit(file_path, full)
+
+        if quiet:
+            self._batch_failures.append((Path(file_path).name, full))
+            return
+
         QMessageBox.warning(
             self,
             "Subtitles",
@@ -433,6 +455,29 @@ class SubtitleTab(QWidget):
             message=f"{Path(file_path).name}: {full[:200]}",
             notification_type="error",
         )
+
+    def _show_batch_failure_summary(self) -> None:
+        """Show one dialog covering every failure collected during a batch."""
+        if not self._batch_failures:
+            return
+
+        count = len(self._batch_failures)
+        shown = self._batch_failures[:15]
+        lines = [f"• {name}: {msg[:160]}" for name, msg in shown]
+        if count > len(shown):
+            lines.append(f"…and {count - len(shown)} more.")
+
+        QMessageBox.warning(
+            self,
+            "Subtitles",
+            f"{count} file(s) failed:\n\n" + "\n".join(lines),
+        )
+        self.notifier.show_notification(
+            title="Subtitle errors",
+            message=f"{count} file(s) failed during batch processing",
+            notification_type="error",
+        )
+        self._batch_failures.clear()
 
     def _current_video_path(self) -> Optional[Path]:
         row = self.file_table.currentRow()
@@ -697,7 +742,7 @@ class SubtitleTab(QWidget):
 
                 def on_err(err: tuple) -> None:
                     em = str(err[1]) if len(err) > 1 else "Unknown error"
-                    self._report_subtitle_failure(video_path, em)
+                    self._report_subtitle_failure(video_path, em, quiet=True)
 
                 return on_res, on_err
 
@@ -716,7 +761,7 @@ class SubtitleTab(QWidget):
                 if isinstance(result, dict)
                 else "Batch download failed."
             )
-            self._report_subtitle_failure(video_path, msg)
+            self._report_subtitle_failure(video_path, msg, quiet=True)
             return
         downloaded = result.get("subtitles_downloaded") or []
         paths = []
@@ -728,6 +773,7 @@ class SubtitleTab(QWidget):
             self._report_subtitle_failure(
                 video_path,
                 "Download reported success but no subtitle paths were returned.",
+                quiet=True,
             )
             return
         subs = self._get_subtitle_settings()
@@ -752,7 +798,7 @@ class SubtitleTab(QWidget):
             self._on_apply_done(result, video_path)
         else:
             msg = result.get("message", "Apply failed.") if isinstance(result, dict) else str(result)
-            self._report_subtitle_failure(video_path, msg)
+            self._report_subtitle_failure(video_path, msg, quiet=True)
 
     def _create_file_panel(self) -> QWidget:
         """Create file list and queue management panel."""

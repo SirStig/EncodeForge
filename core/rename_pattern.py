@@ -215,7 +215,10 @@ def format_filename_stem(
     fmt_dict = build_format_dict(metadata, file_stem)
     try:
         result = Formatter().vformat(pattern, (), _RenameFormatMap(fmt_dict))
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError) as e:
+        # IndexError comes from positional placeholders ("{}" or "{0}"), which
+        # a user can easily type; without it the exception escaped and took the
+        # settings dialog's validation handler down with it.
         logger.error("Rename pattern format error: %s", e)
         return None
     result = result.strip()
@@ -227,9 +230,19 @@ def validate_pattern(pattern: str) -> Tuple[bool, str]:
     if not pattern or not pattern.strip():
         return False, "Pattern is empty."
     try:
-        list(Formatter().parse(pattern))
+        fields = list(Formatter().parse(pattern))
     except ValueError as e:
         return False, f"Invalid pattern syntax: {e}"
+
+    # Positional placeholders have nothing to bind to — reject them with a
+    # message the user can act on rather than letting IndexError escape.
+    for _, field_name, _, _ in fields:
+        if field_name is not None and (field_name == "" or field_name.split(".")[0].split("[")[0].isdigit()):
+            return False, (
+                "Positional placeholders like {} or {0} are not supported. "
+                "Use named fields such as {title} or {episode}."
+            )
+
     for sample in (SAMPLE_TV_METADATA, SAMPLE_MOVIE_METADATA):
         stem = format_filename_stem(sample, pattern, file_stem="Sample.File")
         if stem is None:

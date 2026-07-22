@@ -319,7 +319,7 @@ class FFmpegManager:
                 logger.debug(f"Checking: {path}")
                 if self._test_ffmpeg(path):
                     self.ffmpeg_path = path
-                    self.ffprobe_path = path.replace("ffmpeg", "ffprobe")
+                    self.ffprobe_path = self._derive_ffprobe_path(path)
                     
                     logger.info(f"✓ Found FFmpeg at: {path}")
                     
@@ -375,6 +375,24 @@ class FFmpegManager:
         
         return None
     
+    @staticmethod
+    def _derive_ffprobe_path(ffmpeg_path: str) -> str:
+        """
+        Derive the ffprobe path from an ffmpeg path by renaming only the file.
+
+        A plain str.replace("ffmpeg", "ffprobe") also rewrites directory
+        components, so an install under
+        ...\\ffmpeg\\ffmpeg-7.1-essentials_build\\bin\\ffmpeg.exe becomes a path
+        that does not exist — which silently breaks every probe the app makes.
+
+        Both separators are handled explicitly rather than relying on Path, so
+        the result is correct regardless of which OS the string came from.
+        """
+        separator_index = max(ffmpeg_path.rfind('/'), ffmpeg_path.rfind('\\'))
+        directory = ffmpeg_path[:separator_index + 1]
+        name = ffmpeg_path[separator_index + 1:]
+        return directory + name.replace("ffmpeg", "ffprobe", 1)
+
     def _test_ffmpeg(self, path: str) -> bool:
         """Test if FFmpeg is available at the given path"""
         if not path:
@@ -422,9 +440,13 @@ class FFmpegManager:
                             break
             
             # Check for hardware encoders
-            encoders = self._check_encoders()
-            info["encoders"] = encoders
-            
+            encoder_names, encoder_ids = self._check_encoders()
+            info["encoders"] = encoder_names
+            # Raw FFmpeg encoder ids (h264_nvenc, hevc_amf, ...). The display
+            # names above cannot distinguish H.264 from H.265 support reliably,
+            # and selecting an encoder the build lacks fails the whole job.
+            info["encoder_ids"] = encoder_ids
+
             # Check for hardware decoders
             decoders = self._check_decoders()
             info["decoders"] = decoders
@@ -434,14 +456,20 @@ class FFmpegManager:
         
         return info
     
-    def _check_encoders(self) -> list:
-        """Check available hardware encoders"""
+    def _check_encoders(self) -> tuple:
+        """
+        Check available hardware encoders.
+
+        Returns:
+            (display_names, encoder_ids) — e.g. (["NVIDIA H.264"], ["h264_nvenc"])
+        """
         encoders = []
-        
+        encoder_ids = []
+
         try:
             if not self.ffmpeg_path:
-                return encoders
-            
+                return encoders, encoder_ids
+
             result = subprocess.run(
                 [self.ffmpeg_path, "-encoders"],
                 capture_output=True,
@@ -469,13 +497,14 @@ class FFmpegManager:
                         # Test if the encoder actually works
                         if self._test_encoder(encoder_id):
                             encoders.append(encoder_name)
+                            encoder_ids.append(encoder_id)
                         else:
                             logger.warning(f"Encoder {encoder_id} is available but not functional")
-        
+
         except Exception as e:
             logger.error(f"Error checking encoders: {e}")
-        
-        return encoders
+
+        return encoders, encoder_ids
     
     def _test_encoder(self, encoder_name: str, use_cache: bool = True) -> bool:
         """
@@ -640,7 +669,7 @@ class FFmpegManager:
                     if file.startswith("ffmpeg") and (file.endswith(".exe") or "." not in file):
                         ffmpeg_exe = Path(root) / file
                         self.ffmpeg_path = str(ffmpeg_exe)
-                        self.ffprobe_path = str(ffmpeg_exe).replace("ffmpeg", "ffprobe")
+                        self.ffprobe_path = self._derive_ffprobe_path(str(ffmpeg_exe))
                         
                         # Make executable on Unix systems
                         if system != "Windows":
@@ -854,47 +883,52 @@ class FFmpegManager:
             "encode": []
         }
         
-        # Auto-detect FFmpeg if not already done (lazy detection)
-        if not self.ffmpeg_path:
-            logger.info("FFmpeg path not set, attempting auto-detection for hardware acceleration...")
+        # Gate detection on the encoder list rather than on ffmpeg_path.
+        # get_ffmpeg_path() can populate ffmpeg_path from the shared singleton
+        # without ever running detect_ffmpeg(), which leaves version_info empty —
+        # so keying off the path alone silently reports "no hardware encoders"
+        # on machines that have them.
+        if not self.version_info.get("encoder_ids"):
+            logger.info("Encoder list not populated, running FFmpeg detection for hardware acceleration...")
             success, info = self.detect_ffmpeg()
             if not success:
                 logger.warning("FFmpeg auto-detection failed, no hardware acceleration available")
                 return options
-            logger.info(f"FFmpeg auto-detected: {info.get('ffmpeg_path')}")
-        
+            logger.info(f"FFmpeg detected: {info.get('ffmpeg_path')}")
+
         if not self.ffmpeg_path:
             logger.debug("No FFmpeg path available for hardware detection")
             return options
-        
-        logger.debug(f"Available encoders: {self.version_info.get('encoders', [])}")
-        
-        # Check for NVIDIA
-        if "NVIDIA" not in " ".join(self.version_info.get("encoders", [])):
-            pass
-        else:
-            options["decode"].append("cuda")
-            options["decode"].append("cuvid")
-            options["encode"].append("nvenc")
-        
-        # Check for AMD (AMF encoders)
-        encoders_str = " ".join(self.version_info.get("encoders", []))
-        if "AMD" in encoders_str or "h264_amf" in encoders_str or "hevc_amf" in encoders_str:
-            options["decode"].append("amf")
-            options["encode"].append("amf")
-        
-        # Check for Intel
-        if "Intel" in " ".join(self.version_info.get("encoders", [])):
-            options["decode"].append("qsv")
-            options["encode"].append("qsv")
-        
-        # Check for Apple
-        if "Apple" in " ".join(self.version_info.get("encoders", [])):
-            options["decode"].append("videotoolbox")
-            options["encode"].append("videotoolbox")
-        
+
+        encoder_ids = self.version_info.get("encoder_ids", [])
+        logger.debug(f"Available hardware encoder ids: {encoder_ids}")
+
+        # "encoder_ids" carries the exact ids FFmpeg reported, so a card that
+        # only has h264_nvenc is never offered hevc_nvenc.
+        options["encoder_ids"] = list(encoder_ids)
+
+        vendors = (
+            ("nvenc", ["cuda", "cuvid"], "nvenc"),
+            ("amf", ["amf"], "amf"),
+            ("qsv", ["qsv"], "qsv"),
+            ("videotoolbox", ["videotoolbox"], "videotoolbox"),
+        )
+        for suffix, decode_tokens, encode_token in vendors:
+            if any(eid.endswith(suffix) for eid in encoder_ids):
+                options["decode"].extend(decode_tokens)
+                options["encode"].append(encode_token)
+
         logger.debug(f"Hardware acceleration options detected: {options}")
         return options
+
+    def supports_encoder(self, encoder_id: str) -> bool:
+        """
+        Report whether a specific FFmpeg encoder id is available and functional.
+
+        Args:
+            encoder_id: e.g. "hevc_nvenc"
+        """
+        return encoder_id in self.get_hwaccel_options().get("encoder_ids", [])
     
     def get_recommended_encoder(self, hardware_info: Optional[Dict[str, Any]] = None) -> str:
         """Get the best available encoder based on hardware"""

@@ -11,6 +11,160 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Byte signatures for containers that are definitely NOT subtitle text. When an
+# archive fails to unpack, or a scraper follows a Cloudflare challenge, the raw
+# bytes used to be written straight to a .srt and reported as success.
+_NON_SUBTITLE_SIGNATURES = (
+    (b'PK\x03\x04', 'ZIP archive'),
+    (b'Rar!\x1a\x07', 'RAR archive'),
+    (b'\x1f\x8b', 'gzip archive'),
+    (b'7z\xbc\xaf\x27\x1c', '7-Zip archive'),
+    (b'%PDF', 'PDF document'),
+    (b'\xfd7zXZ\x00', 'xz archive'),
+)
+
+_SUBTITLE_MARKERS = (
+    '-->',           # SRT / WebVTT cue timing
+    '[script info]',  # ASS / SSA header
+    '[events]',
+    'dialogue:',
+    'webvtt',
+)
+
+
+def looks_like_subtitle(content: bytes) -> bool:
+    """
+    Heuristically confirm that downloaded bytes are actually subtitle text.
+
+    Providers scrape HTML pages and unpack archives, both of which can fail in
+    ways that still yield bytes. Writing those bytes to a .srt and returning
+    success means the user gets a corrupt file *and* the aggregator stops
+    trying other providers — so this check turns silent corruption into an
+    honest failure.
+
+    Args:
+        content: Raw downloaded bytes
+
+    Returns:
+        True if the data plausibly contains subtitles.
+    """
+    if not content or len(content) < 16:
+        return False
+
+    for signature, description in _NON_SUBTITLE_SIGNATURES:
+        if content.startswith(signature):
+            logger.debug(f"Rejected subtitle payload: looks like a {description}")
+            return False
+
+    # Decode a prefix leniently — encodings vary wildly across providers.
+    head = content[:4096].decode('utf-8', errors='replace').lower()
+
+    stripped = head.lstrip()
+    if stripped.startswith(('<!doctype html', '<html', '<?xml')):
+        logger.debug("Rejected subtitle payload: looks like an HTML/XML page")
+        return False
+
+    if any(marker in head for marker in _SUBTITLE_MARKERS):
+        return True
+
+    # A numeric cue index on the first line is the other common SRT opening.
+    first_line = stripped.split('\n', 1)[0].strip()
+    if first_line.isdigit():
+        return True
+
+    logger.debug("Rejected subtitle payload: no subtitle markers found")
+    return False
+
+
+# Canonical ISO 639-2/B <-> 639-1 mapping.
+#
+# Providers disagree wildly: the aggregator normalises user input *up* to three
+# letters ('de' -> 'ger') while several scrapers then truncate *down* to two
+# ('ger' -> 'GE', which is not a language). That mismatch silently dropped every
+# German, Chinese, Dutch, Czech and Greek result. Every comparison now goes
+# through languages_match() instead of ad-hoc slicing.
+_ISO639_2_TO_1 = {
+    "eng": "en", "spa": "es", "fre": "fr", "fra": "fr", "ger": "de", "deu": "de",
+    "ita": "it", "por": "pt", "pob": "pt", "rus": "ru", "ara": "ar",
+    "chi": "zh", "zho": "zh", "zht": "zh", "jpn": "ja", "kor": "ko",
+    "hin": "hi", "tha": "th", "vie": "vi", "tur": "tr", "pol": "pl",
+    "dut": "nl", "nld": "nl", "swe": "sv", "nor": "no", "nob": "no",
+    "dan": "da", "fin": "fi", "gre": "el", "ell": "el", "cze": "cs",
+    "ces": "cs", "slo": "sk", "slk": "sk", "hun": "hu", "rum": "ro",
+    "ron": "ro", "bul": "bg", "ukr": "uk", "heb": "he", "ind": "id",
+    "may": "ms", "msa": "ms", "per": "fa", "fas": "fa", "srp": "sr",
+    "hrv": "hr", "slv": "sl", "est": "et", "lav": "lv", "lit": "lt",
+    "cat": "ca", "baq": "eu", "glg": "gl", "ice": "is", "isl": "is",
+}
+
+_ISO639_1_TO_2 = {}
+for _three, _two in _ISO639_2_TO_1.items():
+    _ISO639_1_TO_2.setdefault(_two, _three)
+
+_LANGUAGE_NAME_TO_1 = {
+    "english": "en", "spanish": "es", "french": "fr", "german": "de",
+    "italian": "it", "portuguese": "pt", "brazilian": "pt", "russian": "ru",
+    "arabic": "ar", "chinese": "zh", "japanese": "ja", "korean": "ko",
+    "hindi": "hi", "thai": "th", "vietnamese": "vi", "turkish": "tr",
+    "polish": "pl", "dutch": "nl", "swedish": "sv", "norwegian": "no",
+    "danish": "da", "finnish": "fi", "greek": "el", "czech": "cs",
+    "slovak": "sk", "hungarian": "hu", "romanian": "ro", "bulgarian": "bg",
+    "ukrainian": "uk", "hebrew": "he", "indonesian": "id", "malay": "ms",
+    "persian": "fa", "farsi": "fa", "serbian": "sr", "croatian": "hr",
+    "slovenian": "sl", "estonian": "et", "latvian": "lv", "lithuanian": "lt",
+    "catalan": "ca", "basque": "eu", "galician": "gl", "icelandic": "is",
+}
+
+
+def to_iso639_1(language: str) -> str:
+    """
+    Reduce any language identifier to its two-letter ISO 639-1 code.
+
+    Accepts 2-letter codes, 3-letter codes, and full names with regional
+    qualifiers ("Portuguese (Brazilian)", "English (US)").
+
+    Returns:
+        The 2-letter code, or the lowercased input if unrecognised.
+    """
+    if not language:
+        return ""
+
+    value = language.strip().lower()
+
+    # Drop a regional qualifier: "english (us)" -> "english"
+    if "(" in value:
+        value = value.split("(", 1)[0].strip()
+    value = value.replace("_", "-")
+    if "-" in value and len(value.split("-")[0]) in (2, 3):
+        value = value.split("-")[0]
+
+    if value in _LANGUAGE_NAME_TO_1:
+        return _LANGUAGE_NAME_TO_1[value]
+    if value in _ISO639_2_TO_1:
+        return _ISO639_2_TO_1[value]
+    if len(value) == 2:
+        return value
+    return value
+
+
+def to_iso639_2(language: str) -> str:
+    """Expand any language identifier to a three-letter ISO 639-2/B code."""
+    two = to_iso639_1(language)
+    return _ISO639_1_TO_2.get(two, two)
+
+
+def languages_match(requested: str, found: str) -> bool:
+    """
+    Compare two language identifiers of any form.
+
+    Both sides are reduced to ISO 639-1 first, so 'spa'/'es', 'ger'/'DE' and
+    'English (US)'/'eng' all compare equal — and, critically, 'en' does not
+    match 'slovenian' the way a substring test does.
+    """
+    if not requested or not found:
+        return False
+    return to_iso639_1(requested) == to_iso639_1(found)
+
 
 class BaseSubtitleProvider:
     """Base class for all subtitle providers"""

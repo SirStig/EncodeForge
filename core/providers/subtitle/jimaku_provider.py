@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 from typing import Dict, List
 
-from .base_provider import BaseSubtitleProvider
+from .base_provider import BaseSubtitleProvider, looks_like_subtitle
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +193,13 @@ class JimakuProvider(BaseSubtitleProvider):
                         if content[:2] == b'\x1f\x8b':
                             content = gzip.decompress(content)
                         
+                        if not looks_like_subtitle(content):
+                            logger.error(
+                                "Jimaku: downloaded data is not subtitle text "
+                                "(archive extraction failed or an error page was served)"
+                            )
+                            return False, "Jimaku: Downloaded file is not a valid subtitle"
+
                         with open(output_path, 'wb') as f:
                             f.write(content)
                         

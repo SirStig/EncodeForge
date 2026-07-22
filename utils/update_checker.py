@@ -41,18 +41,42 @@ def _repo_slug() -> str:
 
 
 def normalize_version(tag: str) -> str:
+    """
+    Strip a leading 'v' from a release tag.
+
+    The pre-release segment is deliberately preserved: every release so far has
+    been an '-alpha-N' tag, and discarding it made each one compare equal to
+    plain '0.5.0', so no update could ever be detected. `packaging` normalises
+    '0.5.0-alpha-2' to '0.5.0a2' on its own.
+    """
     tag = (tag or "").strip()
     if tag.lower().startswith("v"):
         tag = tag[1:]
-    tag = tag.split("-")[0].strip()
-    return tag
+    return tag.strip()
 
 
 def _parse_version_tuple(v: str) -> tuple:
-    parts = re.findall(r"\d+", v)
-    if not parts:
-        return (0,)
-    return tuple(int(p) for p in parts)
+    """
+    Fallback ordering used only when `packaging` cannot parse a version.
+
+    Pre-release builds sort *below* the same release without a suffix, matching
+    PEP 440, so 0.5.0-alpha-2 < 0.5.0.
+    """
+    v = normalize_version(v)
+    release_part = re.split(r"[-+]", v, maxsplit=1)
+    numbers = tuple(int(p) for p in re.findall(r"\d+", release_part[0])) or (0,)
+
+    if len(release_part) == 1:
+        # No pre-release suffix: rank above any pre-release of the same numbers.
+        return (numbers, 1, (), ())
+
+    suffix = release_part[1].lower()
+    stage_order = {"alpha": 0, "a": 0, "beta": 1, "b": 1, "rc": 2, "pre": 2}
+    stage = next(
+        (rank for name, rank in stage_order.items() if suffix.startswith(name)), 0
+    )
+    suffix_numbers = tuple(int(p) for p in re.findall(r"\d+", suffix))
+    return (numbers, 0, (stage,), suffix_numbers)
 
 
 def is_newer(remote_version: str, current_version: str) -> bool:

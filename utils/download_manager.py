@@ -12,9 +12,33 @@ from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
+# Magic-byte signatures, checked before falling back to the file extension.
+# Downloads are often written to a generic temp name (e.g. "download.tmp"),
+# so the extension alone is not a reliable indicator of the archive format.
+_ARCHIVE_SIGNATURES = (
+    (b'PK\x03\x04', 'zip'),
+    (b'PK\x05\x06', 'zip'),   # empty archive
+    (b'PK\x07\x08', 'zip'),   # spanned archive
+    (b'\x1f\x8b', 'tar.gz'),
+    (b'BZh', 'tar.bz2'),
+    (b'\xfd7zXZ\x00', 'tar.xz'),
+)
+
+_TAR_MODES = {
+    'tar.gz': 'r:gz',
+    'tar.bz2': 'r:bz2',
+    'tar.xz': 'r:xz',
+    'tar': 'r:',
+}
+
 
 class DownloadError(Exception):
     """Raised when download fails"""
+    pass
+
+
+class UnsafeArchiveError(DownloadError):
+    """Raised when an archive member would extract outside the destination"""
     pass
 
 
@@ -97,8 +121,27 @@ class DownloadManager:
         
         try:
             request = Request(url, headers=headers)
-            
-            with urlopen(request, timeout=self.timeout) as response:
+
+            try:
+                response_ctx = urlopen(request, timeout=self.timeout)
+            except HTTPError as e:
+                if e.code == 416 and start_pos > 0:
+                    # The local file is already >= the remote size, which usually
+                    # means a previous attempt finished but its consumer failed.
+                    # Discard it and fetch from scratch rather than dead-ending.
+                    logger.warning(
+                        "Server rejected resume range (HTTP 416); "
+                        "discarding partial file and restarting download"
+                    )
+                    dest_path.unlink(missing_ok=True)
+                    start_pos = 0
+                    mode = 'wb'
+                    headers.pop('Range', None)
+                    response_ctx = urlopen(Request(url, headers=headers), timeout=self.timeout)
+                else:
+                    raise
+
+            with response_ctx as response:
                 # Get content length
                 content_length_header = response.getheader('Content-Length')
                 
@@ -137,16 +180,19 @@ class DownloadManager:
                 logger.info(f"Download complete: {dest_path} ({downloaded} bytes)")
         
         except HTTPError as e:
+            self._discard_partial(dest_path, start_pos)
             error_msg = f"HTTP Error {e.code}: {e.reason}"
             logger.error(error_msg)
             raise DownloadError(error_msg) from e
-        
+
         except URLError as e:
+            self._discard_partial(dest_path, start_pos)
             error_msg = f"URL Error: {e.reason}"
             logger.error(error_msg)
             raise DownloadError(error_msg) from e
-        
+
         except Exception as e:
+            self._discard_partial(dest_path, start_pos)
             error_msg = f"Download failed: {str(e)}"
             logger.error(error_msg)
             raise DownloadError(error_msg) from e
@@ -156,9 +202,29 @@ class DownloadManager:
             if not self.verify_hash(dest_path, expected_hash):
                 dest_path.unlink()  # Delete corrupted file
                 raise DownloadError(f"Hash verification failed for {dest_path}")
-        
+
         return dest_path
-    
+
+    @staticmethod
+    def _discard_partial(dest_path: Path, start_pos: int) -> None:
+        """
+        Remove a partially written download so the next attempt starts clean.
+
+        A partial file left behind is worse than no file: the next resume sends
+        a Range header derived from its size, which the server may reject
+        outright, leaving the user stuck with no way to recover from the UI.
+        """
+        if start_pos > 0:
+            # Pre-existing bytes belong to an earlier attempt that may still be
+            # resumable; only whole-file failures are cleaned up here.
+            return
+        try:
+            if dest_path.exists():
+                dest_path.unlink()
+                logger.info(f"Removed partial download: {dest_path}")
+        except OSError as e:
+            logger.warning(f"Could not remove partial download {dest_path}: {e}")
+
     def verify_hash(self, file_path: Path, expected_hash: str) -> bool:
         """
         Verify file hash.
@@ -232,59 +298,115 @@ class DownloadManager:
             DownloadError: If extraction fails
         """
         destination.mkdir(parents=True, exist_ok=True)
-        
+        archive_format = self.detect_archive_format(archive_path)
+
+        if archive_format is None:
+            raise DownloadError(
+                f"Unsupported archive format: {archive_path}. "
+                "Expected a zip, tar, tar.gz, tar.bz2 or tar.xz archive."
+            )
+
         try:
-            archive_str = str(archive_path)
-            
-            if archive_str.endswith('.zip'):
+            if archive_format == 'zip':
                 import zipfile
                 with zipfile.ZipFile(archive_path, 'r') as zip_ref:
                     members = zip_ref.namelist()
-                    for i, member in enumerate(members):
+                    for member in members:
+                        self._assert_safe_member(member, destination)
                         if progress_callback:
                             progress_callback(member)
                         zip_ref.extract(member, destination)
-                logger.info(f"Extracted {len(members)} files from {archive_path}")
-            
-            elif archive_str.endswith(('.tar.gz', '.tgz')):
-                import tarfile
-                with tarfile.open(archive_path, 'r:gz') as tar_ref:
-                    members = tar_ref.getmembers()
-                    for i, member in enumerate(members):
-                        if progress_callback:
-                            progress_callback(member.name)
-                        tar_ref.extract(member, destination)
-                logger.info(f"Extracted {len(members)} files from {archive_path}")
-            
-            elif archive_str.endswith(('.tar.bz2', '.tbz2')):
-                import tarfile
-                with tarfile.open(archive_path, 'r:bz2') as tar_ref:
-                    members = tar_ref.getmembers()
-                    for i, member in enumerate(members):
-                        if progress_callback:
-                            progress_callback(member.name)
-                        tar_ref.extract(member, destination)
-                logger.info(f"Extracted {len(members)} files from {archive_path}")
-            
-            elif archive_str.endswith('.tar'):
-                import tarfile
-                with tarfile.open(archive_path, 'r') as tar_ref:
-                    members = tar_ref.getmembers()
-                    for i, member in enumerate(members):
-                        if progress_callback:
-                            progress_callback(member.name)
-                        tar_ref.extract(member, destination)
-                logger.info(f"Extracted {len(members)} files from {archive_path}")
-            
             else:
-                raise DownloadError(f"Unsupported archive format: {archive_path}")
-            
+                import tarfile
+                with tarfile.open(archive_path, _TAR_MODES[archive_format]) as tar_ref:
+                    members = tar_ref.getmembers()
+                    for member in members:
+                        self._assert_safe_member(member.name, destination)
+                        if member.issym() or member.islnk():
+                            # Link targets are resolved at extraction time and can
+                            # escape the destination even when the name looks safe.
+                            self._assert_safe_member(member.linkname, destination)
+                        if progress_callback:
+                            progress_callback(member.name)
+                        tar_ref.extract(member, destination)
+
+            logger.info(
+                f"Extracted {len(members)} files from {archive_path} (format: {archive_format})"
+            )
             return destination
-        
+
+        except UnsafeArchiveError:
+            raise
         except Exception as e:
             error_msg = f"Extraction failed: {str(e)}"
             logger.error(error_msg)
             raise DownloadError(error_msg) from e
+
+    @staticmethod
+    def detect_archive_format(archive_path: Path) -> Optional[str]:
+        """
+        Identify an archive's format from its magic bytes, falling back to its
+        extension.
+
+        Content sniffing comes first because downloads are frequently saved
+        under a generic temporary name that carries no meaningful extension.
+
+        Returns:
+            One of 'zip', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar', or None if the
+            format is not recognised.
+        """
+        try:
+            with open(archive_path, 'rb') as f:
+                header = f.read(264)
+        except OSError as e:
+            logger.warning(f"Could not read archive header from {archive_path}: {e}")
+            header = b''
+
+        for signature, fmt in _ARCHIVE_SIGNATURES:
+            if header.startswith(signature):
+                return fmt
+
+        # Uncompressed tar carries its magic at offset 257, not at the start.
+        if header[257:262] in (b'ustar', b'ustar'):
+            return 'tar'
+
+        name = str(archive_path).lower()
+        if name.endswith('.zip'):
+            return 'zip'
+        if name.endswith(('.tar.gz', '.tgz')):
+            return 'tar.gz'
+        if name.endswith(('.tar.bz2', '.tbz2')):
+            return 'tar.bz2'
+        if name.endswith(('.tar.xz', '.txz')):
+            return 'tar.xz'
+        if name.endswith('.tar'):
+            return 'tar'
+
+        return None
+
+    @staticmethod
+    def _assert_safe_member(member_name: str, destination: Path) -> None:
+        """
+        Reject archive members that would be written outside `destination`.
+
+        Guards against absolute paths and `..` traversal (zip-slip / tar-slip).
+        `tarfile` performs no such validation of its own before Python 3.14.
+        """
+        if not member_name:
+            return
+
+        candidate = Path(member_name)
+        if candidate.is_absolute() or member_name.startswith(('/', '\\')):
+            raise UnsafeArchiveError(
+                f"Refusing to extract absolute path from archive: {member_name}"
+            )
+
+        target = (destination / candidate).resolve()
+        root = destination.resolve()
+        if target != root and root not in target.parents:
+            raise UnsafeArchiveError(
+                f"Refusing to extract outside destination: {member_name}"
+            )
     
     def download_and_extract(
         self,

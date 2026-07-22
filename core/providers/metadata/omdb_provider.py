@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 class OMDBProvider(BaseMetadataProvider):
     """OMDB (Open Movie Database) provider"""
 
-    API_URL = "http://www.omdbapi.com/"
+    # HTTPS: the user's API key travels in the query string, and the JSON
+    # response feeds straight into the file-rename path.
+    API_URL = "https://www.omdbapi.com/"
 
     def __init__(self, api_key: str = "", language_preference: str = "en"):
         super().__init__(api_key, language_preference=language_preference)

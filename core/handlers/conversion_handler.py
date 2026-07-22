@@ -63,77 +63,58 @@ class ConversionHandler:
         logger.info(f"Hardware acceleration options: {hwaccel_options}")
         logger.info(f"Settings - use_nvenc: {self.settings.use_nvenc}, use_amf: {self.settings.use_amf}, use_qsv: {self.settings.use_qsv}")
         logger.info(f"Source is 10-bit: {is_10bit}")
-        
-        # For 10-bit sources, prefer HEVC hardware encoders or software with conversion
+
+        available_ids = set(hwaccel_options.get("encoder_ids", []))
+
+        # Vendor preference order, paired with the setting that enables it.
+        vendors = (
+            ("nvenc", "nvidia", self.settings.use_nvenc),
+            ("amf", "amd", self.settings.use_amf),
+            ("qsv", "intel", self.settings.use_qsv),
+            ("videotoolbox", "apple", self.settings.use_videotoolbox),
+        )
+
         if is_10bit:
             logger.info("10-bit source detected - selecting appropriate encoder")
-            
-            # Try HEVC hardware encoders first (they support 10-bit)
-            if self.settings.use_nvenc and "nvenc" in hwaccel_options.get("encode", []):
-                logger.info("Selected NVENC HEVC hardware encoder for 10-bit source")
-                return {"type": "hardware", "codec": "hevc_nvenc", "platform": "nvidia", "needs_conversion": False}
-            
-            if self.settings.use_amf and "amf" in hwaccel_options.get("encode", []):
-                logger.info("Selected AMF HEVC hardware encoder for 10-bit source")
-                return {"type": "hardware", "codec": "hevc_amf", "platform": "amd", "needs_conversion": False}
-            
-            if self.settings.use_qsv and "qsv" in hwaccel_options.get("encode", []):
-                logger.info("Selected QSV HEVC hardware encoder for 10-bit source")
-                return {"type": "hardware", "codec": "hevc_qsv", "platform": "intel", "needs_conversion": False}
-            
-            if self.settings.use_videotoolbox and "videotoolbox" in hwaccel_options.get("encode", []):
-                logger.info("Selected VideoToolbox HEVC hardware encoder for 10-bit source")
-                return {"type": "hardware", "codec": "hevc_videotoolbox", "platform": "apple", "needs_conversion": False}
 
-            # No HEVC hardware encoder available — fall back to H.264 hardware with 8-bit conversion
-            hevc_available = (
-                (self.settings.use_nvenc and "nvenc" in hwaccel_options.get("encode", []))
-                or (self.settings.use_amf and "amf" in hwaccel_options.get("encode", []))
-                or (self.settings.use_qsv and "qsv" in hwaccel_options.get("encode", []))
-                or (self.settings.use_videotoolbox and "videotoolbox" in hwaccel_options.get("encode", []))
-            )
-            if not hevc_available:
-                if self.settings.use_nvenc and "nvenc" in hwaccel_options.get("encode", []):
-                    logger.info("Using NVENC H.264 with 10-bit to 8-bit conversion")
-                    return {"type": "hardware", "codec": "h264_nvenc", "platform": "nvidia", "needs_conversion": True}
+            # HEVC hardware encoders carry 10-bit through without conversion.
+            for suffix, platform_name, enabled in vendors:
+                codec = f"hevc_{suffix}"
+                if enabled and codec in available_ids:
+                    logger.info(f"Selected {codec} for 10-bit source")
+                    return {"type": "hardware", "codec": codec,
+                            "platform": platform_name, "needs_conversion": False}
 
-                if self.settings.use_amf and "amf" in hwaccel_options.get("encode", []):
-                    logger.info("Using AMF H.264 with 10-bit to 8-bit conversion")
-                    return {"type": "hardware", "codec": "h264_amf", "platform": "amd", "needs_conversion": True}
-
-                if self.settings.use_qsv and "qsv" in hwaccel_options.get("encode", []):
-                    logger.info("Using QSV H.264 with 10-bit to 8-bit conversion")
-                    return {"type": "hardware", "codec": "h264_qsv", "platform": "intel", "needs_conversion": True}
-
-                if self.settings.use_videotoolbox and "videotoolbox" in hwaccel_options.get("encode", []):
-                    logger.info("Using VideoToolbox H.264 with 10-bit to 8-bit conversion")
-                    return {"type": "hardware", "codec": "h264_videotoolbox", "platform": "apple", "needs_conversion": True}
+            # No HEVC support on this build: an H.264 hardware encoder can still
+            # be used, but the source must be converted down to 8-bit first.
+            # Previously this branch tested the same conditions that had already
+            # returned above it, so it could never run.
+            for suffix, platform_name, enabled in vendors:
+                codec = f"h264_{suffix}"
+                if enabled and codec in available_ids:
+                    logger.info(f"Using {codec} with 10-bit to 8-bit conversion")
+                    return {"type": "hardware", "codec": codec,
+                            "platform": platform_name, "needs_conversion": True}
 
             # Fallback to software (supports 10-bit natively)
             logger.info("Using software encoder (supports 10-bit natively)")
-            return {"type": "software", "codec": self.settings.video_codec_fallback, "platform": "cpu", "needs_conversion": False}
-        
+            return {"type": "software", "codec": self.settings.video_codec_fallback,
+                    "platform": "cpu", "needs_conversion": False}
+
         # For 8-bit sources, use H.264 hardware encoders
-        if self.settings.use_nvenc and "nvenc" in hwaccel_options.get("encode", []):
-            logger.info("Selected NVENC H.264 hardware encoder")
-            return {"type": "hardware", "codec": "h264_nvenc", "platform": "nvidia", "needs_conversion": False}
-        
-        if self.settings.use_amf and "amf" in hwaccel_options.get("encode", []):
-            logger.info("Selected AMF H.264 hardware encoder")
-            return {"type": "hardware", "codec": "h264_amf", "platform": "amd", "needs_conversion": False}
-        
-        if self.settings.use_qsv and "qsv" in hwaccel_options.get("encode", []):
-            logger.info("Selected QSV H.264 hardware encoder")
-            return {"type": "hardware", "codec": "h264_qsv", "platform": "intel", "needs_conversion": False}
-        
-        if self.settings.use_videotoolbox and "videotoolbox" in hwaccel_options.get("encode", []):
-            logger.info("Selected VideoToolbox H.264 hardware encoder")
-            return {"type": "hardware", "codec": "h264_videotoolbox", "platform": "apple", "needs_conversion": False}
-        
+        for suffix, platform_name, enabled in vendors:
+            codec = f"h264_{suffix}"
+            if enabled and codec in available_ids:
+                logger.info(f"Selected {codec} hardware encoder")
+                return {"type": "hardware", "codec": codec,
+                        "platform": platform_name, "needs_conversion": False}
+
         # Fallback to software encoding
         logger.info("No hardware encoders available or enabled, falling back to software")
-        return {"type": "software", "codec": self.settings.video_codec_fallback, "platform": "cpu", "needs_conversion": False}
-    
+        return {"type": "software", "codec": self.settings.video_codec_fallback,
+                "platform": "cpu", "needs_conversion": False}
+
+
     def _is_hardware_encoder_error(self, error_output: str) -> bool:
         """Check if error is related to hardware encoder failure"""
         hw_error_indicators = [
@@ -509,7 +490,66 @@ class ConversionHandler:
         
         return converted_subs
     
-    def _retry_with_software_encoder(self, input_file: Path, output_path_obj: Path, 
+    # Subtitle codecs that carry rendered images rather than text. They cannot
+    # be transcoded to a text format at all — FFmpeg aborts the whole job with
+    # "only possible from text to text or bitmap to bitmap" — so they must be
+    # copied (Matroska) or dropped (MP4) rather than converted.
+    BITMAP_SUBTITLE_CODECS = frozenset({
+        "hdmv_pgs_subtitle", "pgssub", "dvd_subtitle", "dvdsub",
+        "dvb_subtitle", "dvbsub", "xsub",
+    })
+
+    def _build_subtitle_args(self, subtitle_tracks: List[Dict], target_codec: str) -> List[str]:
+        """
+        Build the -map/-c:s arguments for the input's subtitle tracks.
+
+        Args:
+            subtitle_tracks: Tracks from _analyze_subtitle_tracks
+            target_codec: "copy", "srt" or "mov_text"
+
+        Returns:
+            Argument list. Empty if there is nothing safe to carry over.
+
+        Bitmap tracks are separated from text tracks so a Blu-ray rip with PGS
+        subtitles does not abort a conversion that has already been running for
+        an hour.
+        """
+        text_tracks, bitmap_tracks = [], []
+        for track in subtitle_tracks:
+            codec = (track.get("codec") or "").lower()
+            index = track.get("index")
+            if index is None:
+                continue
+            (bitmap_tracks if codec in self.BITMAP_SUBTITLE_CODECS else text_tracks).append(index)
+
+        args: List[str] = []
+
+        if target_codec == "copy":
+            # Matroska carries both kinds, so everything can be copied verbatim.
+            for index in text_tracks + bitmap_tracks:
+                args.extend(["-map", f"0:{index}"])
+            if args:
+                args.extend(["-c:s", "copy"])
+            return args
+
+        for index in text_tracks:
+            args.extend(["-map", f"0:{index}"])
+        if args:
+            args.extend(["-c:s", target_codec])
+
+        if bitmap_tracks:
+            logger.warning(
+                f"Dropping {len(bitmap_tracks)} image-based subtitle track(s) "
+                f"(indices {bitmap_tracks}): they cannot be converted to "
+                f"'{target_codec}'. Use an MKV output to keep them."
+            )
+
+        if not text_tracks and not bitmap_tracks:
+            logger.info("No usable subtitle tracks to carry over")
+
+        return args
+
+    def _retry_with_software_encoder(self, input_file: Path, output_path_obj: Path,
                                      progress_callback: Optional[Callable] = None) -> Dict:
         """Retry conversion using software encoder as fallback"""
         logger.warning("⚠️ Retrying with software encoder...")
@@ -743,11 +783,14 @@ class ConversionHandler:
             
             # Audio stream mapping and codec
             # Map all audio streams by default (Java sends 'all' or 'first')
+            # The trailing '?' makes the mapping optional, so a video-only input
+            # (screen capture, silent clip) does not abort with
+            # "Stream map '0:a' matches no streams".
             if self.settings.audio_track_selection == "all":
-                cmd.extend(["-map", "0:a"])  # Include all audio streams
+                cmd.extend(["-map", "0:a?"])  # Include all audio streams, if any
                 logger.info("Mapping: All audio tracks")
             else:
-                cmd.extend(["-map", "0:a:0"])  # Only first audio stream
+                cmd.extend(["-map", "0:a:0?"])  # Only first audio stream, if any
                 logger.info("Mapping: First audio track only")
 
             # Determine effective audio codec (normalization forces decode — cannot filter copy streams)
@@ -789,52 +832,37 @@ class ConversionHandler:
                 if subtitle_tracks:
                     logger.info(f"Found {len(subtitle_tracks)} subtitle track(s)")
 
-                    if self.settings.output_format.lower() in ["mp4", "m4v"]:
-                        # For MP4, check subtitle formats
-                        has_ass_ssa = any(t.get("codec") in ["ass", "ssa"] for t in subtitle_tracks)
-                        has_mov_text = any(t.get("codec") in ["mov_text", "text"] for t in subtitle_tracks)
-                        has_srt = any(t.get("codec") in ["srt", "subrip"] for t in subtitle_tracks)
-
-                        logger.info(f"Subtitle formats detected - ASS/SSA: {has_ass_ssa}, mov_text: {has_mov_text}, SRT: {has_srt}")
-
-                        if has_ass_ssa:
-                            logger.info("ASS/SSA subtitles detected, converting directly to mov_text...")
-                            if progress_callback:
-                                progress_callback({
-                                    'file': input_file.name,
-                                    'status': 'converting_subtitles',
-                                    'progress': 15,
-                                    'message': 'Converting ASS/SSA subtitles to mov_text...'
-                                })
-                            cmd.extend(["-map", "0:s?"])
-                            cmd.extend(["-c:s", "mov_text"])
-                            logger.info(f"Mapped {len(subtitle_tracks)} subtitle tracks, converting ASS/SSA to mov_text")
-                        else:
-                            cmd.extend(["-map", "0:s?"])
-                            cmd.extend(["-c:s", "mov_text"])
-                            logger.info("Converting subtitles to mov_text for MP4 compatibility")
-                    else:
-                        # MKV/WebM: copy all subtitle tracks as-is
-                        cmd.extend(["-map", "0:s?"])
-                        cmd.extend(["-c:s", "copy"])
-                        logger.info("Mapping all subtitle tracks (copy)")
+                    is_mp4 = self.settings.output_format.lower() in ["mp4", "m4v"]
+                    # MP4 has no native text-subtitle codec other than mov_text,
+                    # so text tracks are transcoded; Matroska copies verbatim.
+                    target = "mov_text" if is_mp4 else "copy"
+                    if progress_callback and is_mp4:
+                        progress_callback({
+                            'file': input_file.name,
+                            'status': 'converting_subtitles',
+                            'progress': 15,
+                            'message': 'Converting subtitles to mov_text...'
+                        })
+                    cmd.extend(self._build_subtitle_args(subtitle_tracks, target))
                 else:
                     logger.info("No subtitle tracks found in input file")
 
             elif subtitle_handling == "convert_to_srt":
                 subtitle_tracks = self._analyze_subtitle_tracks(str(input_file))
                 if subtitle_tracks:
-                    if hasattr(self, '_extract_and_convert_subtitles'):
-                        logger.info("Extracting and converting subtitles to SRT...")
-                        self._extract_and_convert_subtitles(str(input_file), temp_subtitle_files)
-                    else:
-                        # Fallback: treat like keep
-                        logger.info("_extract_and_convert_subtitles not available, falling back to keep mode")
-                        cmd.extend(["-map", "0:s?"])
-                        if self.settings.output_format.lower() in ["mp4", "m4v"]:
-                            cmd.extend(["-c:s", "mov_text"])
-                        else:
-                            cmd.extend(["-c:s", "copy"])
+                    # FFmpeg transcodes subtitles in the same pass, so there is
+                    # no need to extract to sidecar files first.
+                    is_mp4 = self.settings.output_format.lower() in ["mp4", "m4v"]
+                    target = "mov_text" if is_mp4 else "srt"
+                    logger.info(f"Converting subtitle tracks to {target}")
+                    if progress_callback:
+                        progress_callback({
+                            'file': input_file.name,
+                            'status': 'converting_subtitles',
+                            'progress': 15,
+                            'message': f'Converting subtitles to {target}...'
+                        })
+                    cmd.extend(self._build_subtitle_args(subtitle_tracks, target))
                 else:
                     logger.info("No subtitle tracks found in input file")
 
@@ -1505,7 +1533,7 @@ class ConversionHandler:
             
             # Try to get duration of output file
             cmd = [
-                "ffprobe",
+                self._ffprobe,
                 "-v", "quiet",
                 "-print_format", "json",
                 "-show_format",
@@ -1536,7 +1564,7 @@ class ConversionHandler:
     def _get_process_state_file(self) -> Path:
         """Get the path to the process state file"""
         # Use unified application data directory
-        from path_manager import get_conversion_state_file
+        from core.path_manager import get_conversion_state_file
         return get_conversion_state_file()
     
     def _save_process_state(self, file_paths: List[str], current_index: int, total_files: int):

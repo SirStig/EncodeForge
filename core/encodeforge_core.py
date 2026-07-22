@@ -6,6 +6,8 @@ Lightweight orchestrator that delegates to specialized handlers
 
 import logging
 import threading
+from copy import deepcopy
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 from core.handlers import (
@@ -339,32 +341,62 @@ class EncodeForgeCore:
     # Profile Management
     # ==================
     
-    def save_profile(self, name: str, settings: Dict) -> Dict:
-        """Save a conversion profile"""
+    def save_profile(self, name: str, settings=None) -> Dict:
+        """
+        Save a conversion profile.
+
+        Args:
+            name: Profile name
+            settings: A ConversionSettings instance, or a dict of overrides.
+                Defaults to the current settings.
+
+        ProfileManager.save_profile calls dataclasses.asdict(), which raises on
+        a plain dict — so passing one used to fail every save.
+        """
+        if settings is None:
+            settings = self.settings
+        elif isinstance(settings, dict):
+            merged = deepcopy(self.settings)
+            for key, value in settings.items():
+                if hasattr(merged, key):
+                    setattr(merged, key, value)
+            settings = merged
+
         success = self.profile_mgr.save_profile(name, settings)
         return {
             "status": "success" if success else "error",
             "message": f"Profile '{name}' saved" if success else "Failed to save profile"
         }
-    
+
     def load_profile(self, name: str) -> Dict:
-        """Load a conversion profile"""
+        """
+        Load a conversion profile and apply it to the current settings.
+
+        ProfileManager returns a ConversionSettings instance, so the previous
+        `isinstance(profile, dict)` guard was never true and the loaded profile
+        was reported as applied without changing anything.
+        """
         profile = self.profile_mgr.load_profile(name)
-        if profile:
-            # Update settings from profile
-            if isinstance(profile, dict):
-                for key, value in profile.items():
-                    if hasattr(self.settings, key):
-                        setattr(self.settings, key, value)
-            return {
-                "status": "success",
-                "profile": profile
-            }
-        else:
+        if not profile:
             return {
                 "status": "error",
                 "message": f"Profile '{name}' not found"
             }
+
+        if isinstance(profile, dict):
+            applied = profile
+        else:
+            applied = asdict(profile)
+
+        for key, value in applied.items():
+            if hasattr(self.settings, key):
+                setattr(self.settings, key, value)
+
+        # Return a JSON-serialisable view rather than the dataclass itself.
+        return {
+            "status": "success",
+            "profile": applied,
+        }
     
     def list_profiles(self) -> Dict:
         """List all saved profiles"""

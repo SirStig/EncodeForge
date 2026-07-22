@@ -1010,10 +1010,54 @@ class SettingsPanel(QWidget):
     # ------------------------------------------------------------------ #
     #  Load / Save
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _select_combo_value(combo, value: str) -> bool:
+        """
+        Select a combo entry by text, tolerating case and spacing differences.
+
+        setCurrentText() on a non-editable combo silently does nothing when the
+        string does not match an item exactly, so values that were saved
+        lower-cased ("whisper ai") or abbreviated ("ja") quietly reset the
+        control to index 0 on every load.
+
+        Returns:
+            True if a matching item was selected.
+        """
+        if value is None:
+            return False
+
+        target = str(value).strip().lower()
+        for i in range(combo.count()):
+            if combo.itemText(i).strip().lower() == target:
+                combo.setCurrentIndex(i)
+                return True
+
+        # Fall back to a prefix match so "whisper ai" still finds "Whisper AI"
+        # even if the label gains a suffix later.
+        for i in range(combo.count()):
+            if combo.itemText(i).strip().lower().startswith(target) and target:
+                combo.setCurrentIndex(i)
+                return True
+
+        logger.debug(f"No combo entry matching {value!r}; leaving current selection")
+        return False
+
+    # Two-letter code <-> display name for the language selector. The stored
+    # value is a code, but the combo lists full names.
+    _LANGUAGE_CODES = {
+        "en": "English", "es": "Spanish", "fr": "French", "de": "German",
+        "it": "Italian", "pt": "Portuguese", "ru": "Russian", "ja": "Japanese",
+        "ko": "Korean", "zh": "Chinese",
+    }
+
     def _load_settings(self):
         """Load current settings into UI."""
         # General
-        self.language_combo.setCurrentText(self.settings.application.language)
+        stored_language = self.settings.application.language or "en"
+        self._select_combo_value(
+            self.language_combo,
+            self._LANGUAGE_CODES.get(stored_language.lower(), stored_language),
+        )
         self.check_updates_check.setChecked(self.settings.application.check_updates)
         self.auto_download_updates_check.setChecked(self.settings.application.auto_download_updates)
         self.clear_temp_check.setChecked(self.settings.application.clear_temp_on_exit)
@@ -1035,10 +1079,10 @@ class SettingsPanel(QWidget):
         self.preserve_metadata_check.setChecked(self.settings.encoder.preserve_metadata)
 
         # Subtitle
-        self.subtitle_mode_combo.setCurrentText(self.settings.subtitle.mode.capitalize())
-        self.subtitle_language_combo.setCurrentText(self.settings.subtitle.language)
-        self.subtitle_format_combo.setCurrentText(self.settings.subtitle.subtitle_format)
-        self.subtitle_encoding_combo.setCurrentText(self.settings.subtitle.encoding)
+        self._select_combo_value(self.subtitle_mode_combo, self.settings.subtitle.mode)
+        self._select_combo_value(self.subtitle_language_combo, self.settings.subtitle.language)
+        self._select_combo_value(self.subtitle_format_combo, self.settings.subtitle.subtitle_format)
+        self._select_combo_value(self.subtitle_encoding_combo, self.settings.subtitle.encoding)
         self.subtitle_fallback_check.setChecked(self.settings.subtitle.fallback)
         self.subtitle_sync_check.setChecked(self.settings.subtitle.sync)
         self.subtitle_translate_check.setChecked(self.settings.subtitle.translate)
@@ -1086,7 +1130,14 @@ class SettingsPanel(QWidget):
     def _save_settings(self):
         """Save UI values to settings."""
         # General
-        self.settings.application.language = self.language_combo.currentText().lower()[:2]
+        # Store the ISO code that matches the selected display name, rather than
+        # blindly truncating the label (which turned "Japanese" into "ja" but
+        # "Chinese" into "ch", neither of which could be loaded back).
+        selected_language = self.language_combo.currentText()
+        self.settings.application.language = next(
+            (code for code, name in self._LANGUAGE_CODES.items() if name == selected_language),
+            selected_language.lower()[:2],
+        )
         self.settings.application.check_updates = self.check_updates_check.isChecked()
         self.settings.application.auto_download_updates = self.auto_download_updates_check.isChecked()
         self.settings.application.clear_temp_on_exit = self.clear_temp_check.isChecked()

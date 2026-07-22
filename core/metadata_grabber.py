@@ -374,13 +374,33 @@ class MetadataGrabber:
         
         # Format new filename
         new_name = self.format_filename(info, pattern)
+
+        # An empty stem would produce a bare ".mkv" — a hidden file that every
+        # subsequent rename in the folder would overwrite in turn.
+        if not new_name or not new_name.strip():
+            return False, "Refusing to rename: pattern produced an empty filename", None
+
         new_path = path.parent / f"{new_name}{path.suffix}"
-        
+
+        if new_path.resolve() == path.resolve():
+            return True, "File already has the target name", str(path)
+
+        # Path.rename overwrites silently on POSIX, so two files resolving to
+        # the same metadata would destroy one another during a batch rename.
+        if new_path.exists():
+            return (
+                False,
+                f"Refusing to overwrite existing file: {new_path.name}",
+                None,
+            )
+
         if dry_run:
             return True, f"Would rename to: {new_path.name}", str(new_path)
-        
+
         # Perform rename
         try:
+            # os.link + unlink would be atomic, but a same-directory rename with
+            # a verified-absent target is sufficient here and keeps metadata.
             path.rename(new_path)
             return True, f"Renamed successfully to: {new_path.name}", str(new_path)
         except Exception as e:

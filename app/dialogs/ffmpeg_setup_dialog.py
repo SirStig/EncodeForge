@@ -415,11 +415,15 @@ class FFmpegSetupDialog(QDialog):
                     }
 
                 else:
-                    # Windows / Linux: download archive and extract
+                    # Windows / Linux: download archive and extract.
+                    # Keep the archive's real extension so the file stays
+                    # identifiable on disk and can be inspected by hand if
+                    # extraction ever fails.
+                    archive_name = url.split("/")[-1].split("?")[0] or "ffmpeg_download"
                     self._log_to_ui.emit(f"Downloading from: {url}")
                     archive_path = self.download_manager.download(
                         url=url,
-                        destination=str(bin_dir / "ffmpeg_download.tmp"),
+                        destination=str(bin_dir / archive_name),
                         progress_callback=_dl_progress,
                         resume=True,
                     )
@@ -433,8 +437,13 @@ class FFmpegSetupDialog(QDialog):
                                 "message": "Extracting FFmpeg…",
                             }
                         )
-                    self.download_manager.extract_archive(archive_path, ffmpeg_dir)
-                    archive_path.unlink(missing_ok=True)
+                    try:
+                        self.download_manager.extract_archive(archive_path, ffmpeg_dir)
+                    finally:
+                        # Always clear the archive: a stale one left on disk makes
+                        # the next attempt resume from a complete file and get
+                        # rejected by the server.
+                        archive_path.unlink(missing_ok=True)
 
                     ffmpeg_exe = "ffmpeg.exe" if system == "windows" else "ffmpeg"
                     ffprobe_exe = "ffprobe.exe" if system == "windows" else "ffprobe"

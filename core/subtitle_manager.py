@@ -50,10 +50,38 @@ class SubtitleProviders:
             "OpenSubtitles.com", "Addic7ed", "SubDL", "Subf2m",
             "YIFY", "Podnapisi", "SubDivX", "Jimaku"
         ]
+        # None means "no restriction". Set enabled_providers to honour a user's
+        # provider selection; anything not listed is skipped entirely.
+        self.enabled_providers: Optional[List[str]] = None
         self.session_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
     
+    def is_provider_enabled(self, provider_name: str) -> bool:
+        """
+        Report whether a provider should be queried.
+
+        Matching is loose so UI labels ("OpenSubtitles") still select the
+        internal name ("OpenSubtitles.com").
+        """
+        if not self.enabled_providers:
+            return True
+
+        target = provider_name.lower().replace(".com", "").strip()
+        for enabled in self.enabled_providers:
+            candidate = str(enabled).lower().replace(".com", "").strip()
+            if candidate in ("all", target) or target in candidate:
+                return True
+        return False
+
+    def _search_opensubtitles(self, video_path: str, lang_codes: List[str]) -> List[Dict]:
+        """Adapter giving OpenSubtitles the same signature as the scrapers."""
+        if not self.opensubtitles:
+            logger.info("  OpenSubtitles.com: Not configured (no API key)")
+            return []
+        success, results = self.opensubtitles.search_subtitles(video_path, lang_codes)
+        return results if (success and results) else []
+
     def extract_media_metadata(self, file_path: str) -> Dict:
         """
         Use the base provider's metadata extraction
@@ -199,145 +227,50 @@ class SubtitleProviders:
 
         logger.info(f"Normalized language codes: {lang_codes}")
         
-        # OpenSubtitles.com
-        logger.info("→ Searching OpenSubtitles.com (with API key)...")
-        if progress_callback:
-            progress_callback("OpenSubtitles.com", [], False)  # Notify start of search
-        if self.opensubtitles:
-            try:
-                success, results = self.opensubtitles.search_subtitles(video_path, lang_codes)
-                logger.info(f"  OpenSubtitles API returned: success={success}, results count={len(results) if results else 0}")
-                if success and results:
-                    for result in results:
-                        result["provider"] = "OpenSubtitles.com"
-                        all_results.append(result)
-                    logger.info(f"  ✅ OpenSubtitles.com: Found {len(results)} subtitles")
-                    # Send incremental update with results
-                    if progress_callback:
-                        progress_callback("OpenSubtitles.com", self._rank_subtitles(all_results.copy()), False)
-                else:
-                    logger.info("  ⚠️ OpenSubtitles.com: No results")
-            except Exception as e:
-                logger.error(f"  ❌ OpenSubtitles.com search failed: {e}", exc_info=True)
-        else:
-            logger.info("  ⚠️ OpenSubtitles.com: Not configured (no API key)")
-        
-        # OpenSubtitles.org (legacy free API) — deprecated, not implemented
-        
-        # Addic7ed (great for TV shows but works for everything)
-        logger.info("→ Searching Addic7ed...")
-        if progress_callback:
-            progress_callback("Addic7ed", all_results.copy(), False)  # Notify start
-        try:
-            addic7ed_results = self.search_addic7ed(video_path, lang_codes)
-            logger.info(f"  Addic7ed returned {len(addic7ed_results)} results")
-            all_results.extend(addic7ed_results)
-            if addic7ed_results:
-                logger.info(f"  ✅ Addic7ed: Found {len(addic7ed_results)} subtitles")
-                if progress_callback:
-                    progress_callback("Addic7ed", self._rank_subtitles(all_results.copy()), False)
-        except Exception as e:
-            logger.error(f"  ❌ Addic7ed search failed: {e}")
-        
-        # SubDL (Movies and TV)
-        logger.info("→ Searching SubDL...")
-        if progress_callback:
-            progress_callback("SubDL", all_results.copy(), False)  # Notify start
-        try:
-            subdl_results = self.search_subdl(video_path, lang_codes)
-            logger.info(f"  SubDL returned {len(subdl_results)} results")
-            all_results.extend(subdl_results)
-            if subdl_results:
-                logger.info(f"  ✅ SubDL: Found {len(subdl_results)} subtitles")
-                if progress_callback:
-                    progress_callback("SubDL", self._rank_subtitles(all_results.copy()), False)
-            else:
-                logger.info("  ⚠️ SubDL: No results found")
-        except Exception as e:
-            logger.error(f"  ❌ SubDL search failed: {e}")
-        
-        # Subf2m (Movies and TV)
-        logger.info("→ Searching Subf2m...")
-        if progress_callback:
-            progress_callback("Subf2m", all_results.copy(), False)  # Notify start
-        try:
-            subf2m_results = self.search_subf2m(video_path, lang_codes)
-            logger.info(f"  Subf2m returned {len(subf2m_results)} results")
-            all_results.extend(subf2m_results)
-            if subf2m_results:
-                logger.info(f"  ✅ Subf2m: Found {len(subf2m_results)} subtitles")
-                if progress_callback:
-                    progress_callback("Subf2m", self._rank_subtitles(all_results.copy()), False)
-            else:
-                logger.info("  ⚠️ Subf2m: No results found")
-        except Exception as e:
-            logger.error(f"  ❌ Subf2m search failed: {e}")
-        
-        # YIFY Subtitles (best for movies)
-        logger.info("→ Searching YIFY Subtitles...")
-        if progress_callback:
-            progress_callback("YIFY", all_results.copy(), False)  # Notify start
-        try:
-            yify_results = self.search_yifysubtitles(video_path, lang_codes)
-            logger.info(f"  YIFY returned {len(yify_results)} results")
-            all_results.extend(yify_results)
-            if yify_results:
-                logger.info(f"  ✅ YIFY: Found {len(yify_results)} subtitles")
-                if progress_callback:
-                    progress_callback("YIFY", self._rank_subtitles(all_results.copy()), False)
-        except Exception as e:
-            logger.error(f"  ❌ YIFY search failed: {e}")
-        
-        # Podnapisi (web scraping)
-        logger.info("→ Searching Podnapisi...")
-        if progress_callback:
-            progress_callback("Podnapisi", all_results.copy(), False)  # Notify start
-        try:
-            podnapisi_results = self.search_podnapisi(video_path, lang_codes)
-            logger.info(f"  Podnapisi returned {len(podnapisi_results)} results")
-            all_results.extend(podnapisi_results)
-            if podnapisi_results:
-                logger.info(f"  ✅ Podnapisi: Found {len(podnapisi_results)} subtitles")
-                if progress_callback:
-                    progress_callback("Podnapisi", self._rank_subtitles(all_results.copy()), False)
-            else:
-                logger.info("  ⚠️ Podnapisi: No results found")
-        except Exception as e:
-            logger.debug(f"  Podnapisi search failed (expected for scraping providers): {e}")
-        
-        # SubDivX (great for Spanish content)
-        if "spa" in lang_codes or "es" in lang_codes or "es-MX" in lang_codes:
-            logger.info("→ Searching SubDivX (Spanish)...")
+        # Each provider is (display name, search callable, only-if predicate).
+        # This replaced eight near-identical copy-pasted blocks; adding or
+        # disabling a provider is now a one-line change.
+        provider_specs = [
+            ("OpenSubtitles.com", self._search_opensubtitles, None),
+            ("Addic7ed", self.search_addic7ed, None),
+            ("SubDL", self.search_subdl, None),
+            ("Subf2m", self.search_subf2m, None),
+            ("YIFY", self.search_yifysubtitles, None),
+            ("Podnapisi", self.search_podnapisi, None),
+            # SubDivX is a Spanish-language site; querying it otherwise is waste.
+            ("SubDivX", self.search_subdivx,
+             lambda codes: any(c in codes for c in ("spa", "es", "es-MX"))),
+            ("Jimaku", self.search_jimaku, None),
+        ]
+
+        for name, search_fn, predicate in provider_specs:
+            if not self.is_provider_enabled(name):
+                logger.info(f"→ Skipping {name} (disabled in settings)")
+                continue
+            if predicate and not predicate(lang_codes):
+                logger.debug(f"→ Skipping {name} (not applicable to {lang_codes})")
+                continue
+
+            logger.info(f"→ Searching {name}...")
             if progress_callback:
-                progress_callback("SubDivX", all_results.copy(), False)  # Notify start
+                progress_callback(name, all_results.copy(), False)  # Notify start
+
             try:
-                subdivx_results = self.search_subdivx(video_path, lang_codes)
-                logger.info(f"  SubDivX returned {len(subdivx_results)} results")
-                all_results.extend(subdivx_results)
-                if subdivx_results:
-                    logger.info(f"  ✅ SubDivX: Found {len(subdivx_results)} subtitles")
+                provider_results = search_fn(video_path, lang_codes) or []
+                logger.info(f"  {name} returned {len(provider_results)} results")
+                for result in provider_results:
+                    result.setdefault("provider", name)
+                all_results.extend(provider_results)
+
+                if provider_results:
+                    logger.info(f"  \u2705 {name}: Found {len(provider_results)} subtitles")
                     if progress_callback:
-                        progress_callback("SubDivX", self._rank_subtitles(all_results.copy()), False)
+                        progress_callback(name, self._rank_subtitles(all_results.copy()), False)
                 else:
-                    logger.info("  ⚠️ SubDivX: No results found")
+                    logger.info(f"  \u26a0\ufe0f {name}: No results")
             except Exception as e:
-                logger.error(f"  ❌ SubDivX search failed: {e}")
-        
-        # Jimaku (Good for anime and Asian content)
-        logger.info("→ Searching Jimaku...")
-        if progress_callback:
-            progress_callback("Jimaku", all_results.copy(), False)  # Notify start
-        try:
-            jimaku_results = self.search_jimaku(video_path, lang_codes)
-            logger.info(f"  Jimaku returned {len(jimaku_results)} results")
-            all_results.extend(jimaku_results)
-            if jimaku_results:
-                logger.info(f"  ✅ Jimaku: Found {len(jimaku_results)} subtitles")
-                if progress_callback:
-                    progress_callback("Jimaku", self._rank_subtitles(all_results.copy()), False)
-        except Exception as e:
-            logger.debug(f"  Jimaku search failed (expected for scraping providers): {e}")
-        
+                logger.error(f"  \u274c {name} search failed: {e}")
+
         logger.info(f"=== SEARCH COMPLETE: Total {len(all_results)} subtitle(s) from {len(set(r.get('provider', 'unknown') for r in all_results))} provider(s) ===")
         
         if all_results:

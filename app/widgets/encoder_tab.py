@@ -4,6 +4,9 @@ File list, settings panel, and queue management for video encoding
 """
 
 import logging
+import os
+import subprocess
+import sys
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
@@ -82,6 +85,20 @@ class EncoderTab(QWidget):
         self._setup_ui()
         self._connect_signals()
         self._apply_saved_encoder_defaults()
+
+    def _configured_hw_backend(self) -> str:
+        """
+        Read the hardware-acceleration backend chosen in Settings.
+
+        Returns the combo's stored value ("None", "NVENC (NVIDIA)", …), or
+        "Auto" if it could not be read — in which case the encoder picks
+        whichever backend the machine actually supports.
+        """
+        try:
+            return get_settings_manager().encoder.hw_accel or "Auto"
+        except Exception as e:
+            logger.debug(f"Could not read hardware acceleration setting: {e}")
+            return "Auto"
 
     def _apply_saved_encoder_defaults(self):
         try:
@@ -436,8 +453,9 @@ class EncoderTab(QWidget):
         """Connect widget signals to slots."""
         # Connect table signals
         self.files_table.itemSelectionChanged.connect(self._on_file_selected)
-        self.files_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.files_table.customContextMenuRequested.connect(self._show_context_menu)
+        # The context menu is already wired during table construction; connecting
+        # it a second time made every right-click open the menu twice (nested
+        # exec()), so dismissing one immediately showed another.
 
         # Button connections
         self.start_btn.clicked.connect(self._start_encoding)
@@ -555,31 +573,59 @@ class EncoderTab(QWidget):
         # Start encoding
         self._encode_file(row, file_path)
     
+    def _row_for_path(self, file_path: str) -> int:
+        """
+        Look up the current table row holding `file_path`.
+
+        Rows shift whenever the user removes an entry mid-batch, so a row index
+        captured when the encode started goes stale and updates land on the
+        wrong file. The path stored in UserRole is the stable identity.
+
+        Returns:
+            The row index, or -1 if the file is no longer in the table.
+        """
+        for row in range(self.files_table.rowCount()):
+            item = self.files_table.item(row, 1)
+            if item and item.data(Qt.ItemDataRole.UserRole) == file_path:
+                return row
+        return -1
+
     def _encode_file(self, proc_row: int, file_path: Path):
         """Start encoding a single file."""
         # Generate output path
         output_path = self._generate_output_path(file_path)
-        
+
+        # Remember the path this job actually targets. Recomputing it later
+        # would read the format combo as it is *then*, which the user may have
+        # changed while the encode was running.
+        name_item = self.files_table.item(proc_row, 1)
+        if name_item:
+            name_item.setData(Qt.ItemDataRole.UserRole + 1, str(output_path))
+
         # Get encoder settings
         settings = self._get_encoder_settings()
-        
+
         # Create worker
         worker = EncoderWorker(file_path, output_path, settings)
-        
-        # Connect signals
+
+        # Signals carry the file path, not the row index, and each handler
+        # re-resolves the row at delivery time.
+        path_str = str(file_path)
         worker.signals.started.connect(
-            lambda: self._on_encode_started(proc_row, str(file_path))
+            lambda: self._on_encode_started(self._row_for_path(path_str), path_str)
         )
         worker.signals.progress.connect(
-            lambda cur, tot, msg: self._on_encode_progress(proc_row, cur, tot, msg)
+            lambda cur, tot, msg: self._on_encode_progress(
+                self._row_for_path(path_str), cur, tot, msg
+            )
         )
         worker.signals.result.connect(
-            lambda result: self._on_encode_completed(proc_row, str(file_path))
+            lambda result: self._on_encode_completed(self._row_for_path(path_str), path_str)
         )
         worker.signals.error.connect(
-            lambda error: self._on_encode_error(proc_row, str(file_path), error)
+            lambda error: self._on_encode_error(self._row_for_path(path_str), path_str, error)
         )
-        
+
         # Track worker
         self.active_workers[str(file_path)] = worker
         
@@ -629,6 +675,10 @@ class EncoderTab(QWidget):
             'quality': self.quality_combo.currentText(),
             'preset': self.preset_combo.currentText(),
             'hw_accel': self.hw_accel_check.isChecked(),
+            # Which backend the user picked in Settings. Without this the worker
+            # has no way to tell NVENC from AMF/QSV/VideoToolbox and defaults
+            # every machine to NVENC.
+            'hw_accel_backend': self._configured_hw_backend(),
             'normalize_audio': self.normalize_audio_check.isChecked() or audio_text == 'Normalize+Copy',
             'container': self.format_combo.currentText().lower(),
             'subtitle_handling': subtitle_map.get(self.subtitle_handling_combo.currentText(), 'keep'),
@@ -793,6 +843,8 @@ class EncoderTab(QWidget):
     
     def _on_encode_progress(self, proc_row: int, current: int, total: int, message: str):
         """Handle encoding progress update."""
+        if proc_row < 0:
+            return  # Row was removed from the queue while encoding
         # Parse ETA from message if encoded
         eta = "-"
         if "|eta:" in message:
@@ -822,30 +874,45 @@ class EncoderTab(QWidget):
     
     def _on_encode_completed(self, proc_row: int, file_path: str):
         """Handle encoding completed event."""
-        # Update status to completed
-        self.files_table.setItem(proc_row, 7, QTableWidgetItem("Completed"))
-        status_item = self.files_table.item(proc_row, 7)
-        if status_item:
-            status_item.setForeground(QColor(34, 197, 94))  # #22c55e success green
+        # A result can still arrive after the user pressed Stop; reporting the
+        # job as "Completed" would label a truncated partial file as good.
+        worker = self.active_workers.get(file_path)
+        cancelled = worker is not None and getattr(worker, "_should_stop", False)
 
-        # Update progress to 100%
-        progress_bar = self.files_table.cellWidget(proc_row, 5)
-        if progress_bar and isinstance(progress_bar, QProgressBar):
-            progress_bar.setValue(100)
-        
-        # Update ETA to completion time
-        self.files_table.setItem(proc_row, 6, QTableWidgetItem("00:00"))
-        
-        # Update output file size if available
-        output_path = self._generate_output_path(Path(file_path))
-        if output_path.exists():
-            new_size = output_path.stat().st_size / (1024 * 1024)  # MB
-            self.files_table.setItem(proc_row, 4, QTableWidgetItem(f"{new_size:.2f} MB"))
-        
+        if proc_row >= 0:
+            label = "Cancelled" if cancelled else "Completed"
+            colour = QColor(148, 163, 184) if cancelled else QColor(34, 197, 94)
+            self.files_table.setItem(proc_row, 7, QTableWidgetItem(label))
+            status_item = self.files_table.item(proc_row, 7)
+            if status_item:
+                status_item.setForeground(colour)
+
+            # Update progress to 100%
+            progress_bar = self.files_table.cellWidget(proc_row, 5)
+            if progress_bar and isinstance(progress_bar, QProgressBar) and not cancelled:
+                progress_bar.setValue(100)
+
+            # Update ETA to completion time
+            self.files_table.setItem(proc_row, 6, QTableWidgetItem("00:00"))
+
+            # Use the output path recorded when this job started, so a format
+            # change mid-encode does not leave the size column blank.
+            name_item = self.files_table.item(proc_row, 1)
+            recorded = name_item.data(Qt.ItemDataRole.UserRole + 1) if name_item else None
+            output_path = Path(recorded) if recorded else self._generate_output_path(Path(file_path))
+            if output_path.exists() and not cancelled:
+                new_size = output_path.stat().st_size / (1024 * 1024)  # MB
+                self.files_table.setItem(proc_row, 4, QTableWidgetItem(f"{new_size:.2f} MB"))
+
         # Remove from active workers
         if file_path in self.active_workers:
             del self.active_workers[file_path]
-        
+
+        if cancelled:
+            logger.info(f"Encode cancelled: {file_path}")
+            self._check_queue_complete()
+            return
+
         self.encode_completed.emit(file_path)
         logger.info(f"Encode completed: {file_path}")
         
@@ -858,16 +925,17 @@ class EncoderTab(QWidget):
         """Handle encoding error event."""
         exc_type, value, tb = error
         error_msg = str(value)
-        
-        # Update status to error
-        self.files_table.setItem(proc_row, 7, QTableWidgetItem(f"Error: {error_msg}"))
-        status_item = self.files_table.item(proc_row, 7)
-        if status_item:
-            status_item.setForeground(QColor(239, 68, 68))  # #ef4444 error red
 
-        # Remove progress bar
-        self.files_table.removeCellWidget(proc_row, 5)
-        
+        if proc_row >= 0:
+            # Update status to error
+            self.files_table.setItem(proc_row, 7, QTableWidgetItem(f"Error: {error_msg}"))
+            status_item = self.files_table.item(proc_row, 7)
+            if status_item:
+                status_item.setForeground(QColor(239, 68, 68))  # #ef4444 error red
+
+            # Remove progress bar
+            self.files_table.removeCellWidget(proc_row, 5)
+
         # Remove from active workers
         if file_path in self.active_workers:
             del self.active_workers[file_path]
@@ -879,14 +947,36 @@ class EncoderTab(QWidget):
         self._check_queue_complete()
     
     def _stop_encoding(self):
-        """Stop all active encoding tasks."""
-        for worker in self.active_workers.values():
-            worker.stop()
-        
+        """Stop all active encoding tasks and mark their rows as cancelled."""
+        stopped_paths = list(self.active_workers.keys())
+
+        for file_path, worker in list(self.active_workers.items()):
+            try:
+                worker.stop()
+            except RuntimeError as e:
+                # The underlying QRunnable auto-deletes as soon as run() returns,
+                # so a job that finished microseconds before Stop was pressed may
+                # already be gone.
+                logger.debug(f"Worker for {file_path} already finished: {e}")
+
+        # Leave no row reading "Encoding…" forever.
+        for file_path in stopped_paths:
+            row = self._row_for_path(file_path)
+            if row < 0:
+                continue
+            status_item = self.files_table.item(row, 7)
+            if status_item and status_item.text().startswith(("Encoding", "Queued")):
+                self.files_table.setItem(row, 7, QTableWidgetItem("Cancelled"))
+                cancelled_item = self.files_table.item(row, 7)
+                if cancelled_item:
+                    cancelled_item.setForeground(QColor(148, 163, 184))
+            self.files_table.removeCellWidget(row, 5)
+            self.files_table.setItem(row, 6, QTableWidgetItem("-"))
+
         self.active_workers.clear()
         self.stop_btn.setEnabled(False)
         self.start_btn.setEnabled(True)
-        logger.info("Stopped all encoding tasks")
+        logger.info(f"Stopped {len(stopped_paths)} encoding task(s)")
     
     def _check_queue_complete(self):
         """Check if all encoding tasks are complete."""
@@ -1243,12 +1333,30 @@ class EncoderTab(QWidget):
     def _open_output_folder(self, row: int):
         """Open the output folder for a completed file."""
         name_item = self.files_table.item(row, 1)
-        if name_item:
-            file_path = Path(name_item.data(Qt.ItemDataRole.UserRole))
-            output_path = self._generate_output_path(file_path)
-            if output_path.exists():
-                import os
-                os.startfile(str(output_path.parent))
+        if not name_item:
+            return
+
+        file_path = Path(name_item.data(Qt.ItemDataRole.UserRole))
+        # Prefer the path recorded when the encode finished; regenerating it
+        # reads the current format combo, which may have changed since.
+        recorded = name_item.data(Qt.ItemDataRole.UserRole + 1)
+        output_path = Path(recorded) if recorded else self._generate_output_path(file_path)
+
+        folder = output_path.parent if output_path.exists() else file_path.parent
+        if not folder.exists():
+            logger.warning(f"Output folder does not exist: {folder}")
+            return
+
+        # os.startfile is Windows-only; EncodeForge ships Linux and macOS builds.
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(folder))  # noqa: F821 - Windows only
+            elif sys.platform == "darwin":
+                subprocess.run(["open", str(folder)], check=False)
+            else:
+                subprocess.run(["xdg-open", str(folder)], check=False)
+        except Exception as e:
+            logger.error(f"Could not open output folder {folder}: {e}")
     
     def _retry_file_encoding(self, row: int):
         """Retry encoding for a failed or cancelled file."""

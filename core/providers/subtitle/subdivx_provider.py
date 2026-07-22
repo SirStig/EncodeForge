@@ -21,7 +21,7 @@ try:
 except ImportError:
     BS4_AVAILABLE = False
 
-from .base_provider import BaseSubtitleProvider
+from .base_provider import BaseSubtitleProvider, looks_like_subtitle
 
 logger = logging.getLogger(__name__)
 
@@ -177,17 +177,27 @@ class SubDivXProvider(BaseSubtitleProvider):
                 
                 # Write to file (handle Latin-1 encoding for Spanish subtitles)
                 try:
-                    # Try to detect and convert encoding
+                    if not looks_like_subtitle(content):
+                        logger.error(
+                            "SubDivX: downloaded data is not subtitle text "
+                            "(archive extraction failed or an error page was served)"
+                        )
+                        return False, "SubDivX: Downloaded file is not a valid subtitle"
+
+                    # Only transcode when the data is *not* already UTF-8.
+                    # bytes.decode('latin-1') maps all 256 byte values and can
+                    # never raise, so converting unconditionally turned every
+                    # UTF-8 subtitle into mojibake ("Aquí" -> "AquÃ­").
                     try:
-                        text = content.decode('latin-1')
-                        content = text.encode('utf-8')
+                        content.decode('utf-8')
+                        logger.debug("SubDivX: content is already UTF-8, leaving as-is")
+                    except UnicodeDecodeError:
+                        content = content.decode('latin-1').encode('utf-8')
                         logger.debug("SubDivX: Converted from Latin-1 to UTF-8")
-                    except:
-                        pass  # Keep original if conversion fails
-                    
+
                     with open(output_path, 'wb') as f:
                         f.write(content)
-                    
+
                     logger.info(f"✅ Downloaded from SubDivX: {output_path}")
                     return True, output_path
                 except Exception as e:

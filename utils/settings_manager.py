@@ -5,6 +5,8 @@ Persistent application settings with validation and defaults
 
 import json
 import logging
+import os
+import threading
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
@@ -16,10 +18,37 @@ from core.handlers.models import ConversionSettings
 logger = logging.getLogger(__name__)
 
 
-def _conversion_from_dict(data: Dict[str, Any]) -> ConversionSettings:
-    valid = {f.name for f in fields(ConversionSettings)}
+def _from_dict(cls, data: Any, section_name: str):
+    """
+    Build a settings dataclass from stored JSON, ignoring unknown keys.
+
+    Settings files outlive the code that wrote them. Passing the stored dict
+    straight into the constructor makes any removed or renamed field raise
+    TypeError, so filtering to the fields the class actually declares is what
+    keeps an older file loadable.
+    """
+    if not isinstance(data, dict):
+        logger.warning(f"Settings section '{section_name}' is not an object; using defaults")
+        return cls()
+
+    valid = {f.name for f in fields(cls)}
+    unknown = set(data) - valid
+    if unknown:
+        logger.info(
+            f"Ignoring {len(unknown)} unrecognised key(s) in settings section "
+            f"'{section_name}': {', '.join(sorted(unknown))}"
+        )
+
     kwargs = {k: v for k, v in data.items() if k in valid}
-    return ConversionSettings(**kwargs)
+    try:
+        return cls(**kwargs)
+    except Exception as e:
+        logger.error(f"Could not load settings section '{section_name}': {e}")
+        return cls()
+
+
+def _conversion_from_dict(data: Dict[str, Any]) -> ConversionSettings:
+    return _from_dict(ConversionSettings, data, 'conversion')
 
 
 @dataclass
@@ -99,34 +128,42 @@ class SettingsManager:
     """
     
     _instance: Optional['SettingsManager'] = None
-    
+    _lock = threading.RLock()
+
     def __new__(cls):
         """Singleton pattern."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+        with cls._lock:
+            if cls._instance is None:
+                instance = super().__new__(cls)
+                instance._initialized = False
+                cls._instance = instance
         return cls._instance
-    
+
     def __init__(self):
         """Initialize settings manager."""
-        if self._initialized:
-            return
-        
-        self._initialized = True
-        self.settings_file = path_manager.get_settings_file()
-        
-        # Initialize settings with defaults
-        self.encoder = EncoderSettings()
-        self.subtitle = SubtitleSettings()
-        self.renamer = RenamerSettings()
-        self.ui = UISettings()
-        self.application = ApplicationSettings()
-        self.conversion = ConversionSettings()
-        
-        # Load settings from disk
-        self.load()
-        
-        logger.info("Settings manager initialized")
+        # Worker threads construct SettingsManager() concurrently with startup.
+        # The whole body must be serialised, and _initialized must only be set
+        # once the attributes exist — otherwise a second thread returns early
+        # from __init__ and reads an object that has no `application` yet.
+        with self._lock:
+            if self._initialized:
+                return
+
+            self.settings_file = path_manager.get_settings_file()
+
+            # Initialize settings with defaults
+            self.encoder = EncoderSettings()
+            self.subtitle = SubtitleSettings()
+            self.renamer = RenamerSettings()
+            self.ui = UISettings()
+            self.application = ApplicationSettings()
+            self.conversion = ConversionSettings()
+
+            # Load settings from disk
+            self.load()
+
+            self._initialized = True
+            logger.info("Settings manager initialized")
 
     def get_merged_conversion_settings(self) -> ConversionSettings:
         c = deepcopy(self.conversion)
@@ -151,23 +188,29 @@ class SettingsManager:
         }
     
     def from_dict(self, data: Dict[str, Any]):
-        """Load settings from dictionary."""
-        try:
-            if 'encoder' in data:
-                self.encoder = EncoderSettings(**data['encoder'])
-            if 'subtitle' in data:
-                self.subtitle = SubtitleSettings(**data['subtitle'])
-            if 'renamer' in data:
-                self.renamer = RenamerSettings(**data['renamer'])
-            if 'ui' in data:
-                self.ui = UISettings(**data['ui'])
-            if 'application' in data:
-                self.application = ApplicationSettings(**data['application'])
-            if 'conversion' in data and isinstance(data['conversion'], dict):
-                self.conversion = _conversion_from_dict(data['conversion'])
-        except Exception as e:
-            logger.error(f"Error loading settings from dict: {e}")
-            logger.info("Using default settings")
+        """
+        Load settings from a dictionary.
+
+        Each section is loaded independently so that a problem in one cannot
+        discard the others — previously a single bad key in 'encoder' meant
+        'conversion' (which holds every API key) was never reached at all.
+        """
+        if not isinstance(data, dict):
+            logger.error("Settings file does not contain an object; using defaults")
+            return
+
+        sections = (
+            ('encoder', EncoderSettings),
+            ('subtitle', SubtitleSettings),
+            ('renamer', RenamerSettings),
+            ('ui', UISettings),
+            ('application', ApplicationSettings),
+            ('conversion', ConversionSettings),
+        )
+
+        for name, cls in sections:
+            if name in data:
+                setattr(self, name, _from_dict(cls, data[name], name))
     
     def load(self) -> bool:
         """
@@ -204,17 +247,45 @@ class SettingsManager:
         try:
             # Ensure directory exists
             self.settings_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Save with pretty formatting
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
+
+            # Write to a sibling temp file and swap it in atomically. Writing in
+            # place means a crash or a full disk mid-write leaves truncated JSON
+            # that fails to parse on the next launch, taking every API key and
+            # preference with it.
+            tmp_path = self.settings_file.with_name(self.settings_file.name + '.tmp')
+            with open(tmp_path, 'w', encoding='utf-8') as f:
                 json.dump(self.to_dict(), f, indent=2)
-            
+                f.flush()
+                os.fsync(f.fileno())
+
+            os.replace(tmp_path, self.settings_file)
+            self._restrict_permissions(self.settings_file)
+
             logger.debug(f"Saved settings to {self.settings_file}")
             return True
-        
+
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except (OSError, UnboundLocalError, NameError):
+                pass
             return False
+
+    @staticmethod
+    def _restrict_permissions(path: Path) -> None:
+        """
+        Make the settings file owner-only.
+
+        It stores API keys in plaintext, and the default umask leaves it
+        world-readable on Linux and macOS.
+        """
+        if os.name == 'nt':
+            return
+        try:
+            os.chmod(path, 0o600)
+        except OSError as e:
+            logger.debug(f"Could not restrict permissions on {path}: {e}")
     
     def reset(self):
         """Reset all settings to defaults."""
@@ -251,23 +322,38 @@ class SettingsManager:
         self.save()
         logger.info(f"Reset {section} settings to defaults")
     
-    def export_settings(self, file_path: Path) -> bool:
+    def export_settings(self, file_path: Path, include_secrets: bool = False) -> bool:
         """
         Export settings to file.
-        
+
         Args:
             file_path: Path to export file
-            
+            include_secrets: Include API keys in the export. Off by default —
+                exports are commonly shared in bug reports and forum posts.
+
         Returns:
             True if exported successfully
         """
         try:
+            data = self.to_dict()
+
+            if not include_secrets:
+                conversion = data.get('conversion', {})
+                redacted = [k for k in conversion if k.endswith('_api_key') and conversion[k]]
+                for key in redacted:
+                    conversion[key] = ''
+                if redacted:
+                    logger.info(
+                        f"Excluded {len(redacted)} API key(s) from export. "
+                        "Pass include_secrets=True to export them."
+                    )
+
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(self.to_dict(), f, indent=2)
-            
+                json.dump(data, f, indent=2)
+
             logger.info(f"Exported settings to {file_path}")
             return True
-        
+
         except Exception as e:
             logger.error(f"Failed to export settings: {e}")
             return False

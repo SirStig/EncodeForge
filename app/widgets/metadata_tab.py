@@ -452,10 +452,24 @@ class MetadataTab(QWidget):
         self.metadata_table.setRowCount(n)
         for row in range(n):
             file_item = self.file_table.item(row, 0)
-            if file_item:
-                file_path = Path(file_item.data(Qt.ItemDataRole.UserRole))
-                new_name = self._generate_new_name(file_path, pattern, None)
-                self.metadata_table.setItem(row, 0, QTableWidgetItem(new_name))
+            if not file_item:
+                continue
+
+            file_path = Path(file_item.data(Qt.ItemDataRole.UserRole))
+
+            # Reuse the metadata fetched earlier instead of discarding it.
+            # Replacing the cell with a bare item dropped the UserRole payload
+            # that _apply_rename requires, so Fetch → Preview → Apply renamed
+            # nothing at all and reported no error.
+            existing = self.metadata_table.item(row, 0)
+            metadata = existing.data(Qt.ItemDataRole.UserRole) if existing else None
+
+            new_name = self._generate_new_name(file_path, pattern, metadata)
+            preview_item = QTableWidgetItem(new_name)
+            if metadata is not None:
+                preview_item.setData(Qt.ItemDataRole.UserRole, metadata)
+            self.metadata_table.setItem(row, 0, preview_item)
+
         self.rename_btn.setEnabled(True)
         logger.info("Generated name previews")
 

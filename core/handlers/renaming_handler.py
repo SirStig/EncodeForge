@@ -20,7 +20,29 @@ class RenamingHandler:
     def __init__(self, settings: ConversionSettings, renamer):
         self.settings = settings
         self.renamer = renamer
-    
+
+    @property
+    def _ffprobe(self) -> str:
+        """
+        Resolve the FFprobe executable.
+
+        A bare "ffprobe" is not reachable when FFmpeg was installed by the app's
+        own downloader, which puts it outside PATH — metadata extraction then
+        fails silently and every rename preview degrades to a filename guess.
+        """
+        configured = (getattr(self.settings, 'ffprobe_path', '') or '').strip()
+        if configured:
+            return configured
+        try:
+            from utils.ffmpeg_manager import get_ffmpeg_manager
+            path = get_ffmpeg_manager().get_ffprobe_path()
+            if path:
+                return str(path)
+        except Exception as e:
+            logger.debug(f"Could not resolve FFprobe path from manager: {e}")
+        return "ffprobe"
+
+
     def _extract_metadata_from_file(self, file_path: str) -> Optional[Dict]:
         """
         Extract any useful metadata from video file for searching providers
@@ -36,7 +58,7 @@ class RenamingHandler:
             
             # Step 1: Try FFprobe to get embedded metadata
             cmd = [
-                'ffprobe',
+                self._ffprobe,
                 '-v', 'quiet',
                 '-print_format', 'json',
                 '-show_format',
@@ -82,9 +104,12 @@ class RenamingHandler:
             
             # Step 2: Try standard S##E## pattern parsing
             season_episode_patterns = [
-                r'[Ss](\d+)[Ee](\d+)',  # S01E02
-                r'(\d+)[xX](\d+)',       # 1x02
-                r'[Ss]eason\s*(\d+).*?[Ee]pisode\s*(\d+)',  # Season 1 Episode 2
+                r'[Ss](\d{1,2})[Ee](\d{1,3})',  # S01E02
+                # 1x02 — bounded to 1-2 digit seasons and preceded by a
+                # separator so a resolution like "1920x1080" is not parsed as
+                # season 1920 episode 1080.
+                r'(?:^|[.\s_\-\[])(\d{1,2})[xX](\d{1,3})(?:$|[.\s_\-\]])',
+                r'[Ss]eason\s*(\d{1,2}).*?[Ee]pisode\s*(\d{1,3})',  # Season 1 Episode 2
             ]
             
             show_name = None
@@ -284,13 +309,26 @@ class RenamingHandler:
         if not results_list:
             return None
         
-        # Common Japanese romaji words that indicate it's not an English title
-        japanese_indicators = [
+        # Common Japanese romaji words that indicate it's not an English title.
+        #
+        # These are matched as whole words. A substring test made the two-letter
+        # particles ('no', 'wa', 'ni', 'to', …) fire on ordinary English titles —
+        # "The Night Of", "Doctor Who" and "Snowfall" all classified as Japanese,
+        # so every candidate was rejected and the function degenerated into
+        # "return the first result".
+        japanese_indicators = {
             'watashi', 'no', 'wa', 'ga', 'wo', 'ni', 'de', 'to', 'kara', 'made',
             'shiawase', 'kekkon', 'shoujo', 'shounen', 'sensei', 'sama', 'chan', 'kun',
-            'anime', 'manga', 'otaku', 'kawaii', 'sugoi', 'desu', 'masu', 'です', 'ます'
-        ]
-        
+            'otaku', 'kawaii', 'sugoi', 'desu', 'masu',
+        }
+
+        def _looks_japanese(title: str) -> bool:
+            # Any CJK character is decisive on its own.
+            if any('぀' <= ch <= 'ヿ' or '一' <= ch <= '鿿' for ch in title):
+                return True
+            words = set(re.findall(r"[a-z']+", title.lower()))
+            return bool(words & japanese_indicators)
+
         # First pass: Look for results from providers known to give English titles
         preferred_sources = ['tvdb', 'tvmaze', 'tmdb', 'trakt', 'omdb', 'anidb', 'kitsu', 'jikan']
         for result in results_list:
@@ -299,9 +337,8 @@ class RenamingHandler:
             
             if source in preferred_sources and title:
                 # Check if title contains Japanese romaji words
-                title_lower = title.lower()
-                has_japanese = any(word in title_lower for word in japanese_indicators)
-                
+                has_japanese = _looks_japanese(title)
+
                 if not has_japanese:
                     logger.info(f"  Preferring English title from {source}: {title}")
                     return result
@@ -310,9 +347,8 @@ class RenamingHandler:
         for result in results_list:
             title = result.get('show_title', '') or result.get('title', '')
             if title:
-                title_lower = title.lower()
-                has_japanese = any(word in title_lower for word in japanese_indicators)
-                
+                has_japanese = _looks_japanese(title)
+
                 if not has_japanese:
                     logger.info(f"  Selecting non-Japanese title: {title}")
                     return result
@@ -937,7 +973,11 @@ class RenamingHandler:
             invalid_chars = r'[/\x00]'
         
         result = re.sub(invalid_chars, '', filename)
-        
+
+        # Control characters are legal on POSIX but corrupt listings and can
+        # come straight from a provider's plot/overview field.
+        result = re.sub(r'[\x00-\x1f\x7f]', '', result)
+
         # Additional platform-specific handling
         if system == "windows":
             # Remove trailing dots and spaces (Windows doesn't like them)
@@ -946,6 +986,31 @@ class RenamingHandler:
             reserved_names = {'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'}
             if result.upper() in reserved_names:
                 result = result + "_"
-        
+
+        # A leading dot hides the file on POSIX; a leading/trailing space is
+        # silently mangled on Windows.
+        result = result.strip().lstrip('.')
+
+        # Filesystems cap a single name at 255 *bytes*, not characters — a
+        # pattern including {overview}, or any CJK title, blows past that and
+        # surfaces as an opaque "[Errno 36] File name too long".
+        result = self._truncate_to_bytes(result, 255)
+
         return result
+
+    @staticmethod
+    def _truncate_to_bytes(name: str, max_bytes: int) -> str:
+        """
+        Truncate `name` so its UTF-8 encoding fits `max_bytes`, without
+        splitting a multi-byte character.
+        """
+        encoded = name.encode('utf-8')
+        if len(encoded) <= max_bytes:
+            return name
+
+        truncated = encoded[:max_bytes].decode('utf-8', errors='ignore').rstrip()
+        logger.warning(
+            f"Filename exceeded {max_bytes} bytes and was truncated: {name[:60]}…"
+        )
+        return truncated
 

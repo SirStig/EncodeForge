@@ -55,8 +55,26 @@ class _WhisperWorker(QRunnable):
         self.task = task
         self.model_name = model_name
         self.signals = _WorkerSignals()
+        self._cancelled = False
+
+    def stop(self):
+        """
+        Detach this worker from the UI.
+
+        The underlying download happens inside the model library and cannot be
+        interrupted mid-transfer, so cancellation means "stop reporting to a
+        dialog that is going away" rather than aborting the transfer.
+        """
+        self._cancelled = True
+        try:
+            self.signals.progress.disconnect()
+            self.signals.finished.disconnect()
+        except (RuntimeError, TypeError):
+            pass  # Nothing connected
 
     def run(self):
+        if self._cancelled:
+            return
         try:
             from core.providers.subtitle.whisper_manager import WhisperManager
             mgr = WhisperManager()
@@ -80,11 +98,30 @@ class WhisperSetupDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Whisper AI Setup")
         self.setMinimumSize(540, 480)
-        self._pool = QThreadPool()
-        self._pool.setMaxThreadCount(1)
+        # Use the shared global pool rather than a dialog-owned one: a
+        # QThreadPool blocks in its destructor until every runnable finishes,
+        # so a dialog-owned pool froze the whole application when the user
+        # closed this window during a multi-gigabyte model download.
+        self._pool = QThreadPool.globalInstance()
         self._model_btns: dict[str, QPushButton] = {}
+        self._active_workers: list = []
         self._setup_ui()
         self._refresh_status()
+
+    def closeEvent(self, event):
+        """Detach in-flight workers so they cannot touch a destroyed dialog."""
+        for worker in list(self._active_workers):
+            try:
+                worker.stop()
+            except Exception as e:
+                logger.debug(f"Could not detach Whisper worker: {e}")
+        self._active_workers.clear()
+        super().closeEvent(event)
+
+    def reject(self):
+        """Route Esc / Cancel through the same cleanup as the close button."""
+        self.close()
+        super().reject()
 
     # ------------------------------------------------------------------
     # UI build
@@ -257,6 +294,10 @@ class WhisperSetupDialog(QDialog):
         worker = _WhisperWorker("install")
         worker.signals.progress.connect(self._on_progress)
         worker.signals.finished.connect(self._on_finished)
+        self._active_workers.append(worker)
+        worker.signals.finished.connect(
+            lambda *_, w=worker: w in self._active_workers and self._active_workers.remove(w)
+        )
         self._pool.start(worker)
 
     def _run_download(self, model_name: str):
@@ -265,6 +306,10 @@ class WhisperSetupDialog(QDialog):
         worker = _WhisperWorker("download", model_name)
         worker.signals.progress.connect(self._on_progress)
         worker.signals.finished.connect(self._on_finished)
+        self._active_workers.append(worker)
+        worker.signals.finished.connect(
+            lambda *_, w=worker: w in self._active_workers and self._active_workers.remove(w)
+        )
         self._pool.start(worker)
 
     def _on_progress(self, data: dict):

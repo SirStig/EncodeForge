@@ -5,6 +5,7 @@ OpenSubtitles Manager - Handles subtitle download from OpenSubtitles.com API
 
 import json
 import logging
+import os
 import shutil
 import struct
 import urllib.error
@@ -13,7 +14,7 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .base_provider import BaseSubtitleProvider
+from .base_provider import BaseSubtitleProvider, languages_match
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,12 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
     API_URL = "https://api.opensubtitles.com/api/v1"
     USER_AGENT = "Encode Forge"  # MUST match registered Consumer name exactly
     
+    # Bundled fallback consumer key. It ships inside every build and is public
+    # in the repository history, so it is shared across the whole user base and
+    # subject to a single rate-limit bucket. A user-supplied key or the
+    # ENCODEFORGE_OPENSUBTITLES_KEY environment variable always takes priority.
     CONSUMER_API_KEY = "N5GIH7h6rpgt9HpG9wqwtXqCoLM07Ot0"
-    
+
     def __init__(self, api_key: str = "", username: str = "", password: str = ""):
         """
         Initialize OpenSubtitles manager.
@@ -54,7 +59,15 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
             password: User's OpenSubtitles password (optional)
         """
         super().__init__()
-        self.consumer_api_key = self.CONSUMER_API_KEY or api_key.strip()
+        # Priority: explicitly configured key > environment override > bundled
+        # fallback. The previous order put the class constant first, which is
+        # always truthy — so a user's own key could never take effect and there
+        # was no way to recover if the bundled key was revoked.
+        self.consumer_api_key = (
+            (api_key or "").strip()
+            or os.environ.get("ENCODEFORGE_OPENSUBTITLES_KEY", "").strip()
+            or self.CONSUMER_API_KEY
+        )
         self.username = username.strip() if username else ""
         self.password = password.strip() if password else ""
         self.user_token = None
@@ -127,7 +140,8 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
                 error_body = e.read().decode()
                 error_data = json.loads(error_body)
                 logger.error(f"Error: {error_data.get('message', error_body)}")
-            except:
+            except Exception:
+                # A bare `except` here also swallowed KeyboardInterrupt.
                 pass
             return False
         except Exception as e:
@@ -531,8 +545,13 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
         
         # Download subtitles for each language
         for language in languages:
-            # Find best subtitle for this language
-            lang_results = [r for r in results if r["language"] == language]
+            # Find best subtitle for this language. Callers pass normalised
+            # 3-letter codes ('eng') while the API returns 2-letter ones ('en'),
+            # so an exact string comparison never matched and every download
+            # reported "no subtitles found".
+            lang_results = [
+                r for r in results if languages_match(language, r.get("language", ""))
+            ]
             
             if not lang_results:
                 continue

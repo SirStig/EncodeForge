@@ -21,7 +21,7 @@ try:
 except ImportError:
     BS4_AVAILABLE = False
 
-from .base_provider import BaseSubtitleProvider
+from .base_provider import BaseSubtitleProvider, looks_like_subtitle, languages_match, to_iso639_1
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +47,11 @@ class PodnapisiProvider(BaseSubtitleProvider):
             if not search_name:
                 return results
             
-            # Convert language codes to Podnapisi format (2-letter)
-            podnapisi_langs = []
-            for lang in languages:
-                if len(lang) == 3:
-                    podnapisi_langs.append(lang[:2].upper())
-                else:
-                    podnapisi_langs.append(lang.upper())
+            # Convert language codes to Podnapisi format (2-letter ISO 639-1).
+            # Slicing the first two characters off a 3-letter code produced
+            # invalid values — 'ger' became 'GE' rather than 'DE' — so German,
+            # Chinese, Dutch, Czech and Greek never matched a single row.
+            podnapisi_langs = [to_iso639_1(lang).upper() for lang in languages if lang]
             
             search_queries = []
             if season and episode:
@@ -122,9 +120,9 @@ class PodnapisiProvider(BaseSubtitleProvider):
                                 lang_img = row.find('img', alt=True)
                                 row_lang = 'en'
                                 if lang_img:
-                                    lang_alt = lang_img.get('alt', '').upper()
-                                    if lang_alt[:2] in podnapisi_langs:
-                                        row_lang = lang_alt[:2].lower()
+                                    lang_alt = to_iso639_1(lang_img.get('alt', '')).upper()
+                                    if lang_alt in podnapisi_langs:
+                                        row_lang = lang_alt.lower()
                                     else:
                                         continue  # Skip if not requested language
                                 
@@ -249,6 +247,13 @@ class PodnapisiProvider(BaseSubtitleProvider):
                     except Exception as e:
                         logger.warning(f"Podnapisi: ZIP extraction failed: {e}")
                 
+                if not looks_like_subtitle(content):
+                    logger.error(
+                        "Podnapisi: downloaded data is not subtitle text "
+                        "(archive extraction failed or an error page was served)"
+                    )
+                    return False, "Podnapisi: Downloaded file is not a valid subtitle"
+
                 with open(output_path, 'wb') as f:
                     f.write(content)
                 

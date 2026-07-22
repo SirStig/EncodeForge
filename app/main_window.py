@@ -463,34 +463,57 @@ class MainWindow(GlassmorphicMainWindow):
         return None
 
     def _handle_add_files(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "Add Files")
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Add Files",
+            "",
+            "Video Files (*.mp4 *.mkv *.avi *.mov *.wmv *.flv *.webm *.m4v);;All Files (*.*)",
+        )
         if not files:
             return
+
         widget = self._current_mode_widget()
-        # try a few common handler names
-        for method_name in ('add_files', '_add_files', 'add_files_from_paths'):
-            if hasattr(widget, method_name):
+
+        # Every tab implements _add_file_to_table(Path); only the encoder tab
+        # happens to have an _add_files() that accepts a list, which is why the
+        # sidebar button silently did nothing on the other two tabs.
+        adder = getattr(widget, '_add_file_to_table', None)
+        if callable(adder):
+            for file in files:
                 try:
-                    getattr(widget, method_name)(files)
-                    return
+                    adder(Path(file))
                 except Exception:
-                    logger.exception("Failed to call mode add-files handler")
-        # last-resort: log selected files
-        logger.info("Files selected: %s", files)
+                    logger.exception("Failed to add file: %s", file)
+            return
+
+        logger.warning(
+            "Active tab %s cannot accept files", type(widget).__name__
+        )
+        QMessageBox.information(
+            self, "Add Files", "This tab does not support adding files."
+        )
 
     def _handle_add_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Add Folder")
         if not folder:
             return
+
         widget = self._current_mode_widget()
-        for method_name in ('add_folder', '_add_folder', 'add_directory'):
-            if hasattr(widget, method_name):
-                try:
-                    getattr(widget, method_name)(folder)
-                    return
-                except Exception:
-                    logger.exception("Failed to call mode add-folder handler")
-        logger.info("Folder selected: %s", folder)
+
+        adder = getattr(widget, '_add_folder_to_table', None)
+        if callable(adder):
+            try:
+                adder(Path(folder))
+            except Exception:
+                logger.exception("Failed to add folder: %s", folder)
+            return
+
+        logger.warning(
+            "Active tab %s cannot accept folders", type(widget).__name__
+        )
+        QMessageBox.information(
+            self, "Add Folder", "This tab does not support adding folders."
+        )
 
     # -------------------- Status & callbacks --------------------
     def _create_statusbar(self):
@@ -766,9 +789,35 @@ class MainWindow(GlassmorphicMainWindow):
 
     def closeEvent(self, event):
         logger.info("Application closing")
+
+        # Cancel outstanding work before waiting. Without this the pool's
+        # destructor blocks until every queued encode finishes — the window
+        # disappears but the process stays alive and pegged for the rest of the
+        # batch, with no way to quit short of killing it.
+        self._cancel_all_background_work()
+
         try:
             if self.threadpool:
-                self.threadpool.waitForDone(2000)
-        except Exception:
-            pass
+                self.threadpool.clear()  # Drop runnables that never started
+                if not self.threadpool.waitForDone(5000):
+                    logger.warning(
+                        "Background tasks did not stop within 5s; exiting anyway"
+                    )
+        except Exception as e:
+            logger.error(f"Error shutting down thread pool: {e}")
+
         super().closeEvent(event)
+
+    def _cancel_all_background_work(self):
+        """Ask every tab to stop its in-flight workers."""
+        for attr in ("encoder_tab", "subtitle_tab", "metadata_tab"):
+            tab = getattr(self, attr, None)
+            workers = getattr(tab, "active_workers", None)
+            if not workers:
+                continue
+            for name, worker in list(workers.items()):
+                try:
+                    worker.stop()
+                except Exception as e:
+                    logger.debug(f"Could not stop worker {name} on {attr}: {e}")
+            workers.clear()

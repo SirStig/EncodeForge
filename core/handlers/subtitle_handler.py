@@ -43,13 +43,49 @@ class SubtitleHandler:
         logger.info("SubtitleHandler.__init__ EXIT - initialization complete")
     
     @property
+    def _ffmpeg(self) -> str:
+        """
+        Resolve the FFmpeg executable.
+
+        Falls back to the bare name only as a last resort: users who installed
+        FFmpeg through the app's own downloader have it in a directory that is
+        not on PATH, so hardcoding "ffmpeg" makes every embed and burn-in fail.
+        """
+        configured = (getattr(self.settings, 'ffmpeg_path', '') or '').strip()
+        if configured:
+            return configured
+        try:
+            from utils.ffmpeg_manager import get_ffmpeg_manager
+            path = get_ffmpeg_manager().get_ffmpeg_path()
+            if path:
+                return str(path)
+        except Exception as e:
+            logger.debug(f"Could not resolve FFmpeg path from manager: {e}")
+        return "ffmpeg"
+
+    @staticmethod
+    def _escape_filter_path(path: str) -> str:
+        """
+        Escape a path for use inside a single-quoted FFmpeg filtergraph argument.
+
+        FFmpeg parses filtergraphs in three layers, so a path containing an
+        apostrophe, comma, colon, bracket or semicolon corrupts the whole chain
+        unless each is escaped. A single folder like "Tom's Shows" is enough to
+        make burn-in fail with "Error parsing filterchain".
+        """
+        escaped = path.replace('\\', '/')
+        for char in ("'", ':', ',', '[', ']', ';'):
+            escaped = escaped.replace(char, '\\' + char)
+        return escaped
+
+    @property
     def whisper_mgr(self):
         """Lazy access to whisper_mgr"""
         if self._lazy_load and self._whisper_mgr is None:
             # Truly lazy - import and create WhisperManager only when first accessed
             logger.info("Lazy loading WhisperManager for the first time...")
             try:
-                from subtitle_providers.whisper_manager import WhisperManager
+                from core.providers.subtitle.whisper_manager import WhisperManager
                 self._whisper_mgr = WhisperManager()
                 logger.info("WhisperManager loaded successfully")
             except ImportError:
@@ -556,12 +592,18 @@ class SubtitleHandler:
                 })
             
             # Build FFmpeg command for embedding (fast, no re-encoding)
+            # Matroska rejects mov_text outright; MP4 has no other text codec.
+            subtitle_codec = (
+                "mov_text" if Path(output_path).suffix.lower() in (".mp4", ".m4v") else "srt"
+            )
             cmd = [
-                "ffmpeg",
+                self._ffmpeg,
                 "-i", video_path,      # Input video
                 "-i", subtitle_path,    # Input subtitle
+                "-map", "0",            # Every stream from the video, not just one per type
+                "-map", "1",            # ...plus the subtitle file
                 "-c", "copy",           # Copy all streams without re-encoding
-                "-c:s", "mov_text",     # Subtitle codec (mov_text for MP4, srt for MKV)
+                "-c:s", subtitle_codec,
                 "-metadata:s:s:0", f"language={language}",  # Set subtitle language
                 "-y",                   # Overwrite output file
                 output_path
@@ -636,11 +678,11 @@ class SubtitleHandler:
             
             # Escape subtitle path for FFmpeg filter (Windows paths with backslashes)
             # Replace backslashes with forward slashes and escape special chars
-            sub_filter_path = subtitle_path.replace('\\', '/').replace(':', '\\:')
-            
+            sub_filter_path = self._escape_filter_path(subtitle_path)
+
             # Build FFmpeg command for burn-in (slow, re-encodes video)
             cmd = [
-                "ffmpeg",
+                self._ffmpeg,
                 "-i", video_path,
                 "-vf", f"subtitles='{sub_filter_path}'",  # Video filter to burn subtitles
                 "-c:a", "copy",         # Copy audio without re-encoding

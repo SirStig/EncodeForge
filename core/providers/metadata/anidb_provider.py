@@ -29,7 +29,9 @@ class AniDBProvider(BaseMetadataProvider):
     """AniDB (anime database) provider using HTTP API"""
 
     API_URL = "http://api.anidb.net:9001/httpapi"
-    TITLES_URL = "http://anidb.net/api/anime-titles.xml.gz"
+    # HTTPS: the response is gzip-decompressed and XML-parsed, so an on-path
+    # attacker would otherwise control the bytes fed to both.
+    TITLES_URL = "https://anidb.net/api/anime-titles.xml.gz"
     # Registered AniDB client credentials
     # See: https://wiki.anidb.net/HTTP_API_Definition
     CLIENT = "encodeforge"  # Registered client name

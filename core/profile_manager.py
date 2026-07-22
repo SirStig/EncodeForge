@@ -128,6 +128,35 @@ class ProfileManager:
         
         return sorted(profiles)
     
+    def _profile_path(self, profile_name: str) -> Optional[Path]:
+        """
+        Resolve a profile name to a file inside the profiles directory.
+
+        Profile names come from a free-text GUI field and were interpolated
+        straight into a path, so a name like "../../settings" resolved outside
+        the profiles directory — and delete_profile() would unlink whatever it
+        landed on.
+
+        Returns:
+            The path, or None if the name is unsafe.
+        """
+        name = (profile_name or "").strip()
+        if not name:
+            logger.error("Profile name cannot be empty")
+            return None
+
+        if any(sep in name for sep in ('/', '\\', '\x00')) or name in ('.', '..'):
+            logger.error(f"Rejecting profile name containing a path separator: {profile_name!r}")
+            return None
+
+        candidate = (self.profiles_dir / f"{name}.json").resolve()
+        root = self.profiles_dir.resolve()
+        if root not in candidate.parents:
+            logger.error(f"Rejecting profile name that escapes the profiles directory: {profile_name!r}")
+            return None
+
+        return candidate
+
     def load_profile(self, profile_name: str):
         """Load a profile by name"""
         # Check built-in profiles first
@@ -135,8 +164,10 @@ class ProfileManager:
             return self.builtin_profiles[profile_name]
         
         # Check custom profiles
-        profile_path = self.profiles_dir / f"{profile_name}.json"
-        
+        profile_path = self._profile_path(profile_name)
+        if profile_path is None:
+            return None
+
         if not profile_path.exists():
             logger.error(f"Profile not found: {profile_name}")
             return None
@@ -167,7 +198,9 @@ class ProfileManager:
             logger.error(f"Cannot overwrite built-in profile: {profile_name}")
             return False
         
-        profile_path = self.profiles_dir / f"{profile_name}.json"
+        profile_path = self._profile_path(profile_name)
+        if profile_path is None:
+            return False
         
         try:
             # Convert settings to dict
@@ -191,7 +224,9 @@ class ProfileManager:
             logger.error(f"Cannot delete built-in profile: {profile_name}")
             return False
         
-        profile_path = self.profiles_dir / f"{profile_name}.json"
+        profile_path = self._profile_path(profile_name)
+        if profile_path is None:
+            return False
         
         if not profile_path.exists():
             logger.error(f"Profile not found: {profile_name}")

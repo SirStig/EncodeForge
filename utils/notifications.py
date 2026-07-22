@@ -5,6 +5,7 @@ Desktop notifications using desktop-notifier
 
 import asyncio
 import logging
+import threading
 from typing import Optional
 from desktop_notifier import DesktopNotifier, Icon, Urgency, Button, ReplyField
 from pathlib import Path
@@ -27,7 +28,72 @@ class NotificationManager:
             notification_limit=10,
             app_icon=_encodeforge_notification_icon(),
         )
-    
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop_lock = threading.Lock()
+
+    def _ensure_loop(self) -> Optional[asyncio.AbstractEventLoop]:
+        """
+        Start (once) a background event loop for the async notifier.
+
+        The GUI thread has no running loop, so the coroutines below can only be
+        driven from a dedicated thread. The thread is a daemon so it never
+        keeps the application alive at shutdown.
+        """
+        with self._loop_lock:
+            if self._loop is not None and not self._loop.is_closed():
+                return self._loop
+
+            try:
+                loop = asyncio.new_event_loop()
+                thread = threading.Thread(
+                    target=loop.run_forever,
+                    name="EncodeForge-Notifications",
+                    daemon=True,
+                )
+                thread.start()
+                self._loop = loop
+                return loop
+            except Exception as e:
+                logger.error(f"Could not start notification loop: {e}")
+                self._loop = None
+                return None
+
+    def show_notification(
+        self,
+        title: str,
+        message: str,
+        notification_type: str = "info",
+    ) -> None:
+        """
+        Show a desktop notification from synchronous code.
+
+        Safe to call from a Qt slot: it never blocks and never raises, because
+        a failed notification must not take down the operation that triggered
+        it — these calls sit on success *and* error paths.
+
+        Args:
+            title: Notification title
+            message: Body text
+            notification_type: "success", "error", "warning" or "info"
+        """
+        coroutine_for_type = {
+            "success": self.notify_success,
+            "error": self.notify_error,
+            "warning": self.notify_warning,
+        }
+        send = coroutine_for_type.get(notification_type, self.notify_success)
+
+        try:
+            loop = self._ensure_loop()
+            if loop is None:
+                logger.warning(f"Notification suppressed ({title}): no event loop")
+                return
+            asyncio.run_coroutine_threadsafe(send(title, message), loop)
+        except Exception as e:
+            # Deliberately swallowed: notifications are advisory.
+            logger.error(f"Failed to dispatch notification '{title}': {e}")
+
+
     async def notify_success(self, title: str, message: str):
         """Show success notification"""
         try:

@@ -81,10 +81,12 @@ class BaseMetadataProvider(ABC):
         """
         # TV show patterns
         tv_patterns = [
-            r'[Ss](\d+)[Ee](\d+)',  # S01E01
-            r'(\d+)x(\d+)',  # 1x01
-            r'[Ee]pisode\s*(\d+)',  # Episode 01
-            r'\[(\d+)\]',  # [01]
+            r'[Ss](\d{1,2})[Ee](\d{1,3})',  # S01E01
+            # 1x01 — bounded and separator-anchored so "1920x1080" is read as a
+            # resolution rather than season 1920 episode 1080.
+            r'(?:^|[.\s_\-\[])(\d{1,2})x(\d{1,3})(?:$|[.\s_\-\]])',
+            r'[Ee]pisode\s*(\d{1,3})',  # Episode 01
+            r'\[(\d{1,3})\]',  # [01]
         ]
         
         for pattern in tv_patterns:
@@ -108,9 +110,13 @@ class BaseMetadataProvider(ABC):
         
         # Common TV patterns
         patterns = [
-            r'(?P<title>.+?)[.\s_-]+[Ss](?P<season>\d+)[Ee](?P<episode>\d+)',
-            r'(?P<title>.+?)[.\s_-]+(?P<season>\d+)x(?P<episode>\d+)',
-            r'(?P<title>.+?)[.\s_-]+[Ee]pisode\s*(?P<episode>\d+)',
+            r'(?P<title>.+?)[.\s_-]+[Ss](?P<season>\d{1,2})[Ee](?P<episode>\d{1,3})',
+            r'(?P<title>.+?)[.\s_-]+(?P<season>\d{1,2})x(?P<episode>\d{1,3})(?:$|[.\s_\-\]])',
+            r'(?P<title>.+?)[.\s_-]+[Ee]pisode\s*(?P<episode>\d{1,3})',
+            # Release-group bracket numbering, e.g. "[SubsPlease] Frieren - [12]".
+            # detect_media_type() already classified these as TV, but there was
+            # no matching parse pattern, so every such file failed to rename.
+            r'(?P<title>.+?)[\s_-]*\[(?P<episode>\d{1,3})\]',
         ]
         
         for pattern in patterns:
@@ -121,11 +127,18 @@ class BaseMetadataProvider(ABC):
                 # Clean title
                 title = result['title'].replace('.', ' ').replace('_', ' ').strip()
                 title = re.sub(r'\s+', ' ', title)
-                
+                # Strip a leading release-group tag: "[SubsPlease] Frieren"
+                title = re.sub(r'^\[[^\]]+\]\s*', '', title).strip(' -_')
+
+                # `.get('season', 1)` cannot defend against a pattern that
+                # matched but has no season group — it yields None, not the
+                # default — so fall back explicitly.
+                season = result.get('season')
+
                 return {
                     "type": "tv",
                     "title": title,
-                    "season": int(result.get('season', 1)),
+                    "season": int(season) if season else 1,
                     "episode": int(result['episode']),
                     "original": filename
                 }
@@ -141,8 +154,29 @@ class BaseMetadataProvider(ABC):
         # Remove extension
         name = Path(filename).stem
         
-        # Movie pattern with year
-        pattern = r'(?P<title>.+?)[.\s_-]+\(?(?P<year>\d{4})\)?'
+        # Find every plausible release year, then take the LAST one: a title can
+        # itself contain a year-like number ("Blade Runner 2049"), and the
+        # release year always follows the title.
+        #
+        # (?![xX]\d) rejects the leading half of a resolution such as 1920x1080,
+        # which otherwise parses as the year 1920.
+        year_pattern = r'(?<!\d)((?:19|20)\d{2})(?!\d)(?![xX]\d)'
+        year_matches = list(re.finditer(year_pattern, name))
+
+        if year_matches:
+            last = year_matches[-1]
+            title = name[:last.start()].rstrip(' .()_-')
+            if title:
+                title = title.replace('.', ' ').replace('_', ' ').strip()
+                title = re.sub(r'\s+', ' ', title)
+                return {
+                    "type": "movie",
+                    "title": title,
+                    "year": int(last.group(1)),
+                    "original": filename,
+                }
+
+        pattern = r'(?P<title>.+?)[.\s_-]+\(?(?P<year>(?:19|20)\d{2})\)?(?!\d)'
         match = re.search(pattern, name)
         
         if match:

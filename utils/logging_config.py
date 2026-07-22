@@ -58,10 +58,21 @@ class LineCountRotatingHandler(RotatingFileHandler):
             return True
         return False
     
+    def doRollover(self):
+        """
+        Roll the log over and reset the line counter.
+
+        Without the reset the counter stays above maxLines forever, so every
+        subsequent record triggers another rollover and the log retains a
+        single line instead of maxLines.
+        """
+        super().doRollover()
+        self._line_count = 0
+
     def emit(self, record):
         """
         Emit a record and increment line counter.
-        
+
         Args:
             record: Log record to emit
         """
