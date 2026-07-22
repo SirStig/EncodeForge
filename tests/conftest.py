@@ -18,6 +18,25 @@ def qapp():
     yield app
 
 
+@pytest.fixture(autouse=True)
+def _no_real_desktop_notifications(monkeypatch):
+    """
+    NotificationManager spins up a background thread that drives desktop-notifier's
+    async backend (dbus_fast on Linux, UNUserNotificationCenter on macOS, WinRT toast
+    on Windows). Headless CI runners have no notification service to talk to, and the
+    native backend calls racing against that background thread have been observed to
+    segfault the interpreter rather than raise a catchable exception. Stub the one
+    shared async entrypoint so no test — even ones that never touch notifications.py
+    directly, e.g. via _apply_rename's success/error paths — reaches real OS APIs.
+    """
+    from desktop_notifier import DesktopNotifier
+
+    async def _noop_send(self, *args, **kwargs):
+        return None
+
+    monkeypatch.setattr(DesktopNotifier, "send", _noop_send)
+
+
 @pytest.fixture
 def isolated_app_data(tmp_path, monkeypatch):
     """
