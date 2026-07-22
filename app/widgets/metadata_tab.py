@@ -61,6 +61,10 @@ class MetadataTab(QWidget):
     rename_completed = Signal(str)  # file path
     rename_error = Signal(str, str)  # file path, error message
 
+    # Marks a metadata_table row as manually resolved via the match picker,
+    # so a bulk "Fetch Metadata" re-run doesn't clobber the user's correction.
+    LOCK_ROLE = Qt.ItemDataRole.UserRole + 1
+
     def __init__(self, thread_pool: QThreadPool, parent=None):
         super().__init__(parent)
         self.thread_pool = thread_pool
@@ -107,6 +111,12 @@ class MetadataTab(QWidget):
         btn_row.addWidget(self.clear_btn)
         btn_row.addStretch()
         self.fetch_metadata_btn = QPushButton("Fetch Metadata")
+        self.match_btn = QPushButton("Search / Fix Match…")
+        self.match_btn.setEnabled(False)
+        self.match_btn.setToolTip(
+            "Search manually and pick the correct match for the selected file — "
+            "for when auto-match picked the wrong show, or nothing at all."
+        )
         self.preview_btn = QPushButton("Preview")
         self.preview_btn.setEnabled(False)
         self.rename_btn = QPushButton("Apply Rename")
@@ -114,6 +124,7 @@ class MetadataTab(QWidget):
         self.undo_btn = QPushButton("Undo Rename")
         self.undo_btn.setEnabled(False)
         btn_row.addWidget(self.fetch_metadata_btn)
+        btn_row.addWidget(self.match_btn)
         btn_row.addWidget(self.preview_btn)
         btn_row.addWidget(self.rename_btn)
         btn_row.addWidget(self.undo_btn)
@@ -197,11 +208,16 @@ class MetadataTab(QWidget):
         self.remove_btn.clicked.connect(self._remove_selected)
         self.clear_btn.clicked.connect(self._clear_all)
         self.fetch_metadata_btn.clicked.connect(self._fetch_metadata)
+        self.match_btn.clicked.connect(self._open_match_picker)
         self.preview_btn.clicked.connect(self._preview_names)
         self.rename_btn.clicked.connect(self._apply_rename)
         self.undo_btn.clicked.connect(self._undo_rename)
         self.pattern_btn.clicked.connect(self._open_pattern_dialog)
         self.pattern_input.editingFinished.connect(self._persist_pattern_from_field)
+        self.file_table.itemSelectionChanged.connect(self._update_match_btn_enabled)
+
+    def _update_match_btn_enabled(self) -> None:
+        self.match_btn.setEnabled(bool(self.file_table.selectedIndexes()))
 
     def _persist_pattern_from_field(self) -> None:
         sm = get_settings_manager()
@@ -360,11 +376,10 @@ class MetadataTab(QWidget):
             return
         
         logger.info("Fetching metadata for files")
-        
+
         n = self.file_table.rowCount()
-        self.metadata_table.setRowCount(n)
-        for i in range(n):
-            self.metadata_table.setItem(i, 0, QTableWidgetItem("Fetching…"))
+        if self.metadata_table.rowCount() != n:
+            self.metadata_table.setRowCount(n)
 
         provider = self._get_selected_provider()
         api_key = ""
@@ -373,9 +388,18 @@ class MetadataTab(QWidget):
             file_item = self.file_table.item(row, 0)
             if not file_item:
                 continue
-            
+
+            existing = self.metadata_table.item(row, 0)
+            if existing is not None and existing.data(self.LOCK_ROLE) is True:
+                # A manual match from the picker — a bulk re-fetch must not
+                # overwrite a correction the user already made for this row.
+                logger.debug(f"Skipping fetch for row {row}: locked to a manual match")
+                continue
+
+            self.metadata_table.setItem(row, 0, QTableWidgetItem("Fetching…"))
+
             file_path = Path(file_item.data(Qt.ItemDataRole.UserRole))
-            
+
             # Use RenamerWorker to fetch metadata
             settings = {
                 'provider': provider,
@@ -452,6 +476,65 @@ class MetadataTab(QWidget):
         logger.error(f"Metadata fetch error for row {row}: {error_msg}")
         if 0 <= row < self.metadata_table.rowCount():
             self.metadata_table.setItem(row, 0, QTableWidgetItem(f"Error: {error_msg}"))
+
+    def _open_match_picker(self) -> None:
+        """
+        Let the user search manually and pick the correct candidate for the
+        selected file — auto-match has no recovery when it picks the wrong
+        show (or nothing) beyond renaming the source file and hoping the
+        parser does better; this is the direct fix.
+        """
+        selected = self.file_table.selectedIndexes()
+        if not selected:
+            return
+        row = selected[0].row()
+        file_item = self.file_table.item(row, 0)
+        if not file_item:
+            return
+        file_path = Path(file_item.data(Qt.ItemDataRole.UserRole))
+
+        existing = self.metadata_table.item(row, 0) if row < self.metadata_table.rowCount() else None
+        current_meta = existing.data(Qt.ItemDataRole.UserRole) if existing else None
+        if not isinstance(current_meta, dict):
+            current_meta = None
+
+        from core.metadata_grabber import MetadataGrabber
+        media_type = MetadataGrabber().detect_media_type(file_path.name)
+        if media_type != "movie":
+            media_type = "tv"
+
+        from app.dialogs.match_picker_dialog import MatchPickerDialog
+        dlg = MatchPickerDialog(
+            self, self.thread_pool,
+            file_stem=file_path.stem, media_type=media_type, initial=current_meta,
+        )
+        if not dlg.exec():
+            return
+        chosen = dlg.selected_metadata()
+        if not chosen:
+            return
+
+        if self.metadata_table.rowCount() <= row:
+            self.metadata_table.setRowCount(row + 1)
+
+        pattern = self.pattern_input.text().strip()
+        preview_name = (
+            self._generate_new_name(file_path, pattern, chosen)
+            if pattern else self._metadata_fallback_label(chosen)
+        )
+        item = QTableWidgetItem(f"\U0001F512 {preview_name}")  # lock icon: won't be overwritten by Fetch Metadata
+        item.setData(Qt.ItemDataRole.UserRole, chosen)
+        item.setData(self.LOCK_ROLE, True)
+        item.setToolTip(
+            f"Manually matched via {chosen.get('source', 'search')} — "
+            "Fetch Metadata will not overwrite this row."
+        )
+        self.metadata_table.setItem(row, 0, item)
+        self.preview_btn.setEnabled(True)
+        logger.info(
+            f"Manual match set for {file_path.name}: "
+            f"{chosen.get('show_title') or chosen.get('title')}"
+        )
 
     @staticmethod
     def _metadata_fallback_label(meta_dict: Dict[str, Any]) -> str:

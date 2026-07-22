@@ -25,6 +25,7 @@ SAMPLE_TV_METADATA: Dict[str, Any] = {
     "show_year": "2008",
     "season": 1,
     "episode": 5,
+    "episode2": 6,
     "episode_title": "Gray Matter",
     "episodeTitle": "Gray Matter",
     "episode_airdate": "2008-02-24",
@@ -61,6 +62,8 @@ PLACEHOLDER_DOCS: List[Tuple[str, str]] = [
     ("show_year", "Series year string from provider"),
     ("season", "Season number (int; use {season:02d} for zero padding)"),
     ("episode", "Episode number (int; use {episode:02d} for zero padding)"),
+    ("episode_end", "Second episode number for a double-episode file (int; same as {episode} otherwise)"),
+    ("episode2", "Alias of episode_end"),
     ("episode_title", "Episode title"),
     ("episodeTitle", "Same as episode_title (alternate spelling)"),
     ("episode_airdate", "Episode air date (YYYY-MM-DD when available)"),
@@ -82,6 +85,7 @@ BUILTIN_TEMPLATE_GROUPS: List[Tuple[str, List[Tuple[str, str]]]] = [
         [
             ("Standard (default core)", "{title} - S{season:02d}E{episode:02d} - {episode_title}"),
             ("Compact SxxExx", "{title} - S{season:02d}E{episode:02d}"),
+            ("Multi-episode", "{title} - S{season:02d}E{episode:02d}-E{episode_end:02d} - {episode_title}"),
             ("Dots (scene-style)", "{title}.S{season:02d}E{episode:02d}.{episode_title}.1080p"),
             ("Season folder style", "{title} - Season {season:02d} - {episode:02d} - {episode_title}"),
             ("Anime bracket group", "[{group}] {title} - {episode:02d} - {episode_title}"),
@@ -168,6 +172,9 @@ def build_format_dict(metadata: Optional[Dict[str, Any]], file_stem: str = "") -
     show_year = str(md.get("show_year", year) or "")
     season = _as_int(md.get("season"), 0)
     episode = _as_int(md.get("episode"), 0)
+    # Defaults to `episode` (not 0) so {episode_end} is harmless in a pattern
+    # applied to an ordinary single-episode file.
+    episode2 = _as_int(md.get("episode2") if md.get("episode2") is not None else md.get("episode_end"), episode)
     ep_title = md.get("episode_title") or md.get("episodeTitle") or ""
     ep_title = str(ep_title) if ep_title is not None else ""
     air = str(md.get("episode_airdate") or md.get("airdate") or md.get("date") or "")
@@ -179,6 +186,8 @@ def build_format_dict(metadata: Optional[Dict[str, Any]], file_stem: str = "") -
         "show_year": show_year,
         "season": season,
         "episode": episode,
+        "episode2": episode2,
+        "episode_end": episode2,
         "episode_title": ep_title,
         "episodeTitle": ep_title,
         "episode_airdate": air,

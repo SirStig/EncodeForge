@@ -1,4 +1,21 @@
+import os
+
 import pytest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """
+    Shared QApplication for widget-level tests. GUI tests run headless via
+    QT_QPA_PLATFORM=offscreen, set above before PySide6 touches a display.
+    """
+    pyside6 = pytest.importorskip("PySide6")
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    yield app
 
 
 @pytest.fixture

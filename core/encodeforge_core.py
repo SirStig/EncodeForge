@@ -64,7 +64,15 @@ class EncodeForgeCore:
         
         self.renamer = MetadataGrabber(
             tmdb_key=self.settings.tmdb_api_key,
-            tvdb_key=self.settings.tvdb_api_key
+            tvdb_key=self.settings.tvdb_api_key,
+            # OMDB/Trakt were never passed here, so MetadataGrabber built
+            # self.omdb/self.trakt as None at construction time regardless of
+            # a configured key — preview_rename's later `self.renamer.omdb_key
+            # = ...` only updates the string, not the (already-None) provider
+            # instance, so those two providers silently never ran.
+            omdb_key=self.settings.omdb_api_key,
+            trakt_key=self.settings.trakt_api_key,
+            fanart_key=self.settings.fanart_api_key,
         )
         self.subtitle_providers = SubtitleProviders(
             opensubtitles_key=self.settings.opensubtitles_api_key,
@@ -316,7 +324,26 @@ class EncodeForgeCore:
         return self.renaming_handler.rename_files(
             file_paths, dry_run, create_backup, preview_settings=preview_settings
         )
-    
+
+    def search_rename_candidates(
+        self,
+        title: str,
+        media_type: str = "tv",
+        season: int = 1,
+        episode: int = 1,
+        year: Optional[int] = None,
+    ) -> List[Dict]:
+        """
+        Every metadata candidate across configured providers for a manual
+        title/season/episode search — powers the renamer's match picker,
+        for when auto-match picked the wrong show (or nothing at all).
+        """
+        self._ensure_handlers_initialized()
+        if media_type == "movie":
+            return self.renamer.search_movie_candidates(title, year)
+        return self.renamer.search_tv_show_candidates(title, season, episode)
+
+
     # =======================
     # Conversion Operations
     # =======================

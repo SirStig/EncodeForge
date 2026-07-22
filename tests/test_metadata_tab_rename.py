@@ -9,23 +9,14 @@ a real temp directory; only the QMessageBox confirmation prompt is stubbed
 since there's no one to click it in a headless test run.
 """
 
-import os
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
 pyside6 = pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt, QThreadPool  # noqa: E402
-from PySide6.QtWidgets import QApplication, QMessageBox, QTableWidgetItem  # noqa: E402
-
-
-@pytest.fixture(scope="session")
-def qapp():
-    app = QApplication.instance() or QApplication([])
-    yield app
+from PySide6.QtWidgets import QMessageBox, QTableWidgetItem  # noqa: E402
 
 
 @pytest.fixture

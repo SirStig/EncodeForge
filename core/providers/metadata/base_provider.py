@@ -108,9 +108,15 @@ class BaseMetadataProvider(ABC):
         # Remove extension
         name = Path(filename).stem
         
-        # Common TV patterns
+        # Common TV patterns. The primary S##E## pattern optionally captures a
+        # second episode number — "S01E01E02" or "S01E01-E02" — for a double
+        # episode released as one file; without it, "E02" was simply left
+        # dangling in the filename and silently dropped. The 'E'/'e' is
+        # required (not just a bare "-02") so a hyphenated quality tag like
+        # "S01E05-1080p" can't be misread as episode 108.
         patterns = [
-            r'(?P<title>.+?)[.\s_-]+[Ss](?P<season>\d{1,2})[Ee](?P<episode>\d{1,3})',
+            r'(?P<title>.+?)[.\s_-]+[Ss](?P<season>\d{1,2})[Ee](?P<episode>\d{1,3})'
+            r'(?:[-_]?[Ee](?P<episode2>\d{1,3}))?',
             r'(?P<title>.+?)[.\s_-]+(?P<season>\d{1,2})x(?P<episode>\d{1,3})(?:$|[.\s_\-\]])',
             r'(?P<title>.+?)[.\s_-]+[Ee]pisode\s*(?P<episode>\d{1,3})',
             # Release-group bracket numbering, e.g. "[SubsPlease] Frieren - [12]".
@@ -118,12 +124,12 @@ class BaseMetadataProvider(ABC):
             # no matching parse pattern, so every such file failed to rename.
             r'(?P<title>.+?)[\s_-]*\[(?P<episode>\d{1,3})\]',
         ]
-        
+
         for pattern in patterns:
             match = re.search(pattern, name, re.IGNORECASE)
             if match:
                 result = match.groupdict()
-                
+
                 # Clean title
                 title = result['title'].replace('.', ' ').replace('_', ' ').strip()
                 title = re.sub(r'\s+', ' ', title)
@@ -134,15 +140,19 @@ class BaseMetadataProvider(ABC):
                 # matched but has no season group — it yields None, not the
                 # default — so fall back explicitly.
                 season = result.get('season')
+                episode2 = result.get('episode2')
 
-                return {
+                parsed = {
                     "type": "tv",
                     "title": title,
                     "season": int(season) if season else 1,
                     "episode": int(result['episode']),
                     "original": filename
                 }
-        
+                if episode2:
+                    parsed["episode2"] = int(episode2)
+                return parsed
+
         return None
 
     def parse_movie_filename(self, filename: str) -> Optional[Dict]:

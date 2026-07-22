@@ -601,6 +601,29 @@ class RenamingHandler:
                                 season_str = f"S{parsed['season']:02d}" if parsed.get('season') else "S??"
                                 episode_str = f"E{parsed['episode']:02d}" if parsed.get('episode') else "E??"
                                 logger.info(f"  No metadata found for '{parsed.get('title', 'Unknown')}' {season_str}{episode_str}")
+                            elif parsed.get('episode2'):
+                                # A double-episode file ("S01E05E06") — `info`
+                                # above only covers the first episode. Fetch
+                                # the second episode's title from the same
+                                # provider so {episode_title} doesn't silently
+                                # cover only half the file.
+                                info = dict(info)
+                                info['episode2'] = parsed['episode2']
+                                prov_key = {
+                                    "TMDB": "tmdb", "TVDB": "tvdb", "TVmaze": "tvmaze", "Trakt": "trakt",
+                                    "OMDB": "omdb", "AniDB": "anidb", "Kitsu": "kitsu", "Jikan": "jikan",
+                                }.get(provider)
+                                if prov_key:
+                                    try:
+                                        info2 = self.renamer.search_tv_show(
+                                            title, season, parsed['episode2'], provider=prov_key
+                                        )
+                                        if info2 and info2.get('episode_title'):
+                                            info['episode_title'] = (
+                                                f"{info.get('episode_title', '')} & {info2['episode_title']}"
+                                            ).strip(' &')
+                                    except Exception as e:
+                                        logger.debug(f"Second-episode title lookup failed: {e}")
                     
                     elif media_type == "movie":
                         parsed = self.renamer.parse_movie_filename(path.name)

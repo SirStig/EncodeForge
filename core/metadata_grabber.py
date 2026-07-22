@@ -164,38 +164,8 @@ class MetadataGrabber:
             elif provider == "jikan":
                 return self.jikan.search_tv(title, season, episode)
             elif provider == "all":
-                from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
-                ordered = [
-                    ("tvdb", self.tvdb), ("tvmaze", self.tvmaze), ("tmdb", self.tmdb),
-                    ("trakt", self.trakt), ("omdb", self.omdb),
-                    ("anidb", self.anidb), ("kitsu", self.kitsu), ("jikan", self.jikan),
-                ]
-                results = []
-                with ThreadPoolExecutor(max_workers=4) as _ex:
-                    future_map = {
-                        _ex.submit(prov.search_tv, title, season, episode): name
-                        for name, prov in ordered if prov is not None
-                    }
-                    # as_completed() raises TimeoutError from the *iterator*, so
-                    # a per-future try/except cannot catch it — the exception
-                    # escaped to the caller and discarded the results the other
-                    # providers had already returned.
-                    try:
-                        for fut in _as_completed(future_map, timeout=20):
-                            try:
-                                res = fut.result()
-                                if res:
-                                    results.append(res)
-                            except Exception as e:
-                                logger.debug(
-                                    f"Provider {future_map.get(fut, '?')} failed: {e}"
-                                )
-                    except TimeoutError:
-                        logger.warning(
-                            f"Metadata lookup timed out after 20s; "
-                            f"using {len(results)} result(s) that did arrive"
-                        )
-                return max(results, key=self._score_result) if results else None
+                candidates = self.search_tv_show_candidates(title, season, episode)
+                return candidates[0] if candidates else None
             return None
 
         # Auto: try all providers in priority order
@@ -244,37 +214,8 @@ class MetadataGrabber:
             elif provider == "jikan":
                 return self.jikan.search_movie(title, year)
             elif provider == "all":
-                from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
-                ordered = [
-                    ("tmdb", self.tmdb), ("trakt", self.trakt), ("omdb", self.omdb),
-                    ("anidb", self.anidb), ("kitsu", self.kitsu), ("jikan", self.jikan),
-                ]
-                results = []
-                with ThreadPoolExecutor(max_workers=4) as _ex:
-                    future_map = {
-                        _ex.submit(prov.search_movie, title, year): name
-                        for name, prov in ordered if prov is not None
-                    }
-                    # as_completed() raises TimeoutError from the *iterator*, so
-                    # a per-future try/except cannot catch it — the exception
-                    # escaped to the caller and discarded the results the other
-                    # providers had already returned.
-                    try:
-                        for fut in _as_completed(future_map, timeout=20):
-                            try:
-                                res = fut.result()
-                                if res:
-                                    results.append(res)
-                            except Exception as e:
-                                logger.debug(
-                                    f"Provider {future_map.get(fut, '?')} failed: {e}"
-                                )
-                    except TimeoutError:
-                        logger.warning(
-                            f"Metadata lookup timed out after 20s; "
-                            f"using {len(results)} result(s) that did arrive"
-                        )
-                return max(results, key=self._score_result) if results else None
+                candidates = self.search_movie_candidates(title, year)
+                return candidates[0] if candidates else None
             return None
 
         # Auto: try all providers in priority order
@@ -298,7 +239,61 @@ class MetadataGrabber:
 
         logger.warning(f"No movie results found for: {title}")
         return None
-    
+
+    def _gather_candidates(self, ordered, search_fn_name: str, *args) -> "list[Dict]":
+        """
+        Query every provider in `ordered` concurrently and return every hit
+        that came back (not just the best), tagged with its source and
+        sorted best-first. provider="all" uses the top result; a manual
+        match picker wants the whole list.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+
+        results = []
+        with ThreadPoolExecutor(max_workers=4) as _ex:
+            future_map = {
+                _ex.submit(getattr(prov, search_fn_name), *args): name
+                for name, prov in ordered if prov is not None
+            }
+            # as_completed() raises TimeoutError from the *iterator*, so a
+            # per-future try/except cannot catch it — the exception escaped
+            # to the caller and discarded the results the other providers
+            # had already returned.
+            try:
+                for fut in _as_completed(future_map, timeout=20):
+                    try:
+                        res = fut.result()
+                        if res:
+                            res = dict(res)
+                            res.setdefault("source", future_map[fut])
+                            results.append(res)
+                    except Exception as e:
+                        logger.debug(f"Provider {future_map.get(fut, '?')} failed: {e}")
+            except TimeoutError:
+                logger.warning(
+                    f"Metadata lookup timed out after 20s; "
+                    f"using {len(results)} result(s) that did arrive"
+                )
+        results.sort(key=self._score_result, reverse=True)
+        return results
+
+    def search_tv_show_candidates(self, title: str, season: int = 1, episode: int = 1) -> "list[Dict]":
+        """Every TV candidate across all configured providers, best first — for a manual match picker."""
+        ordered = [
+            ("tvdb", self.tvdb), ("tvmaze", self.tvmaze), ("tmdb", self.tmdb),
+            ("trakt", self.trakt), ("omdb", self.omdb),
+            ("anidb", self.anidb), ("kitsu", self.kitsu), ("jikan", self.jikan),
+        ]
+        return self._gather_candidates(ordered, "search_tv", title, season, episode)
+
+    def search_movie_candidates(self, title: str, year: Optional[int] = None) -> "list[Dict]":
+        """Every movie candidate across all configured providers, best first — for a manual match picker."""
+        ordered = [
+            ("tmdb", self.tmdb), ("trakt", self.trakt), ("omdb", self.omdb),
+            ("anidb", self.anidb), ("kitsu", self.kitsu), ("jikan", self.jikan),
+        ]
+        return self._gather_candidates(ordered, "search_movie", title, year)
+
     def _score_result(self, result: Dict) -> int:
         """Score a metadata result by completeness. Higher = better."""
         score = 0
