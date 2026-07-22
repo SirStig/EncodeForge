@@ -18,6 +18,20 @@ from core.handlers.models import ConversionSettings
 logger = logging.getLogger(__name__)
 
 
+def _app_version() -> str:
+    """
+    Stamp saved settings with the running application version.
+
+    Read lazily so a hardcoded copy cannot drift out of sync with
+    app/__init__.py during a release bump.
+    """
+    try:
+        from app import __version__
+        return __version__
+    except Exception:
+        return "unknown"
+
+
 def _from_dict(cls, data: Any, section_name: str):
     """
     Build a settings dataclass from stored JSON, ignoring unknown keys.
@@ -90,6 +104,9 @@ class RenamerSettings:
     lowercase: bool = False
     remove_special: bool = False
     preserve_extension: bool = True
+    destination_root: str = ""  # empty = rename in place, same folder
+    action: str = "rename"  # rename, move, copy, hardlink, symlink
+    include_sidecars: bool = True  # carry .srt/.ass/.nfo along with the video
 
 
 @dataclass
@@ -173,6 +190,20 @@ class SettingsManager:
         fp = (self.application.ffprobe_path or "").strip()
         if fp:
             c.ffprobe_path = fp
+
+        # The Renamer tab's settings live in their own section (`renamer`),
+        # separate from the `conversion` section RenamingHandler actually
+        # reads. Without this, a pattern/destination saved in the Renamer
+        # tab was silently ignored by the CLI and by RenamerWorker's
+        # non-preview (real rename) path, which fell back to the
+        # ConversionSettings dataclass defaults instead.
+        pat = (self.renamer.pattern or "").strip()
+        if pat:
+            c.renaming_pattern_tv = pat
+            c.renaming_pattern_movie = pat
+        c.renaming_destination_root = self.renamer.destination_root or ""
+        c.renaming_action = self.renamer.action or "rename"
+        c.renaming_include_sidecars = self.renamer.include_sidecars
         return c
     
     def to_dict(self) -> Dict[str, Any]:
@@ -184,7 +215,7 @@ class SettingsManager:
             'ui': asdict(self.ui),
             'application': asdict(self.application),
             'conversion': asdict(self.conversion),
-            'version': '0.5.0-alpha-2',
+            'version': _app_version(),
         }
     
     def from_dict(self, data: Dict[str, Any]):

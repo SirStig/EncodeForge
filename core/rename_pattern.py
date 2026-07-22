@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import platform
 import re
 from string import Formatter
 from typing import Any, Dict, List, Optional, Tuple
@@ -265,3 +266,95 @@ def apply_filename_options(
     if remove_special:
         out = "".join(c for c in out if c.isalnum() or c in ".-_ ")
     return out
+
+
+_WINDOWS_RESERVED_NAMES = {
+    'CON', 'PRN', 'AUX', 'NUL',
+    'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+    'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+}
+
+
+def truncate_to_bytes(name: str, max_bytes: int = 255) -> str:
+    """
+    Truncate `name` so its UTF-8 encoding fits `max_bytes`, without
+    splitting a multi-byte character.
+
+    Filesystems cap a single path segment at 255 *bytes*, not characters —
+    a pattern including {overview}, or any CJK title, blows past that and
+    surfaces as an opaque "[Errno 36] File name too long".
+    """
+    encoded = name.encode('utf-8')
+    if len(encoded) <= max_bytes:
+        return name
+    truncated = encoded[:max_bytes].decode('utf-8', errors='ignore').rstrip()
+    logger.warning(f"Name exceeded {max_bytes} bytes and was truncated: {name[:60]}…")
+    return truncated
+
+
+def sanitize_path_segment(segment: str) -> str:
+    """
+    Sanitize a single filename/folder-name segment for cross-platform use.
+
+    This never looks at '/' or '\\\\' — callers that allow a pattern to
+    describe subfolders must split on the separator first and sanitize each
+    segment independently (see sanitize_relative_path).
+    """
+    system = platform.system().lower()
+
+    if system == "windows":
+        invalid_chars = r'[<>:"/\\|?*]'
+    else:
+        invalid_chars = r'[/\\\x00]'
+
+    result = re.sub(invalid_chars, '', segment)
+
+    # Control characters are legal on POSIX but corrupt listings and can
+    # come straight from a provider's plot/overview field.
+    result = re.sub(r'[\x00-\x1f\x7f]', '', result)
+
+    if system == "windows":
+        # Windows doesn't like trailing dots/spaces on a path component.
+        result = result.rstrip('. ')
+        if result.upper() in _WINDOWS_RESERVED_NAMES:
+            result = result + "_"
+
+    # A leading dot hides the entry on POSIX; a leading/trailing space is
+    # silently mangled on Windows.
+    result = result.strip().lstrip('.')
+
+    result = truncate_to_bytes(result, 255)
+
+    return result
+
+
+def sanitize_relative_path(stem: str) -> str:
+    """
+    Sanitize a formatted stem that may contain '/' to describe subfolders.
+
+    Each path segment is sanitized independently. '.' and '..' segments are
+    dropped rather than sanitized — a pattern built from provider metadata
+    must never be able to walk out of the destination root.
+    """
+    segments = []
+    for raw in str(stem).replace('\\', '/').split('/'):
+        seg = raw.strip()
+        if seg in ('', '.', '..'):
+            continue
+        clean = sanitize_path_segment(seg)
+        if clean:
+            segments.append(clean)
+    return '/'.join(segments)
+
+
+def sanitize_filename(stem: str, *, allow_subfolders: bool = False) -> str:
+    """
+    Sanitize a formatted filename stem (no extension).
+
+    allow_subfolders=True keeps '/' as a folder separator (each segment
+    sanitized on its own); otherwise the whole stem is treated as one
+    segment and '/' is stripped like any other invalid character.
+    """
+    if allow_subfolders:
+        return sanitize_relative_path(stem)
+    return sanitize_path_segment(stem)

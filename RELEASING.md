@@ -60,8 +60,13 @@ powershell -File packaging/windows/package-zip.ps1
 
 ## 4. Verify before tagging
 
-- Tag format must keep its pre-release suffix (`v0.5.0-alpha-3`). The update
-  checker compares full PEP 440 versions, so the suffix is significant.
-- Bump `__version__` in `app/__init__.py` and the `version` in `setup.py`
-  together — they are separate strings today.
+- Bump `__version__` in `app/__init__.py`. It is the single source of truth —
+  `setup.py` and the settings file stamp both read it, so nothing else needs
+  editing.
+- Tag the release to match, prefixed with `v` (`v0.5.0`). Pre-release tags keep
+  their suffix (`v0.5.1-beta-1`): the update checker compares full PEP 440
+  versions, so the suffix is significant and must not be dropped.
+- Update `CHANGELOG.md` and the version strings in `docs/index.html`,
+  `docs/guide.html`, and `README.md`. The download page reads GitHub Releases
+  at runtime and needs no edit.
 - CI runs the unit suite on every branch; confirm it is green.

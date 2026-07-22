@@ -4,10 +4,12 @@ Renaming Handler - Media file renaming operations
 """
 
 import logging
-import platform
 import re
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from core.rename_executor import RenamePair, execute_renames, find_sidecar_files
+from core.rename_pattern import sanitize_filename
 
 from .models import ConversionSettings
 
@@ -751,26 +753,26 @@ class RenamingHandler:
         preview_settings: Optional[Dict] = None,
     ) -> Dict:
         """
-        Rename media files using metadata
+        Rename (or move/copy/link, per settings) media files using metadata.
+
+        Filesystem work — collision detection, the overwrite guard, dry-run,
+        and the backup log — all happen in core.rename_executor, shared with
+        the GUI's Apply Rename so a fix here can't drift out of sync with it.
 
         Args:
             file_paths: List of file paths to rename
-            dry_run: If True, don't actually rename files
-            create_backup: If True, create a backup list of original filenames
+            dry_run: If True, don't actually touch the filesystem
+            create_backup: If True, write a backup log usable by rename_executor.restore_from_backup
             preview_settings: Optional dict passed to preview_rename (API keys, selected_provider)
 
         Returns:
-            Dict with status, renamed count, total count, and results
+            Dict with status, renamed count, total count, results, and backup_file.
+            `results` covers file_paths only, in order; sidecar files that were
+            carried along (subtitles, .nfo) are reported separately under
+            `sidecar_results` since they weren't part of the caller's request.
         """
-        import json
-        import os
-        from datetime import datetime
-
         logger.info(f"=== Starting file renaming for {len(file_paths)} files ===")
         logger.info(f"Dry run: {dry_run}, Create backup: {create_backup}")
-
-        results = []
-        backup_data = []
 
         preview_result = self.preview_rename(file_paths, settings_dict=preview_settings)
         if preview_result["status"] != "success":
@@ -781,174 +783,112 @@ class RenamingHandler:
                 "total": len(file_paths),
                 "results": []
             }
-        
+
         metadata_list = preview_result["metadata"]
-        
+        dest_root = (getattr(self.settings, 'renaming_destination_root', '') or '').strip()
+        action = getattr(self.settings, 'renaming_action', 'rename') or 'rename'
+        include_sidecars = getattr(self.settings, 'renaming_include_sidecars', True)
+
+        pairs: List[RenamePair] = []
+        skip_reasons: List[Optional[str]] = []  # None = has a pair; else a fixed failure to report
+
         for i, file_path in enumerate(file_paths):
-            try:
-                logger.info(f"Processing file {i+1}/{len(file_paths)}: {os.path.basename(file_path)}")
-                
-                path = Path(file_path)
-                if not path.exists():
-                    logger.error(f"File not found: {file_path}")
-                    results.append({
-                        "original": file_path,
-                        "new_path": None,
-                        "success": False,
-                        "message": f"File not found: {file_path}"
-                    })
-                    continue
-                
-                # Get metadata for this file
-                metadata = metadata_list[i] if i < len(metadata_list) else {}
-                
-                if not metadata:
-                    logger.warning(f"No metadata available for: {os.path.basename(file_path)}")
-                    results.append({
-                        "original": file_path,
-                        "new_path": None,
-                        "success": False,
-                        "message": "No metadata found for file"
-                    })
-                    continue
-                
-                # Determine pattern based on media type
-                media_type = self.renamer.detect_media_type(path.name)
-                pattern = self.settings.renaming_pattern_tv
-                if media_type == "movie":
-                    pattern = self.settings.renaming_pattern_movie
-                
-                logger.info(f"Using pattern: {pattern}")
-                
-                # Format new filename using metadata
-                new_name = self._format_filename_from_metadata(metadata, pattern)
-                if not new_name:
-                    logger.error(f"Failed to format filename for: {os.path.basename(file_path)}")
-                    results.append({
-                        "original": file_path,
-                        "new_path": None,
-                        "success": False,
-                        "message": "Failed to format new filename"
-                    })
-                    continue
-                
-                # Ensure new filename has the same extension
-                new_path = path.parent / f"{new_name}{path.suffix}"
-                
-                # Check if file already has the correct name
-                if path.name == new_path.name:
-                    logger.info(f"File already has correct name: {path.name}")
-                    results.append({
-                        "original": file_path,
-                        "new_path": str(new_path),
-                        "success": True,
-                        "message": f"File already correctly named: {path.name}"
-                    })
-                    continue
-                
-                # Check if target file already exists
-                if new_path.exists() and new_path != path:
-                    logger.warning(f"Target file already exists: {new_path.name}")
-                    results.append({
-                        "original": file_path,
-                        "new_path": str(new_path),
-                        "success": False,
-                        "message": f"Target file already exists: {new_path.name}"
-                    })
-                    continue
-                
-                # Store backup information
-                if create_backup:
-                    backup_data.append({
-                        "original_path": str(path),
-                        "original_name": path.name,
-                        "new_path": str(new_path),
-                        "new_name": new_path.name,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                
-                if dry_run:
-                    logger.info(f"DRY RUN: Would rename '{path.name}' to '{new_path.name}'")
-                    results.append({
-                        "original": file_path,
-                        "new_path": str(new_path),
-                        "success": True,
-                        "message": f"Would rename to: {new_path.name}"
-                    })
-                else:
-                    # Perform the actual rename
-                    try:
-                        logger.info(f"Renaming '{path.name}' to '{new_path.name}'")
-                        path.rename(new_path)
-                        logger.info(f"✅ Successfully renamed to: {new_path.name}")
-                        results.append({
-                            "original": file_path,
-                            "new_path": str(new_path),
-                            "success": True,
-                            "message": f"Renamed to: {new_path.name}"
-                        })
-                    except Exception as e:
-                        logger.error(f"Failed to rename file: {e}")
-                        results.append({
-                            "original": file_path,
-                            "new_path": str(new_path),
-                            "success": False,
-                            "message": f"Rename failed: {str(e)}"
-                        })
-                        
-            except Exception as e:
-                logger.error(f"Error processing file {file_path}: {e}", exc_info=True)
+            path = Path(file_path)
+            if not path.exists():
+                pairs.append(None)  # placeholder, replaced below by a synthetic failure
+                skip_reasons.append(f"File not found: {file_path}")
+                continue
+
+            metadata = metadata_list[i] if i < len(metadata_list) else {}
+            if not metadata:
+                pairs.append(None)
+                skip_reasons.append("No metadata found for file")
+                continue
+
+            media_type = self.renamer.detect_media_type(path.name)
+            pattern = self.settings.renaming_pattern_tv
+            if media_type == "movie":
+                pattern = self.settings.renaming_pattern_movie
+
+            new_name = self._format_filename_from_metadata(metadata, pattern, allow_subfolders=bool(dest_root))
+            if not new_name:
+                pairs.append(None)
+                skip_reasons.append("Failed to format new filename")
+                continue
+
+            dest = self._resolve_destination(path, new_name, dest_root)
+            pairs.append(RenamePair(source=path, dest=dest))
+            skip_reasons.append(None)
+
+        # Pull out the ones we couldn't even build a pair for; execute_renames
+        # only ever sees real pairs.
+        real_pairs = [p for p in pairs if p is not None]
+        sidecar_pairs: List[RenamePair] = []
+        if include_sidecars:
+            for p in real_pairs:
+                for sidecar in find_sidecar_files(p.source):
+                    sidecar_dest = p.dest.parent / f"{p.dest.stem}{sidecar.suffix}"
+                    sidecar_pairs.append(RenamePair(source=sidecar, dest=sidecar_dest, label=f"sidecar: {sidecar.name}"))
+
+        exec_result = execute_renames(
+            real_pairs + sidecar_pairs,
+            action=action,
+            dry_run=dry_run,
+            create_backup=create_backup,
+        )
+        exec_results = exec_result["results"]
+        video_results = exec_results[:len(real_pairs)]
+        sidecar_results = exec_results[len(real_pairs):]
+
+        # Re-interleave with the files that never made it to a pair at all.
+        results: List[Dict] = []
+        vi = 0
+        for file_path, reason in zip(file_paths, skip_reasons):
+            if reason is not None:
                 results.append({
-                    "original": file_path,
-                    "new_path": None,
-                    "success": False,
-                    "message": f"Processing error: {str(e)}"
+                    "original": file_path, "new_path": None,
+                    "success": False, "message": reason,
                 })
-        
-        # Create backup file if requested and not dry run
-        if create_backup and not dry_run and backup_data:
-            try:
-                from core.path_manager import get_backups_dir
-                backup_dir = get_backups_dir()
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_file = backup_dir / f"rename_backup_{timestamp}.json"
-                
-                with open(backup_file, 'w', encoding='utf-8') as f:
-                    json.dump({
-                        "timestamp": datetime.now().isoformat(),
-                        "total_files": len(file_paths),
-                        "successful_renames": len([r for r in results if r["success"]]),
-                        "files": backup_data
-                    }, f, indent=2, ensure_ascii=False)
-                
-                logger.info(f"📝 Backup created: {backup_file}")
-                
-            except Exception as e:
-                logger.error(f"Failed to create backup file: {e}")
-        
+            else:
+                results.append(video_results[vi])
+                vi += 1
+
         success_count = sum(1 for r in results if r["success"])
-        
         logger.info(f"=== Renaming complete: {success_count}/{len(file_paths)} files renamed ===")
-        
+
         return {
             "status": "success",
             "renamed": success_count,
             "total": len(file_paths),
-            "results": results
+            "results": results,
+            "sidecar_results": sidecar_results,
+            "backup_file": exec_result.get("backup_file"),
         }
-    
-    def _format_filename_from_metadata(self, metadata: Dict, pattern: str) -> Optional[str]:
+
+    def _resolve_destination(self, path: Path, new_name: str, dest_root: str) -> Path:
         """
-        Format filename using metadata and pattern
-        
+        new_name may itself contain '/' when a destination root is set,
+        describing subfolders (e.g. "Show/Season 01/Show - S01E01"); it
+        never does when renaming in place, so this stays a flat sibling.
+        """
+        if dest_root:
+            return Path(dest_root) / f"{new_name}{path.suffix}"
+        return path.parent / f"{new_name}{path.suffix}"
+
+    def _format_filename_from_metadata(
+        self, metadata: Dict, pattern: str, *, allow_subfolders: bool = False
+    ) -> Optional[str]:
+        """
+        Format filename (or relative path, if allow_subfolders) using
+        metadata and pattern.
+
         Args:
             metadata: Metadata dictionary from provider
             pattern: Naming pattern (e.g., "{title} - S{season:02d}E{episode:02d} - {episode_title}")
-        
+            allow_subfolders: keep '/' in the pattern as a folder separator
+
         Returns:
-            Formatted filename or None if formatting fails
+            Formatted filename/relative path or None if formatting fails
         """
         from core.rename_pattern import format_filename_stem
 
@@ -957,60 +897,6 @@ class RenamingHandler:
         stem = format_filename_stem(metadata, pattern, file_stem="")
         if not stem:
             return None
-        result = self._sanitize_filename(stem)
+        result = sanitize_filename(stem, allow_subfolders=allow_subfolders)
         return result if result else None
-    
-    def _sanitize_filename(self, filename: str) -> str:
-        """Sanitize filename for cross-platform compatibility"""
-        # Remove or replace invalid characters based on platform
-        system = platform.system().lower()
-        
-        if system == "windows":
-            # Windows invalid characters
-            invalid_chars = r'[<>:"/\\|?*]'
-        else:
-            # Unix/Linux/macOS - only forward slash and null character
-            invalid_chars = r'[/\x00]'
-        
-        result = re.sub(invalid_chars, '', filename)
-
-        # Control characters are legal on POSIX but corrupt listings and can
-        # come straight from a provider's plot/overview field.
-        result = re.sub(r'[\x00-\x1f\x7f]', '', result)
-
-        # Additional platform-specific handling
-        if system == "windows":
-            # Remove trailing dots and spaces (Windows doesn't like them)
-            result = result.rstrip('. ')
-            # Windows reserved names
-            reserved_names = {'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'}
-            if result.upper() in reserved_names:
-                result = result + "_"
-
-        # A leading dot hides the file on POSIX; a leading/trailing space is
-        # silently mangled on Windows.
-        result = result.strip().lstrip('.')
-
-        # Filesystems cap a single name at 255 *bytes*, not characters — a
-        # pattern including {overview}, or any CJK title, blows past that and
-        # surfaces as an opaque "[Errno 36] File name too long".
-        result = self._truncate_to_bytes(result, 255)
-
-        return result
-
-    @staticmethod
-    def _truncate_to_bytes(name: str, max_bytes: int) -> str:
-        """
-        Truncate `name` so its UTF-8 encoding fits `max_bytes`, without
-        splitting a multi-byte character.
-        """
-        encoded = name.encode('utf-8')
-        if len(encoded) <= max_bytes:
-            return name
-
-        truncated = encoded[:max_bytes].decode('utf-8', errors='ignore').rstrip()
-        logger.warning(
-            f"Filename exceeded {max_bytes} bytes and was truncated: {name[:60]}…"
-        )
-        return truncated
 

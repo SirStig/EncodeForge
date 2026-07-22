@@ -2,8 +2,9 @@
 """
 EncodeForge CLI
 
-This release ships the desktop app only. Commands other than ``gui`` are placeholders
-and exit with a notice; full CLI may return in a later release.
+``rename`` and ``gui`` are fully implemented and share EncodeForgeCore with
+the desktop app. ``encode``/``subtitle`` are placeholders and exit with a
+notice; they may land in a later release.
 """
 
 import sys
@@ -15,6 +16,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app import __version__ as APP_VERSION
+
+VIDEO_EXTENSIONS = {
+    '.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv',
+    '.webm', '.m4v', '.mpg', '.mpeg', '.3gp',
+}
 
 # Setup logging
 try:
@@ -31,7 +37,7 @@ logger = logging.getLogger(__name__)
 @click.group()
 @click.version_option(version=APP_VERSION)
 def cli():
-    """EncodeForge — desktop app; CLI encode/subtitle/rename not implemented yet."""
+    """EncodeForge — desktop app, plus a scriptable `rename` command. `encode`/`subtitle` are not yet implemented."""
     pass
 
 
@@ -69,18 +75,106 @@ def subtitle(input_path, language, generate, model, provider):
 
 @cli.command()
 @click.argument('input_path', type=click.Path(exists=True))
-@click.option('--tmdb-key', help='TMDB API key')
-@click.option('--tvdb-key', help='TVDB API key')
-@click.option('--pattern', help='Custom naming pattern')
-@click.option('--preview', is_flag=True, help='Preview changes without renaming')
-@click.option('--type', type=click.Choice(['movie', 'tv', 'anime', 'auto']), default='auto')
-def rename(input_path, tmdb_key, tvdb_key, pattern, preview, type):
-    """Rename media files using metadata (not available in this release — use the GUI)."""
-    click.echo(
-        click.style(f"The rename command is not implemented in v{APP_VERSION}.", fg="yellow", bold=True)
+@click.option('--tmdb-key', help='TMDB API key (overrides saved settings)')
+@click.option('--tvdb-key', help='TVDB API key (overrides saved settings)')
+@click.option('--omdb-key', help='OMDb API key (overrides saved settings)')
+@click.option('--trakt-key', help='Trakt API key (overrides saved settings)')
+@click.option('--provider', default='automatic',
+              help='Metadata provider to use, or "automatic" to try all in priority order (default).')
+@click.option('--pattern', help='Naming pattern, applied to both TV and movies (overrides saved settings).')
+@click.option('-d', '--destination', 'destination', type=click.Path(file_okay=False),
+              help='Move/copy into this root folder instead of renaming in place. '
+                   'Enables "/" in the pattern to describe subfolders (e.g. "{title}/Season {season:02d}/...").')
+@click.option('--action', type=click.Choice(['rename', 'move', 'copy', 'hardlink', 'symlink']), default=None,
+              help='What to do with each file (default: rename in place, or move if --destination is set).')
+@click.option('--sidecars/--no-sidecars', default=True,
+              help='Carry along same-name .srt/.ass/.nfo files sitting next to each video (default: on).')
+@click.option('--recursive/--no-recursive', default=True,
+              help='When INPUT_PATH is a folder, scan it recursively (default: on).')
+@click.option('--dry-run', '--preview', 'dry_run', is_flag=True,
+              help="Show what would happen without touching the filesystem.")
+@click.option('-y', '--yes', is_flag=True, help='Skip the confirmation prompt.')
+@click.option('--type', 'media_type', type=click.Choice(['movie', 'tv', 'anime', 'auto']), default='auto',
+              help='Media type hint (currently informational — detection is automatic per file).')
+def rename(input_path, tmdb_key, tvdb_key, omdb_key, trakt_key, provider, pattern,
+           destination, action, sidecars, recursive, dry_run, yes, media_type):
+    """
+    Rename media files using metadata (TMDB, TVDB, TVmaze, AniDB, Kitsu, Jikan, and more).
+
+    INPUT_PATH is a single video file, or a folder to scan for video files.
+    """
+    from utils.settings_manager import get_settings_manager
+
+    src = Path(input_path)
+    if src.is_dir():
+        it = src.rglob('*') if recursive else src.iterdir()
+        files = sorted(str(f) for f in it if f.is_file() and f.suffix.lower() in VIDEO_EXTENSIONS)
+    else:
+        files = [str(src)]
+
+    if not files:
+        click.echo(click.style("No video files found.", fg="yellow"))
+        raise SystemExit(1)
+
+    sm = get_settings_manager()
+    settings = sm.get_merged_conversion_settings()
+    if pattern:
+        settings.renaming_pattern_tv = pattern
+        settings.renaming_pattern_movie = pattern
+    if destination:
+        settings.renaming_destination_root = destination
+    settings.renaming_action = action or ('move' if destination else settings.renaming_action or 'rename')
+    settings.renaming_include_sidecars = sidecars
+
+    preview_settings = {"selected_provider": provider}
+    key_overrides = {
+        "tmdb_api_key": tmdb_key, "tvdb_api_key": tvdb_key,
+        "omdb_api_key": omdb_key, "trakt_api_key": trakt_key,
+    }
+    for field, value in key_overrides.items():
+        if value:
+            setattr(settings, field, value)
+            preview_settings[field] = value
+
+    from core.encodeforge_core import EncodeForgeCore
+    core = EncodeForgeCore(settings=settings)
+
+    click.echo(f"Scanning {len(files)} file(s)…")
+    if not dry_run and not yes:
+        verb = settings.renaming_action
+        if not click.confirm(f"{verb.capitalize()} {len(files)} file(s) using pattern from settings?", default=False):
+            click.echo("Cancelled.")
+            raise SystemExit(1)
+
+    result = core.rename_files(
+        files, dry_run=dry_run, create_backup=not dry_run, preview_settings=preview_settings
     )
-    click.echo("Use the desktop application: python main.py   or   python cli.py gui")
-    raise SystemExit(2)
+    if result.get("status") != "success":
+        click.echo(click.style(f"Rename failed: {result.get('message', 'unknown error')}", fg="red", bold=True))
+        raise SystemExit(1)
+
+    failures = 0
+    for r in result.get("results", []):
+        name = Path(r["original"]).name
+        if r["success"]:
+            click.echo(click.style("  ok  ", fg="green") + f"{name}  →  {r['message']}")
+        else:
+            failures += 1
+            click.echo(click.style(" fail ", fg="red") + f"{name}  —  {r['message']}")
+
+    for r in result.get("sidecar_results", []) or []:
+        name = Path(r["original"]).name
+        if r["success"]:
+            click.echo(click.style("  ok  ", fg="green") + f"{name}  →  {r['message']}  (companion file)")
+        else:
+            click.echo(click.style(" skip ", fg="yellow") + f"{name}  —  {r['message']}  (companion file)")
+
+    if result.get("backup_file"):
+        click.echo(f"\nBackup written: {result['backup_file']}")
+
+    total = result.get("total", len(files))
+    click.echo(f"\n{result.get('renamed', 0)}/{total} renamed" + (f", {failures} failed" if failures else ""))
+    raise SystemExit(1 if failures else 0)
 
 
 @cli.command()

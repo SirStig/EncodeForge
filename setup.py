@@ -19,9 +19,18 @@ if requirements_path.exists():
 else:
     requirements = []
 
+# Read the version from app/__init__.py without importing the package (which
+# would pull in PySide6 at build time).
+version_file = Path(__file__).parent / "app" / "__init__.py"
+version = "0.0.0"
+for line in version_file.read_text(encoding="utf-8").splitlines():
+    if line.startswith("__version__"):
+        version = line.split("=", 1)[1].strip().strip('"').strip("'")
+        break
+
 setup(
     name="encodeforge",
-    version="0.5.0-alpha-2",
+    version=version,
     author="Joshua Kac",
     author_email="",
     description="FFmpeg GUI for batch video encoding, AI subtitles, and media file renaming",

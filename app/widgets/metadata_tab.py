@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QStyle,
@@ -31,7 +32,14 @@ from app.widgets.custom_widgets import (
     StyledLabel,
     StyledLineEdit,
 )
-from core.rename_pattern import apply_filename_options, format_filename_stem
+from core.rename_executor import (
+    RenamePair,
+    execute_renames,
+    find_sidecar_files,
+    list_backups,
+    restore_from_backup,
+)
+from core.rename_pattern import apply_filename_options, format_filename_stem, sanitize_filename
 from utils.notifications import get_notification_manager
 from utils.settings_manager import get_settings_manager
 from utils.workers import RenamerWorker
@@ -64,6 +72,8 @@ class MetadataTab(QWidget):
         sm = get_settings_manager()
         self.pattern_input.setText(sm.renamer.pattern)
         self.refresh_providers()
+        # A backup from a previous session's rename may still be undoable.
+        self.undo_btn.setEnabled(bool(list_backups()))
         logger.debug("Metadata tab initialized - using base glassmorphism theme")
 
     def _setup_ui(self):
@@ -201,9 +211,21 @@ class MetadataTab(QWidget):
             sm.save()
 
     def _undo_rename(self):
-        """Undo the last batch of renames."""
-        if not self._rename_history:
+        """
+        Undo the last batch of renames.
+
+        Prefers this session's in-memory history (instant, no dialog). If
+        that's empty — a fresh session, or a batch that was renamed with no
+        undo pending — falls back to the durable backup log every real
+        Apply Rename now writes, so undo survives past a session that ended
+        without clicking Undo.
+        """
+        if self._rename_history:
+            self._undo_from_memory()
             return
+        self._undo_from_backup()
+
+    def _undo_from_memory(self):
         errors = 0
         for new_path_str, original_path_str in list(self._rename_history.items()):
             try:
@@ -216,9 +238,48 @@ class MetadataTab(QWidget):
                 errors += 1
                 logger.error(f"Failed to undo rename: {e}")
         self._rename_history.clear()
-        self.undo_btn.setEnabled(False)
+        self.undo_btn.setEnabled(bool(list_backups()))
         if errors == 0:
             self.notifier.show_notification(title="Undo Complete", message="Renames undone successfully", notification_type="success")
+        else:
+            self.notifier.show_notification(
+                title="Undo Incomplete",
+                message=f"{errors} file(s) could not be restored — see logs",
+                notification_type="warning",
+            )
+
+    def _undo_from_backup(self):
+        backups = list_backups()
+        if not backups:
+            logger.info("No rename history or backup available to undo")
+            return
+        latest = backups[0]
+        confirm = QMessageBox.question(
+            self,
+            "Undo Rename",
+            "Nothing from this session is pending undo.\n\n"
+            f"Restore the most recent saved rename batch instead?\n({latest.name})",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        result = restore_from_backup(latest)
+        restored = result.get("renamed", 0)
+        total = result.get("total", 0)
+        if restored:
+            self.notifier.show_notification(
+                title="Undo Complete",
+                message=f"Restored {restored}/{total} file(s) from backup",
+                notification_type="success" if restored == total else "warning",
+            )
+        else:
+            self.notifier.show_notification(
+                title="Undo Failed",
+                message="Could not restore any files from the backup — see logs",
+                notification_type="error",
+            )
+        self.undo_btn.setEnabled(bool(list_backups()))
 
     def _drag_enter_event(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
@@ -473,8 +534,19 @@ class MetadataTab(QWidget):
         self.rename_btn.setEnabled(True)
         logger.info("Generated name previews")
 
-    def _generate_new_name(self, file_path: Path, pattern: str, metadata: Optional[dict] = None) -> str:
-        ext = file_path.suffix
+    def _destination_root(self) -> str:
+        return (get_settings_manager().renamer.destination_root or "").strip()
+
+    def _rename_action(self) -> str:
+        return get_settings_manager().renamer.action or "rename"
+
+    def _generate_new_stem(self, file_path: Path, pattern: str, metadata: Optional[dict] = None) -> str:
+        """
+        Formatted, sanitized stem (no extension). Contains '/' describing
+        subfolders only when a destination root is configured — otherwise a
+        pattern's '/' is stripped like any other invalid character, so
+        renaming in place can never accidentally create a subfolder.
+        """
         stem = format_filename_stem(metadata, pattern, file_stem=file_path.stem) or file_path.stem
         stem = apply_filename_options(
             stem,
@@ -482,39 +554,52 @@ class MetadataTab(QWidget):
             lowercase=self.lowercase_check.isChecked(),
             remove_special=self.remove_special_check.isChecked(),
         )
-        if self.preserve_extension_check.isChecked():
-            return f"{stem}{ext}"
-        return stem
+        return sanitize_filename(stem, allow_subfolders=bool(self._destination_root()))
+
+    def _generate_new_name(self, file_path: Path, pattern: str, metadata: Optional[dict] = None) -> str:
+        """Flat display name (last path segment + extension) for the preview table."""
+        stem = self._generate_new_stem(file_path, pattern, metadata)
+        display_stem = stem.rsplit("/", 1)[-1] if stem else ""
+        ext = file_path.suffix if self.preserve_extension_check.isChecked() else ""
+        return f"{display_stem}{ext}"
+
+    def _resolve_destination(self, file_path: Path, stem: str) -> Path:
+        ext = file_path.suffix if self.preserve_extension_check.isChecked() else ""
+        dest_root = self._destination_root()
+        if dest_root:
+            return Path(dest_root) / f"{stem}{ext}"
+        return file_path.parent / f"{stem}{ext}"
 
     def _apply_rename(self):
-        """Apply renaming to all files based on metadata."""
+        """
+        Apply renaming to all files based on metadata.
+
+        Builds (source, destination) pairs from the metadata already shown
+        in the table, then hands them to core.rename_executor — the same
+        collision-safe, backup-writing path RenamingHandler.rename_files
+        (CLI, RenamerWorker) uses. This used to be a separate inline
+        Path.rename() loop with none of that safety; a fix landed here
+        would not have reached the CLI, and vice versa.
+        """
         if self.file_table.rowCount() == 0:
             logger.warning("No files to rename")
             return
-        
-        logger.info("Applying renames to files")
-        
-        # Get settings
-        provider = self._get_selected_provider()
-        api_key = ""
+
         pattern = self.pattern_input.text() if hasattr(self, 'pattern_input') else ''
-        
-        renamed_count = 0
-        error_count = 0
-        
-        # Process each file
+        dest_root = self._destination_root()
+        action = self._rename_action()
+        include_sidecars = get_settings_manager().renamer.include_sidecars
+
+        pairs: List[RenamePair] = []
+        rows: List[int] = []  # row each entry in `pairs` came from, same order
+
         for row in range(self.file_table.rowCount()):
             file_item = self.file_table.item(row, 0)
             if not file_item:
                 continue
-            
             file_path = Path(file_item.data(Qt.ItemDataRole.UserRole))
-            
-            # Check if we have metadata for this file
-            meta_item = None
-            if row < self.metadata_table.rowCount():
-                meta_item = self.metadata_table.item(row, 0)
-            
+
+            meta_item = self.metadata_table.item(row, 0) if row < self.metadata_table.rowCount() else None
             if not meta_item or meta_item.text().startswith("Error:"):
                 logger.warning(f"Skipping {file_path.name}: No valid metadata")
                 continue
@@ -524,36 +609,90 @@ class MetadataTab(QWidget):
                 logger.warning(f"Skipping {file_path.name}: No structured metadata for rename")
                 continue
 
-            new_name = self._generate_new_name(file_path, pattern, metadata)
+            stem = self._generate_new_stem(file_path, pattern, metadata)
+            if not stem or not stem.strip(" ./"):
+                meta_item.setText("✗ Error: pattern produced an empty filename")
+                logger.error(f"Refusing to rename {file_path.name}: empty target name")
+                continue
 
-            # Try to rename
-            new_path = file_path.parent / new_name
-            try:
-                if new_path != file_path:
-                    self._rename_history[str(new_path)] = str(file_path)
-                    file_path.rename(new_path)
-                    file_item.setText(new_name)
-                    file_item.setData(Qt.ItemDataRole.UserRole, str(new_path))
-                    meta_item.setText(f"✓ Renamed: {new_name}")
-                    renamed_count += 1
-                    logger.info(f"Renamed: {file_path.name} → {new_name}")
-                else:
-                    logger.debug(f"Skipped: {file_path.name} (same name)")
-            except Exception as e:
+            pairs.append(RenamePair(source=file_path, dest=self._resolve_destination(file_path, stem)))
+            rows.append(row)
+
+        if not pairs:
+            logger.warning("No files ready to rename — fetch metadata and preview first")
+            return
+
+        sidecar_pairs: List[RenamePair] = []
+        if include_sidecars:
+            for p in pairs:
+                for sidecar in find_sidecar_files(p.source):
+                    sidecar_pairs.append(RenamePair(
+                        source=sidecar,
+                        dest=p.dest.parent / f"{p.dest.stem}{sidecar.suffix}",
+                        label=f"sidecar: {sidecar.name}",
+                    ))
+
+        verb = {"rename": "Rename", "move": "Move", "copy": "Copy",
+                "hardlink": "Hardlink", "symlink": "Symlink"}.get(action, "Rename")
+        msg_lines = [f"{verb} {len(pairs)} file(s)"]
+        if sidecar_pairs:
+            msg_lines[0] += f" and {len(sidecar_pairs)} companion file(s)"
+        if dest_root:
+            msg_lines.append(f"Destination: {dest_root}")
+        msg_lines.append("Use Undo immediately afterwards if the result is not what you expected.")
+
+        confirm = QMessageBox.question(
+            self,
+            "Apply Rename",
+            "\n\n".join(msg_lines),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            logger.info("Rename cancelled by user")
+            return
+
+        logger.info(f"Applying {action} to {len(pairs)} file(s) ({len(sidecar_pairs)} sidecar(s))")
+        exec_result = execute_renames(pairs + sidecar_pairs, action=action, dry_run=False, create_backup=True)
+        video_results = exec_result["results"][:len(pairs)]
+
+        renamed_count = 0
+        error_count = 0
+        for row, pair, res in zip(rows, pairs, video_results):
+            file_item = self.file_table.item(row, 0)
+            meta_item = self.metadata_table.item(row, 0)
+            if res["success"]:
+                renamed_count += 1
+                if res.get("new_path") and res.get("original"):
+                    self._rename_history[res["new_path"]] = res["original"]
+                if file_item:
+                    file_item.setText(pair.dest.name)
+                    file_item.setData(Qt.ItemDataRole.UserRole, str(pair.dest))
                 if meta_item:
-                    meta_item.setText(f"✗ Error: {str(e)}")
+                    meta_item.setText(f"✓ {res['message']}")
+            else:
                 error_count += 1
-                logger.error(f"Failed to rename {file_path.name}: {e}")
-        
-        # Show notification
+                if meta_item:
+                    meta_item.setText(f"✗ Error: {res['message']}")
+                logger.error(f"Failed to rename {pair.source.name}: {res['message']}")
+
+        if exec_result.get("backup_file"):
+            logger.info(f"Backup written: {exec_result['backup_file']}")
+
         if renamed_count > 0:
             self.undo_btn.setEnabled(True)
             self.rename_completed.emit(f"{renamed_count} files")
             self.notifier.show_notification(
                 title="Renaming Complete",
-                message=f"Renamed {renamed_count} files ({error_count} errors)",
-                notification_type="success" if error_count == 0 else "warning"
+                message=f"{verb}d {renamed_count} file(s)" + (f", {error_count} error(s)" if error_count else ""),
+                notification_type="success" if error_count == 0 else "warning",
             )
             logger.info(f"Batch rename complete: {renamed_count} files, {error_count} errors")
+        elif error_count > 0:
+            self.notifier.show_notification(
+                title="Renaming Failed",
+                message=f"{error_count} file(s) could not be renamed — see the Metadata Result column.",
+                notification_type="error",
+            )
 
         self.rename_btn.setEnabled(False)

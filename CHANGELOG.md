@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] — 2026-07-22
+
+First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line to a full release and lands a large correctness pass from a full audit of the codebase — several features that appeared to work were failing silently and are now fixed.
+
+### Fixed — features that did not work at all
+
+- **Automatic FFmpeg download on Windows and Linux** — The downloaded archive was saved under a generic temporary name, and extraction was chosen from the file extension, so it always failed with “Unsupported archive format.” The first-run setup flow now identifies archives by content and supports `.tar.xz` (used by the Linux builds).
+- **Update notifications** — The version check discarded the pre-release suffix from both sides before comparing, so every `-alpha` release compared equal and no update was ever detected. Version comparison is now full PEP 440, and a manual check no longer reports “You are up to date” when it isn’t.
+- **AI subtitle generation through the subtitle handler** — An import still pointed at a package layout from before the PySide6 refactor, so Whisper reported “not available” even when it was fully installed.
+- **Crash recovery of an interrupted batch** — The same class of stale import meant conversion state was never written to disk, so resuming after an interruption never worked.
+- **“Convert to SRT” subtitle mode** — Called an internal method with the wrong number of arguments, failing every file that had a subtitle track. Subtitles are now transcoded in the same FFmpeg pass.
+- **Hardware acceleration in the encode queue** — Encoder detection was gated on the wrong field, so encodes silently fell back to CPU even with a supported GPU. Selecting AMF, QSV, or VideoToolbox also always produced NVENC arguments; each backend is now honoured.
+- **API key “Test” buttons** — Always reported `✗ Error`, including for valid keys, because the worker passed an argument the check did not accept.
+- **Desktop notifications** — Five call sites used a method that did not exist, raising an error mid-operation — including on the subtitle failure path.
+- **“Open Output Folder”** — Used a Windows-only API and crashed on Linux and macOS.
+- **Sidebar “Add Files” / “Add Folder”** — Did nothing on the Subtitles and Metadata tabs due to a signature mismatch that was silently swallowed.
+- **The Providers list on the Subtitles tab** — Was built by the UI and then discarded; every provider was queried regardless of what you selected.
+- **Preview then Apply Rename** — Preview discarded the fetched metadata, so Apply silently renamed nothing.
+
+### Fixed — data loss and safety
+
+- **Batch rename could destroy files** — Renaming used an operation that overwrites silently on macOS and Linux, so two files resolving to the same episode left only one. Collisions and empty names are now refused.
+- **Settings loss on upgrade** — All settings sections shared one error handler, and the section holding every API key was loaded last, so a single unrecognised key wiped the lot. Sections now load independently and unknown keys are ignored.
+- **Corrupt settings after an unclean exit** — `settings.json` was written in place; it is now written atomically and stored with owner-only permissions.
+- **Exported settings leaked API keys** — Export now redacts them by default.
+- **Archive extraction** — FFmpeg archives are validated against path traversal (zip-slip / tar-slip) before any file is written.
+- **Profile names** — Were used unsanitised as file paths, so a name containing `../` could read or delete files outside the profiles directory.
+
+### Fixed — wrong results
+
+- **Subtitles for the wrong episode** — Addic7ed results were taken from the season page without filtering by episode, then labelled with the episode you asked for.
+- **Spanish, German, Chinese, Dutch, Czech, and Greek subtitles** — Several providers mangled language codes (`ger` became `GE`, not `DE`), so those languages returned no results at all. Language handling is now shared and normalised.
+- **Subtitles in the wrong language** — A substring match meant a request for English could match Slovenian or French.
+- **Corrupt subtitle files reported as successful** — When an archive failed to unpack or a site returned an error page, the raw bytes were written as `.srt` and reported as a success, which also stopped other providers from being tried. Downloads are now validated as subtitle text.
+- **Mojibake in Spanish subtitles** — SubDivX content was re-encoded unconditionally, turning UTF-8 into `AquÃ­ estÃ¡`.
+- **Resolutions parsed as season/episode** — `Show.1920x1080.mkv` parsed as season 1920, episode 1080.
+- **Release year detection** — `Blade.Runner.2049.2017.mkv` used 2049 as the year.
+- **Release-group anime filenames** — `[SubsPlease] Show - [12].mkv` classified as a TV episode but had no matching parse rule, so it never renamed.
+- **English title preference** — Matched two-letter Japanese particles anywhere in a title, so “The Night Of”, “Doctor Who”, and “Snowfall” were all treated as Japanese.
+- **Bitmap subtitles aborted the encode** — PGS/VobSub tracks were force-converted to a text format, failing the job after it had been running. They are now copied where the container allows it and dropped with a warning where it does not.
+- **Video-only files failed to encode** — The audio stream mapping was not optional.
+- **Progress stuck at 0%** — Sources without a frame count (some `.ts` captures) produced no progress updates at all; elapsed time is now used as a fallback.
+- **Profiles saved but never applied** — Loading a profile reported success without changing any setting.
+- **`ffprobe` path corruption** — Deriving the `ffprobe` path rewrote every occurrence of “ffmpeg” in the path, including directory names, breaking all probing for the app’s own FFmpeg installer.
+- **Language and subtitle mode settings reset on restart** — Saved in a format that could not be read back.
+
+### Fixed — stability
+
+- **The app hung on exit during an encode** — The window closed but the process stayed alive and busy until the batch finished.
+- **Stop did not stop** — Queued files started encoding anyway, rows stayed at “Encoding…”, and cancelled files could be marked “Completed”.
+- **Removing a queued row corrupted other rows** — Progress and completion were written to a row index captured when the encode started.
+- **Closing the Whisper setup window mid-download froze the app** until the download finished.
+- **Log files were destroyed after 5,000 lines** — A rotation bug left one line per file, so logs attached to bug reports contained nothing useful.
+- **Batch subtitle failures opened one dialog per file** — 40 failures meant 40 dialogs; there is now a single summary.
+- **Right-click menu opened twice** in the encoder queue.
+- **GPU detection** re-ran external tools on every call and could freeze the UI for seconds; results are now cached.
+- **Whisper on a GPU-less machine** — Now falls back to CPU instead of failing outright, and reports real transcription progress instead of sitting at 10%.
+- **Partially downloaded Whisper models** no longer show as installed.
+
+### Changed
+
+- **Dependencies trimmed** — Removed packages that were declared but never imported, including `pandas` and `numpy` (~100 MB). Two were actively harmful: the obsolete `pathlib` backport, which shadows the standard library, and `PyQt-Fluent-Widgets`, which pulled a second Qt binding into the process. Build tooling moved to `requirements-dev.txt`.
+- **Packaging** — `pip install .` now ships the entry-point modules; previously all three console scripts failed with `ModuleNotFoundError`.
+- **CI** — Now runs the test suite on every branch across Linux, macOS, and Windows. The macOS workflow, which still built a JavaFX/Maven project that no longer exists, was replaced with one that builds the current app.
+- **API keys** — The bundled OpenSubtitles and SubDL keys can be overridden via `ENCODEFORGE_OPENSUBTITLES_KEY` and `ENCODEFORGE_SUBDL_KEY`. A user-supplied OpenSubtitles key is now actually used; previously the bundled key always took precedence. Keys are no longer written to debug logs.
+- **OMDb and AniDB** are now contacted over HTTPS.
+- **Release process** — `prepare_release.sh`, which only printed instructions, is now `RELEASING.md`.
+
+### Known limitations
+
+- Several subtitle scrapers (Podnapisi, SubDivX, Jimaku) target site layouts that have since changed and may return no results. They fail quietly rather than erroring.
+- The CLI still exposes only `gui`; encode, subtitle, and rename subcommands remain planned.
+- Theme selection, two-pass encoding, and a few other settings are still displayed but not yet wired up.
+
+### Release Links
+
+- **GitHub Release** — [v0.5.0](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0)
+- **Compare** — [v0.5.0-alpha-2...v0.5.0](https://github.com/SirStig/EncodeForge/compare/v0.5.0-alpha-2...v0.5.0)
+
+---
+
 ## [0.5.0-alpha-2] — 2026-03-28
 
 Renamer overhaul, smarter provider selection, a cleaner Settings experience, and stability/layout improvements on top of the first PySide6 alpha.
@@ -165,7 +246,7 @@ Renamer overhaul, smarter provider selection, a cleaner Settings experience, and
 
 ## [0.4.1] — 2025-10-24
 
-> **Note:** Final **JavaFX** release (deprecated). Current binaries are the **PySide6** line; see **[v0.5.0-alpha-2](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0-alpha-2)**.
+> **Note:** Final **JavaFX** release (deprecated). Current binaries are the **PySide6** line; see **[v0.5.0](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0)**.
 
 ### Highlights
 

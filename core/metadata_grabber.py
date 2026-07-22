@@ -5,8 +5,6 @@ Orchestrates multiple metadata providers for movies, TV shows, and anime
 """
 
 import logging
-import platform
-import re
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -315,121 +313,6 @@ class MetadataGrabber:
         if result.get("year") or result.get("show_year"):
             score += 1
         return score
-
-    def format_filename(self, info: Dict, pattern: str) -> str:
-        """Format filename stem; patterns match core.rename_pattern (Python format syntax)."""
-        from core.rename_pattern import format_filename_stem
-
-        stem = format_filename_stem(info, pattern, file_stem="") or ""
-        if not stem:
-            return ""
-        return self._sanitize_filename(stem)
-    
-    def _sanitize_filename(self, filename: str) -> str:
-        """Sanitize filename for cross-platform compatibility"""
-        # Remove or replace invalid characters based on platform
-        system = platform.system().lower()
-        
-        if system == "windows":
-            # Windows invalid characters
-            invalid_chars = r'[<>:"/\\|?*]'
-        else:
-            # Unix/Linux/macOS - only forward slash and null character
-            invalid_chars = r'[/\x00]'
-        
-        result = re.sub(invalid_chars, '', filename)
-        
-        # Additional platform-specific handling
-        if system == "windows":
-            # Remove trailing dots and spaces (Windows doesn't like them)
-            result = result.rstrip('. ')
-            # Windows reserved names
-            reserved_names = {'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'}
-            if result.upper() in reserved_names:
-                result = result + "_"
-        
-        return result
-    
-    def rename_file(
-        self,
-        file_path: str,
-        pattern: str,
-        auto_detect: bool = True,
-        dry_run: bool = False
-    ) -> Tuple[bool, str, Optional[str]]:
-        """
-        Rename a media file
-        
-        Args:
-            file_path: Path to file
-            pattern: Naming pattern
-            auto_detect: Automatically detect and search for metadata
-            dry_run: Don't actually rename, just show what would happen
-            
-        Returns:
-            (success, message, new_path)
-        """
-        path = Path(file_path)
-        
-        if not path.exists():
-            return False, f"File not found: {file_path}", None
-        
-        # Detect media type
-        media_type = self.detect_media_type(path.name)
-        
-        info = None
-        
-        if auto_detect:
-            if media_type == "tv":
-                parsed = self.parse_tv_filename(path.name)
-                if parsed:
-                    info = self.search_tv_show(
-                        parsed["title"],
-                        parsed["season"],
-                        parsed["episode"]
-                    )
-            elif media_type == "movie":
-                parsed = self.parse_movie_filename(path.name)
-                if parsed:
-                    info = self.search_movie(parsed["title"], parsed.get("year"))
-        
-        if not info:
-            return False, "Could not find metadata for file", None
-        
-        # Format new filename
-        new_name = self.format_filename(info, pattern)
-
-        # An empty stem would produce a bare ".mkv" — a hidden file that every
-        # subsequent rename in the folder would overwrite in turn.
-        if not new_name or not new_name.strip():
-            return False, "Refusing to rename: pattern produced an empty filename", None
-
-        new_path = path.parent / f"{new_name}{path.suffix}"
-
-        if new_path.resolve() == path.resolve():
-            return True, "File already has the target name", str(path)
-
-        # Path.rename overwrites silently on POSIX, so two files resolving to
-        # the same metadata would destroy one another during a batch rename.
-        if new_path.exists():
-            return (
-                False,
-                f"Refusing to overwrite existing file: {new_path.name}",
-                None,
-            )
-
-        if dry_run:
-            return True, f"Would rename to: {new_path.name}", str(new_path)
-
-        # Perform rename
-        try:
-            # os.link + unlink would be atomic, but a same-directory rename with
-            # a verified-absent target is sufficient here and keeps metadata.
-            path.rename(new_path)
-            return True, f"Renamed successfully to: {new_path.name}", str(new_path)
-        except Exception as e:
-            return False, f"Rename failed: {str(e)}", None
-
 
 def main():
     """Test the metadata grabber"""

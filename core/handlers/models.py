@@ -51,6 +51,9 @@ class ConversionSettings:
     enable_renaming: bool = False
     renaming_pattern_tv: str = "{title} - S{season:02d}E{episode:02d} - {episode_title}"
     renaming_pattern_movie: str = "{title} ({year})"
+    renaming_destination_root: str = ""  # empty = rename in place, same folder
+    renaming_action: str = "rename"  # rename, move, copy, hardlink, symlink
+    renaming_include_sidecars: bool = True  # carry .srt/.ass/.nfo along with the video
     tmdb_api_key: str = ""
     tvdb_api_key: str = ""
     omdb_api_key: str = ""
