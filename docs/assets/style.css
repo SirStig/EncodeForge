@@ -751,6 +751,29 @@ a.dl-btn:hover { text-decoration: none; }
 }
 .sidebar-overlay.visible { display: block; }
 
+/* Off-canvas mobile nav for pages without a docs sidebar (home, download, changelog) */
+.mobile-drawer { display: none; }
+@media (max-width: 900px) {
+  .mobile-drawer {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: var(--sidebar-w);
+    z-index: 160;
+    background: var(--side-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-right: 1px solid var(--border-md);
+    padding: calc(var(--header-h) + 0.75rem) 0 3rem;
+    transform: translateX(-100%);
+    transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+  }
+  .mobile-drawer.open { transform: translateX(0); }
+}
+
 .doc-standalone {
   position: relative;
   z-index: 1;
@@ -806,6 +829,7 @@ a.dl-btn:hover { text-decoration: none; }
 }
 .doc-footer a { color: var(--muted); }
 .doc-footer a:hover { color: var(--text); text-decoration: none; }
+.doc-footer-tight { margin-top: 2rem; }
 
 .changelog-wrap {
   max-width: 720px;
@@ -817,6 +841,9 @@ a.dl-btn:hover { text-decoration: none; }
 
 .page-title { font-size: 1.75rem; margin-bottom: 0.4rem; }
 .page-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+.page-body { position: relative; z-index: 1; padding-top: var(--header-h); }
+
+#changelog-status { color: var(--muted); font-size: 0.9rem; }
 
 #changelog-body h1 { font-size: 1.6rem; margin: 0 0 0.5rem; }
 #changelog-body h2 {

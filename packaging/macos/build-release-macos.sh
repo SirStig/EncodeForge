@@ -12,7 +12,7 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-AC_PASSWORD}"
 
 echo "Installing build dependencies..."
 python3 -m pip install -q -r requirements.txt
-python3 -m pip install -q nuitka ordered-set zstandard imageio
+python3 -m pip install -q "nuitka>=2.4.9,<3" ordered-set zstandard imageio
 
 echo "Building with Nuitka..."
 python3 build_nuitka.py

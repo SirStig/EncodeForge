@@ -109,17 +109,20 @@
       });
     var macArm =
       first(function (f) {
-        return /macos-arm|apple-?silicon|arm64.*\.zip$/i.test(f);
+        return /\.(dmg|zip)$/i.test(f) && /(macos-arm|apple-?silicon|arm64)/i.test(f);
       }) ||
       first(function (f) {
         return /\.zip$/i.test(f) && /mac/i.test(f);
-      });
-    var macIntel =
+      }) ||
+      // The macOS build script produces a single unmarked EncodeForge-*-macos.dmg
+      // from the (Apple Silicon) GitHub-hosted runner, with no arch tag in the
+      // filename. Treat an untagged mac .dmg as Apple Silicon rather than Intel.
       first(function (f) {
-        return /\.dmg$/i.test(f) && /(x64|intel|amd64)/i.test(f);
-      }) || first(function (f) {
-        return /\.dmg$/i.test(f) && !/arm64/i.test(f);
+        return /\.dmg$/i.test(f) && /mac/i.test(f) && !/(x64|intel|amd64)/i.test(f);
       });
+    var macIntel = first(function (f) {
+      return /\.(dmg|zip)$/i.test(f) && /mac/i.test(f) && /(x64|intel|amd64)/i.test(f);
+    });
     var deb = first(function (f) {
       return /\.deb$/i.test(f);
     });
@@ -136,6 +139,11 @@
     if (!file) return 'Windows download';
     if (/\.zip$/i.test(file)) return 'Windows (.zip)';
     return 'Windows (.exe)';
+  }
+
+  function macArmLabel(file) {
+    if (!file) return 'Apple Silicon';
+    return 'Apple Silicon (' + (/\.dmg$/i.test(file) ? '.dmg' : '.zip') + ')';
   }
 
   function linkRow(href, label, primary, pending) {
@@ -193,13 +201,13 @@
           function () {
             return linkRow(
               url(slots.macArm),
-              'Apple Silicon (.zip)',
+              macArmLabel(slots.macArm),
               true,
               pending || !slots.macArm
             );
           },
           function () {
-            return linkRow(null, 'Intel 64-bit (.zip)', false, true);
+            return linkRow(null, 'Intel 64-bit', false, true);
           },
         ])
       );
@@ -247,9 +255,7 @@
             var f = slots.macArm || slots.macIntel;
             var lbl = f
               ? slots.macArm
-                ? /dmg/i.test(f)
-                  ? 'Apple Silicon (.dmg)'
-                  : 'Apple Silicon (.zip)'
+                ? macArmLabel(f)
                 : 'Intel (.dmg)'
               : 'No macOS asset for this release';
             return linkRow(url(f), lbl, !!f, !f);

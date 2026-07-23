@@ -18,8 +18,11 @@
     });
   });
 
-  var sidebar = document.getElementById('sidebar');
-  var overlay = document.getElementById('sidebarOverlay');
+  // Guide pages use #sidebar (a table-of-contents panel); every other page
+  // uses #mobileDrawer (a copy of the header nav) for the same off-canvas
+  // mobile menu pattern.
+  var sidebar = document.getElementById('sidebar') || document.getElementById('mobileDrawer');
+  var overlay = document.getElementById('sidebarOverlay') || document.getElementById('navOverlay');
   var menuBtn = document.getElementById('menuBtn');
 
   function openSidebar() {
@@ -35,7 +38,7 @@
   if (overlay) overlay.addEventListener('click', closeSidebar);
 
   if (sidebar) {
-    sidebar.querySelectorAll('.sidebar-link[href^="#"]').forEach(function (link) {
+    sidebar.querySelectorAll('.sidebar-link').forEach(function (link) {
       link.addEventListener('click', function () {
         if (window.innerWidth < 900) closeSidebar();
       });

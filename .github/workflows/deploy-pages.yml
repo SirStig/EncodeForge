@@ -48,10 +48,6 @@ jobs:
             cp screenshots/* _site/screenshots/
           fi
           
-          # Copy app icon from new location
-          mkdir -p _site/assets
-          cp resources/icons/app-icon.png _site/assets/logo.png || true
-          
           cp CHANGELOG.md _site/changelog.md
           
           echo "Site build complete"

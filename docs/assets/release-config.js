@@ -4,7 +4,7 @@
   g.EncodeForgeReleaseConfig = {
     owner: owner,
     repo: repo,
-    defaultTag: 'v0.5.0-alpha-2',
+    defaultTag: 'v0.5.0',
     apiUrl: 'https://api.github.com/repos/' + owner + '/' + repo + '/releases?per_page=100',
     releaseIndexUrl: 'https://github.com/' + owner + '/' + repo + '/releases',
     downloadUrl: function (tag, file) {
@@ -20,8 +20,8 @@
       );
     },
     defaultReleaseAssets: {
-      macArmZip: 'encodeforge-macos-arm.zip',
-      windowsAsset: 'encodeforge-windows-86_64.zip',
+      macArmZip: 'EncodeForge-0.5.0-macos.dmg',
+      windowsAsset: 'EncodeForge-0.5.0-windows-x64.exe',
     },
     previewReleases: [],
   };

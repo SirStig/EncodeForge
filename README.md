@@ -21,23 +21,24 @@
 
 ## About
 
-**EncodeForge** is a free, open-source FFmpeg GUI that brings professional video encoding, AI subtitle generation, and smart media file renaming together in a single, clean desktop application — no command-line experience required.
+**EncodeForge** is a free, open-source FFmpeg GUI that brings professional video encoding, AI subtitle generation, and smart media file renaming together in a single, clean desktop application — no command-line experience required (though a [scriptable CLI](#scripting-renames-from-the-cli) is there if you want it).
 
-It pairs a modern desktop interface with GPU-accelerated encoding via NVENC/AMF/Quick Sync/VideoToolbox, and local AI subtitles powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — fast transcription in 90+ languages that runs entirely on your machine.
+Encoding is GPU-accelerated wherever your hardware allows it, and AI subtitle transcription runs entirely on your own machine via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — no cloud service involved.
 
 ### Why EncodeForge?
 
 - **Batch Processing** — Convert entire video libraries while you sleep
 - **Hardware Accelerated** — Leverage your GPU for fast encoding via NVENC, AMF, Quick Sync, or VideoToolbox
 - **AI Subtitles** — Local transcription via faster-whisper with GPU acceleration; no cloud required
-- **Smart Renaming** — Pull metadata from 10+ sources and rename your library in seconds
-- **Modern UI** — Clean Fluent Design interface with dark & light theme support
+- **Smart Renaming** — Pull metadata from 8 sources and rename your library in seconds
+- **Modern UI** — A custom dark glassmorphism interface built natively in PySide6
+- **Scriptable** — Batch-rename from the command line with `cli.py rename`, sharing the same engine as the GUI
 - **Cross-Platform** — Windows, macOS, and Linux
 
 ### Built With
 
 - [PySide6](https://doc.qt.io/qtforpython/) — Qt 6 for Python
-- [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) — Fluent Design UI components
+- [QtAwesome](https://github.com/spyder-ide/qtawesome) — Icon set for the UI
 - [FFmpeg](https://ffmpeg.org/) — Industry-standard multimedia processing
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — Fast local AI subtitle generation
 - [Nuitka](https://nuitka.net/) — Python compiler for standalone distribution
@@ -64,16 +65,16 @@ It pairs a modern desktop interface with GPU-accelerated encoding via NVENC/AMF/
 
 ### Smart File Renaming
 
-- **10+ Metadata Providers** — TMDB, TVDB, OMDB, Trakt, Fanart.tv, AniDB, Kitsu, Jikan/MAL, TVmaze
+- **8 Metadata Providers** — TMDB, TVDB, OMDB, Trakt, AniDB, Kitsu, Jikan/MAL, TVmaze
 - **Auto-Detection** — Recognizes movies, TV shows, and anime automatically
 - **Custom Patterns** — Define your own naming conventions with template variables
 - **Preview Mode** — Review all changes before applying them
-- **Bulk Operations** — Rename entire libraries in seconds
+- **Bulk Operations** — Rename entire libraries in seconds, from the GUI or the CLI
 
 ### Modern Interface
 
-- **Fluent Design** — Clean, modern tabbed layout
-- **Dark & Light Themes** — Easy on the eyes during long sessions
+- **Glassmorphism Design** — Clean, modern tabbed layout with translucent panels
+- **Dark Theme** — Tuned for long sessions (light/auto themes are in progress — see [Roadmap](#roadmap))
 - **Real-Time Progress** — Detailed per-file and overall progress tracking
 - **Queue Management** — Add, reorder, and remove jobs at any time
 - **Comprehensive Logging** — Exportable logs for troubleshooting
@@ -84,9 +85,9 @@ It pairs a modern desktop interface with GPU-accelerated encoding via NVENC/AMF/
 
 ### Pre-Built Binaries (Recommended)
 
-**Download links and version history live on the [EncodeForge website](https://sirstig.github.io/EncodeForge/)** so they stay accurate without editing this README for every release.
+Download links and version history live on the **[EncodeForge website](https://sirstig.github.io/EncodeForge/)**, so they stay accurate without editing this README for every release.
 
-- **[Downloads](https://sirstig.github.io/EncodeForge/downloads.html)** — versions are listed **newest first**; the latest is marked **(Latest)**. **0.5.0** ([release](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0)) includes **Windows** (.zip), **macOS Apple Silicon** (.zip), **Linux** (.deb, .rpm, AppImage). Older **0.4.x** builds are listed too. Anything not yet on GitHub shows as “coming soon.” The page pulls live data from [GitHub Releases](https://github.com/SirStig/EncodeForge/releases) when available.
+- **[Downloads](https://sirstig.github.io/EncodeForge/downloads.html)** — every version, newest first, pulled live from [GitHub Releases](https://github.com/SirStig/EncodeForge/releases). The current release, [0.5.0](https://github.com/SirStig/EncodeForge/releases/tag/v0.5.0), ships as a Windows .exe, a macOS (Apple Silicon) .dmg, and Linux .deb/.rpm/AppImage packages. Older 0.4.x builds are listed too; anything not yet uploaded shows as "coming soon."
 - **[Changelog](https://sirstig.github.io/EncodeForge/changelog.html)** — web version of `CHANGELOG.md`. Add a hash to jump to a version section when it exists, e.g. [`changelog.html#release-0-5-0-alpha-2`](https://sirstig.github.io/EncodeForge/changelog.html#release-0-5-0-alpha-2), [`#release-0-4-1`](https://sirstig.github.io/EncodeForge/changelog.html#release-0-4-1).
 
 > FFmpeg is required but not bundled. EncodeForge will prompt you to set it up on first launch.
@@ -124,6 +125,18 @@ python build_nuitka.py
 5. Configure your settings and click **Start**
 
 That's it. Most options have sensible defaults, so you can dive straight in.
+
+### Scripting Renames from the CLI
+
+`cli.py rename` shares the same renaming engine as the GUI, so you can batch-rename a library without opening a window:
+
+```bash
+python cli.py rename /path/to/library --dry-run          # preview only
+python cli.py rename /path/to/library -y                 # rename in place
+python cli.py rename /path/to/library -d /path/to/sorted --action move
+```
+
+Run `python cli.py rename --help` for the full option list. `encode` and `subtitle` CLI subcommands are not implemented yet — use the GUI for those (see [Roadmap](#roadmap)).
 
 ---
 
@@ -167,15 +180,19 @@ EncodeForge auto-detects available GPU encoders on startup:
 | **Storage** | 500 MB | 2 GB |
 | **Python** | 3.10+ | 3.11+ |
 
+> The Python row only applies if you're running from source (see [From Source](#from-source)). The pre-built binaries bundle their own interpreter.
+
 ---
 
 ## Roadmap
 
-- ✅ Modern Fluent Design desktop UI
+- ✅ Modern glassmorphism desktop UI
 - ✅ GPU-accelerated faster-whisper for local AI subtitles
 - ✅ Shared core backend (GUI & CLI)
 - ✅ Nuitka compilation for all platforms
-- ⏳ Full CLI support (`encode`, `subtitle`, `rename` commands)
+- ✅ Scriptable CLI renaming (`cli.py rename`)
+- ⏳ CLI support for `encode` and `subtitle` commands
+- ⏳ Light & Auto theme options (selector exists in Settings; not yet wired up)
 - ⏳ Enhanced concurrent task processing
 - ⏳ Plugin system architecture
 - ⏳ Jellyfin & Plex direct integration
@@ -217,12 +234,11 @@ Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.
 
 ## Acknowledgments
 
-- [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) — Fluent Design widget library
+- [QtAwesome](https://github.com/spyder-ide/qtawesome) — Icon set for the UI
 - [FFmpeg](https://ffmpeg.org/) — Multimedia processing framework
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — Fast local Whisper inference
 - [OpenAI Whisper](https://github.com/openai/whisper) — Model architecture and weights
 - [Nuitka](https://nuitka.net/) — Python compiler
-- [curl-cffi](https://github.com/lexiforest/curl_cffi) — HTTP client with browser fingerprinting
 - [desktop-notifier](https://github.com/samschott/desktop-notifier) — Cross-platform desktop notifications
 
 ---
