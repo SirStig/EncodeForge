@@ -47,6 +47,46 @@ IS_WINDOWS = SYSTEM == "Windows"
 IS_MACOS = SYSTEM == "Darwin"
 IS_LINUX = SYSTEM == "Linux"
 
+_VERSIONED_DYLIB_RE = re.compile(r"^(lib[\w-]+?)\.(\d+(?:\.\d+)*)\.dylib$")
+
+
+def _fix_versioned_dylib_symlinks(package_dir: Path) -> None:
+    """
+    Some macOS wheels (onnxruntime, a faster-whisper dependency, is the one
+    we've hit) ship only the fully versioned dylib, e.g.
+    libonnxruntime.1.27.0.dylib, but the library's own @rpath load command
+    references the shorter libonnxruntime.1.dylib — the symlink a normal
+    macOS build would carry alongside it and that pip's wheel unpacking
+    doesn't recreate. Nuitka's DLL resolver looks for that exact filename on
+    disk and aborts ("failed to find path ... please report the bug") if
+    it's missing. Recreate whatever short aliases are missing so Nuitka can
+    resolve them.
+    """
+    if not package_dir.is_dir():
+        return
+    for real_file in sorted(package_dir.glob("*.dylib")):
+        if real_file.is_symlink():
+            continue
+        match = _VERSIONED_DYLIB_RE.match(real_file.name)
+        if not match:
+            continue
+        base, version = match.groups()
+        major = version.split(".")[0]
+        for alias_name in (f"{base}.{major}.dylib", f"{base}.dylib"):
+            alias_path = package_dir / alias_name
+            if alias_path.exists() or alias_path.is_symlink():
+                continue
+            alias_path.symlink_to(real_file.name)
+            print(f"Created missing symlink for Nuitka: {alias_path.name} -> {real_file.name}")
+
+
+def _fix_macos_dylib_symlinks() -> None:
+    try:
+        import onnxruntime
+    except ImportError:
+        return
+    _fix_versioned_dylib_symlinks(Path(onnxruntime.__file__).parent / "capi")
+
 
 def build():
     """Build the application with Nuitka"""
@@ -121,6 +161,9 @@ def build():
 
     cmd.append(MAIN_SCRIPT)
 
+    if IS_MACOS:
+        _fix_macos_dylib_symlinks()
+
     print(f"\nRunning command:\n{' '.join(cmd)}\n")
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     result = subprocess.run(cmd, env=env)
@@ -129,7 +172,12 @@ def build():
         print("\nBuild successful. Output in dist/ directory")
 
         if IS_MACOS:
-            print(f"macOS App Bundle: dist/{PROJECT_NAME}.app")
+            # Nuitka names the bundle after the entry script (main.py -> main.app),
+            # not after --macos-app-name/--output-filename, which only control the
+            # binary name and Info.plist metadata. packaging/macos/build-release-macos.sh
+            # renames it to {PROJECT_NAME}.app for the actual release artifact.
+            entry_stem = Path(MAIN_SCRIPT).stem
+            print(f"macOS App Bundle: dist/{entry_stem}.app")
         elif IS_WINDOWS:
             print(f"Windows Executable: dist/{PROJECT_NAME}.exe")
         else:

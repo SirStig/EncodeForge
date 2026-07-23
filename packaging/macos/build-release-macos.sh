@@ -17,10 +17,21 @@ python3 -m pip install -q "nuitka>=2.4.9,<3" ordered-set zstandard imageio
 echo "Building with Nuitka..."
 python3 build_nuitka.py
 
-APP_PATH="$DIST/$APP_BUNDLE"
-if [[ ! -d "$APP_PATH" ]]; then
-  echo "Missing $APP_PATH after build."
+# Nuitka names the bundle after the entry script (main.py -> main.app), not
+# after --macos-app-name/--output-filename — those only set the binary name
+# and Info.plist metadata, not the bundle directory. Discover whatever it
+# actually produced (mirrors how the Linux packaging scripts find *.dist)
+# and normalize it to EncodeForge.app for a properly named release artifact.
+RAW_APP="$(find "$DIST" -maxdepth 1 -name '*.app' -type d | head -1 || true)"
+if [[ -z "$RAW_APP" || ! -d "$RAW_APP" ]]; then
+  echo "No *.app bundle under $DIST after build."
   exit 1
+fi
+
+APP_PATH="$DIST/$APP_BUNDLE"
+if [[ "$RAW_APP" != "$APP_PATH" ]]; then
+  rm -rf "$APP_PATH"
+  mv "$RAW_APP" "$APP_PATH"
 fi
 
 echo "Signing..."
