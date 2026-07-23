@@ -1,8 +1,10 @@
 <div align="center">
 
-# EncodeForge
-
-<img src="resources/icons/app-icon.png" alt="EncodeForge Logo" width="128" height="128">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo-light.png">
+  <img src="docs/assets/logo.png" alt="EncodeForge" width="480">
+</picture>
 
 ### Video Encoding, AI Subtitles & Smart Media Renaming — all in one place
 

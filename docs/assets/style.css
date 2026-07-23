@@ -129,16 +129,17 @@ pre code { background: none; border: none; padding: 0; font-size: inherit; }
 }
 
 .header-logo {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--text);
+  display: flex;
+  align-items: center;
   text-decoration: none;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
   flex-shrink: 0;
 }
-.header-logo span { color: var(--accent); }
 .header-logo:hover { text-decoration: none; }
+
+.header-logo-img { height: 24px; width: auto; display: block; }
+.header-logo-img-light { display: none; }
+[data-theme="light"] .header-logo-img-dark { display: none; }
+[data-theme="light"] .header-logo-img-light { display: block; }
 
 .header-spacer { flex: 1; }
 
