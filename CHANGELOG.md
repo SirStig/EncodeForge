@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0] — 2026-07-22
 
-First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line to a full release and lands a large correctness pass from a full audit of the codebase — several features that appeared to work were failing silently and are now fixed.
+First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line to a full release
 
-### Fixed — features that did not work at all
+### Fixed
 
 - **Automatic FFmpeg download on Windows and Linux** — The downloaded archive was saved under a generic temporary name, and extraction was chosen from the file extension, so it always failed with “Unsupported archive format.” The first-run setup flow now identifies archives by content and supports `.tar.xz` (used by the Linux builds).
 - **Update notifications** — The version check discarded the pre-release suffix from both sides before comparing, so every `-alpha` release compared equal and no update was ever detected. Version comparison is now full PEP 440, and a manual check no longer reports “You are up to date” when it isn’t.
