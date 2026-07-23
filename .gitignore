@@ -209,3 +209,5 @@ dist-deb/
 dist-macos/
 dist-rpm/
 docker/
+
+.playwright-mcp/

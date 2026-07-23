@@ -33,8 +33,15 @@
     if (sidebar) sidebar.classList.remove('open');
     if (overlay) overlay.classList.remove('visible');
   }
+  function toggleSidebar() {
+    if (sidebar && sidebar.classList.contains('open')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  }
 
-  if (menuBtn) menuBtn.addEventListener('click', openSidebar);
+  if (menuBtn) menuBtn.addEventListener('click', toggleSidebar);
   if (overlay) overlay.addEventListener('click', closeSidebar);
 
   if (sidebar) {
