@@ -131,51 +131,58 @@ jobs:
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
       (github.event_name == 'workflow_dispatch' && (inputs.targets == 'all' || inputs.targets == 'linux'))
     timeout-minutes: 180
+    env:
+      # The compiled binary can only run on systems whose glibc is >= the
+      # build machine's. ubuntu-22.04 (glibc 2.35) was making the released
+      # AppImage refuse to start on anything older — flagged by the AppImage
+      # catalog's "not self-contained ... references glibc 2.35" check, and
+      # the likely cause of it exiting instantly instead of showing a window.
+      # Compile inside this container instead: it's the exact glibc floor
+      # (2.28) that PySide6's own official wheels are already built against,
+      # so it can't be tightened further without PySide6 doing so first.
+      MANYLINUX_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Build with Nuitka inside manylinux_2_28 (glibc 2.28)
+        timeout-minutes: 120
+        run: |
+          docker run --rm -v "${{ github.workspace }}":/io -w /io \
+            "${MANYLINUX_IMAGE}" bash -lc '
+              set -euo pipefail
+              export PATH="/opt/python/cp311-cp311/bin:${PATH}"
+              dnf install -y --setopt=install_weak_deps=False \
+                curl patchelf ccache \
+                mesa-libGL mesa-libEGL \
+                libxkbcommon libxkbcommon-x11 \
+                libxcb xcb-util xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-wm \
+                fontconfig freetype libSM libICE libXext libXrender libxshmfence \
+                dbus-libs glib2 zlib
+              python3 -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install "nuitka>=2.4.9,<3" ordered-set zstandard
+              PYTHONUNBUFFERED=1 python3 build_nuitka.py
+              chmod +x packaging/linux/build-appimage.sh packaging/linux/AppRun
+              ./packaging/linux/build-appimage.sh
+            '
+
+      - name: Set up Python 3.11 (for deb/rpm packaging)
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install system packages
+      - name: Install fpm and rpmbuild
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            patchelf ccache file \
-            ruby ruby-dev build-essential rpm \
-            libfuse2 wget ca-certificates
+          sudo apt-get install -y --no-install-recommends ruby ruby-dev build-essential rpm
+          sudo gem install --no-document fpm
 
-      - name: Install fpm
-        run: sudo gem install --no-document fpm
-
-      - name: Install appimagetool
+      - name: Build deb and rpm
         run: |
-          wget -q -O /tmp/appimagetool \
-            "https://github.com/AppImage/AppImageKit/releases/download/12/appimagetool-x86_64.AppImage"
-          chmod +x /tmp/appimagetool
-          sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install "nuitka>=2.4.9,<3" ordered-set zstandard
-
-      - name: Build with Nuitka
-        timeout-minutes: 90
-        env:
-          PYTHONUNBUFFERED: "1"
-        run: python build_nuitka.py
-
-      - name: Build deb, rpm, and AppImage
-        run: |
-          chmod +x packaging/linux/build-deb-rpm.sh packaging/linux/build-appimage.sh packaging/linux/AppRun
+          chmod +x packaging/linux/build-deb-rpm.sh
           ./packaging/linux/build-deb-rpm.sh
-          ./packaging/linux/build-appimage.sh
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
@@ -193,4 +200,4 @@ jobs:
           echo "## Linux packages" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- deb, rpm, AppImage: artifact encodeforge-linux-packages-${{ github.run_number }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Built on ubuntu-22.04 (x86_64) for broader glibc compatibility" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Nuitka build + AppImage run inside manylinux_2_28 (glibc 2.28) for broad compatibility" >> "$GITHUB_STEP_SUMMARY"

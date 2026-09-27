@@ -2,4 +2,29 @@
 set -euo pipefail
 HERE="$(dirname "$(readlink -f "${0}")")"
 cd "$HERE"
+
+# The host system may have its own Qt install and export QT_PLUGIN_PATH /
+# QML2_IMPORT_PATH pointing at it. If those survive into this process, Qt
+# tries to load the *host's* platform plugins (xcb, etc.) against the
+# PySide6/Qt libraries bundled in this AppImage, an ABI mismatch that makes
+# the app abort before any window is shown. Clear them and point Qt at the
+# bundled plugins instead.
+unset QT_PLUGIN_PATH QML2_IMPORT_PATH QT_QPA_PLATFORM_PLUGIN_PATH
+for candidate in \
+  "${HERE}/PySide6/Qt/plugins" \
+  "${HERE}/PySide6/Qt6/plugins" \
+  "${HERE}/PySide6/plugins"
+do
+  if [[ -d "${candidate}/platforms" ]]; then
+    export QT_QPA_PLATFORM_PLUGIN_PATH="${candidate}"
+    break
+  fi
+done
+
+# Nuitka sets $ORIGIN-relative RPATHs on the binaries it produces, so this
+# isn't usually required, but it's a safety net for any bundled .so that
+# Nuitka placed flat in the dist dir without one, and it takes priority
+# over whatever the host already has on its loader path.
+export LD_LIBRARY_PATH="${HERE}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+
 exec "${HERE}/EncodeForge" "$@"
