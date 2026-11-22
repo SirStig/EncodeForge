@@ -31,18 +31,23 @@ logger = logging.getLogger(__name__)
 
 class SubDLProvider(BaseSubtitleProvider):
     """SubDL provider with free API"""
-    
-    def __init__(self):
+
+    def __init__(self, api_key: str = ""):
         super().__init__()
         self.provider_name = "SubDL"
-        # SubDL provides free API keys without login (no rate limits on free keys).
-        # The bundled key is public in the repository history and shipped in every
-        # build, so ENCODEFORGE_SUBDL_KEY overrides it for anyone who wants their
-        # own quota.
+        # Free keys at subdl.com — no bundled default. Settings or
+        # ENCODEFORGE_SUBDL_KEY required for the API path; web scraping can
+        # still run without a key when BeautifulSoup is available.
         self.api_key = (
-            os.environ.get("ENCODEFORGE_SUBDL_KEY", "").strip()
-            or "0kzwwW12CndUyeuPru5DtdRwpIXfH9H9"
+            (api_key or "").strip()
+            or os.environ.get("ENCODEFORGE_SUBDL_KEY", "").strip()
         )
+        if not self.api_key:
+            logger.info(
+                "SubDL API key not set — API search disabled. "
+                "Add one in Settings → Accounts or set ENCODEFORGE_SUBDL_KEY. "
+                "Web scraping fallback may still run."
+            )
 
     def _redact(self, url: str) -> str:
         """
@@ -66,7 +71,7 @@ class SubDLProvider(BaseSubtitleProvider):
             
             if not search_term:
                 return results
-            
+
             # Convert 3-letter ISO 639-2 codes to 2-letter ISO 639-1 for SubDL
             _lang3_to_2 = {
                 'eng': 'en', 'spa': 'es', 'fre': 'fr', 'fra': 'fr', 'ger': 'de', 'deu': 'de',
@@ -85,10 +90,20 @@ class SubDLProvider(BaseSubtitleProvider):
                     subdl_languages.append(_lang3_to_2.get(lang.lower(), lang[:2].lower()))
                 else:
                     subdl_languages.append(lang.lower())
-            
+
+            if not self.api_key:
+                logger.info(
+                    "SubDL: skipping API search (no key); trying web fallback if available"
+                )
+                if BS4_AVAILABLE:
+                    return self._search_web_fallback(
+                        search_term, season, episode, subdl_languages
+                    )
+                return results
+
             # Build search queries
             searches = []
-            
+
             # Try with season/episode in parameters (best for TV shows)
             if season and episode:
                 url = f"https://api.subdl.com/api/v1/subtitles"

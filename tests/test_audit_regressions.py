@@ -1395,6 +1395,8 @@ class TestKeylessFirstMetadataProviders:
         grabber.kitsu.search_movie.assert_called_once()
         grabber.jikan.search_movie.assert_called_once()
 
+
+# --------------------------------------------------------------------------- #
 # P2-C — SubtitleHandler shares Core Whisper; dead dual-UI removed
 # --------------------------------------------------------------------------- #
 
@@ -1471,3 +1473,83 @@ class TestSubtitleDeadDualUiRemoved:
         ):
             assert f"def {name}" not in text, name
         assert "enableDragDrop(self._drag_enter_event, self._drop_event)" in text
+
+
+
+# --------------------------------------------------------------------------- #
+# P2-E — no bundled OpenSubtitles / SubDL API keys in source
+# --------------------------------------------------------------------------- #
+
+class TestSubtitleSecretsHygiene:
+    def test_opensubtitles_source_has_no_plaintext_default(self):
+        from pathlib import Path
+
+        src = Path("core/providers/subtitle/opensubtitles_manager.py").read_text(
+            encoding="utf-8"
+        )
+        assert "CONSUMER_API_KEY" not in src
+        # Historical leaked key must not reappear.
+        assert "N5GIH7h6rpgt9HpG9wqwtXqCoLM07Ot0" not in src
+
+    def test_subdl_source_has_no_plaintext_default(self):
+        from pathlib import Path
+
+        src = Path("core/providers/subtitle/subdl_provider.py").read_text(
+            encoding="utf-8"
+        )
+        assert "0kzwwW12CndUyeuPru5DtdRwpIXfH9H9" not in src
+
+    def test_opensubtitles_empty_without_settings_or_env(self, monkeypatch):
+        from core.providers.subtitle.opensubtitles_manager import OpenSubtitlesManager
+
+        monkeypatch.delenv("ENCODEFORGE_OPENSUBTITLES_KEY", raising=False)
+        mgr = OpenSubtitlesManager()
+        assert mgr.consumer_api_key == ""
+
+    def test_opensubtitles_prefers_arg_then_env(self, monkeypatch):
+        from core.providers.subtitle.opensubtitles_manager import OpenSubtitlesManager
+
+        monkeypatch.setenv("ENCODEFORGE_OPENSUBTITLES_KEY", "env-os-key")
+        assert OpenSubtitlesManager().consumer_api_key == "env-os-key"
+        assert OpenSubtitlesManager(api_key="user-os-key").consumer_api_key == "user-os-key"
+
+    def test_subdl_empty_without_settings_or_env(self, monkeypatch):
+        from core.providers.subtitle.subdl_provider import SubDLProvider
+
+        monkeypatch.delenv("ENCODEFORGE_SUBDL_KEY", raising=False)
+        assert SubDLProvider().api_key == ""
+
+    def test_subdl_prefers_arg_then_env(self, monkeypatch):
+        from core.providers.subtitle.subdl_provider import SubDLProvider
+
+        monkeypatch.setenv("ENCODEFORGE_SUBDL_KEY", "env-subdl-key")
+        assert SubDLProvider().api_key == "env-subdl-key"
+        assert SubDLProvider(api_key="user-subdl-key").api_key == "user-subdl-key"
+
+    def test_core_wires_subtitle_keys_from_settings(self, monkeypatch, isolated_app_data):
+        from core.encodeforge_core import EncodeForgeCore
+        from core.handlers.models import ConversionSettings
+
+        monkeypatch.delenv("ENCODEFORGE_OPENSUBTITLES_KEY", raising=False)
+        monkeypatch.delenv("ENCODEFORGE_SUBDL_KEY", raising=False)
+        settings = ConversionSettings(
+            opensubtitles_api_key="os-from-settings",
+            subdl_api_key="subdl-from-settings",
+        )
+        core = EncodeForgeCore(settings=settings)
+        assert core.subtitle_providers.opensubtitles.consumer_api_key == "os-from-settings"
+        assert core.subtitle_providers.subdl.api_key == "subdl-from-settings"
+
+    def test_export_redacts_subtitle_api_keys(self, isolated_app_data, tmp_path):
+        from utils.settings_manager import SettingsManager
+
+        SettingsManager._instance = None
+        manager = SettingsManager()
+        manager.conversion.opensubtitles_api_key = "OS-SECRET"
+        manager.conversion.subdl_api_key = "SUBDL-SECRET"
+
+        target = tmp_path / "export-subs.json"
+        assert manager.export_settings(target) is True
+        data = json.loads(target.read_text())
+        assert data["conversion"]["opensubtitles_api_key"] == ""
+        assert data["conversion"]["subdl_api_key"] == ""
