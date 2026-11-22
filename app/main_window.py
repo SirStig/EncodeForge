@@ -92,6 +92,7 @@ class MainWindow(GlassmorphicMainWindow):
 
         self._setup_ui()
         self._create_statusbar()
+        self._apply_statusbar_visibility()
         QTimer.singleShot(2000, self._maybe_auto_check_updates)
         logger.debug("Main window initialized - theme loaded at startup")
 
@@ -422,6 +423,7 @@ class MainWindow(GlassmorphicMainWindow):
         logging.getLogger().setLevel(getattr(logging, sm.application.log_level, logging.INFO))
         if hasattr(self, 'threadpool'):
             self.threadpool.setMaxThreadCount(sm.application.max_threads)
+        self._apply_statusbar_visibility()
         if self.subtitle_tab is not None:
             if hasattr(self.subtitle_tab, "_show_idle_subtitle_banner"):
                 self.subtitle_tab._show_idle_subtitle_banner()
@@ -577,6 +579,14 @@ class MainWindow(GlassmorphicMainWindow):
         self.statusbar.addPermanentWidget(self._whisper_status_btn)
 
         QTimer.singleShot(500, self._refresh_tool_status)
+
+    def _apply_statusbar_visibility(self) -> None:
+        """Show or hide the status bar from UISettings.show_statusbar."""
+        from utils.settings_manager import SettingsManager
+
+        if not hasattr(self, "statusbar") or self.statusbar is None:
+            return
+        self.statusbar.setVisible(bool(SettingsManager().ui.show_statusbar))
 
     def _refresh_tool_status(self):
         """Update FFmpeg and Whisper status indicator buttons."""

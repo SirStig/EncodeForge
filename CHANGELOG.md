@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`pip install` missing styles/icons** — `package_data` used an empty-string key with no `MANIFEST.in`, so wheels and sdists omitted `resources/`. Added `MANIFEST.in`, a `resources` package, proper `package_data`, and a `pyproject.toml` build backend so CSS and icons install under `site-packages/resources/`.
 - **Intel GPU detection on Linux** — `_detect_intel` only queried Windows WMI/PowerShell. Linux now reads PCI vendor `0x8086` from `/sys/class/drm` (same path AMD already used).
 - **Fonts on non-Windows** — Splash and Logs no longer hard-require Segoe UI / Consolas. UI and mono helpers pick OS-appropriate faces (SF Pro / Helvetica Neue / Ubuntu / Noto; Menlo / DejaVu Sans Mono) with fallbacks, and the base theme CSS carries the same stack.
+- **Cosmetic Settings toggles** — Theme Light/Auto, app language, toolbar, and two-pass encoding controls saved values but did nothing. They are removed from Settings until implemented; Show status bar now actually hides/shows the bottom status bar.
 
 ### Changed
 
@@ -106,7 +107,7 @@ First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line 
 
 - Several subtitle scrapers (Podnapisi, SubDivX, Jimaku) target site layouts that have since changed. They are **quarantined**: shown as unavailable in the Subtitles tab and skipped during search until rewritten (no silent empty “success”).
 - CLI: `rename` and `gui` work and share `EncodeForgeCore` with the desktop app; `encode` and `subtitle` are stubs that exit with status 2 (use the GUI for those).
-- Theme selection (Light/Auto), two-pass encoding, toolbar/statusbar toggles, and a few other settings are still displayed but not yet wired up.
+- Theme Light/Auto, app language, toolbar, and two-pass encoding are not offered in Settings until implemented; status bar visibility is wired.
 - Fanart.tv appears in Settings (API key field) but has no provider implementation; artwork grab from Fanart is not available.
 - Screenshots under `docs/screenshots/` show an older menu-bar / three-table UI, not the current frameless sidebar layout.
 

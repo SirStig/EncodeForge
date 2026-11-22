@@ -207,8 +207,8 @@ EncodeForge auto-detects available GPU encoders on startup. Backends are OS-spec
 - ✅ Nuitka compilation for all platforms
 - ✅ Scriptable CLI renaming (`cli.py rename`)
 - ⏳ CLI support for `encode` and `subtitle` commands (stubs today; use the GUI)
-- ⏳ Light & Auto theme options (selector exists in Settings; not yet wired up)
-- ⏳ Two-pass encoding (setting saved but not applied)
+- ⏳ Light & Auto theme options (hidden until a light token set exists)
+- ⏳ Two-pass encoding (hidden until ConversionHandler supports it)
 - ⏳ Enhanced concurrent task processing
 - ⏳ Plugin system architecture
 - ⏳ Jellyfin & Plex direct integration

@@ -64,7 +64,7 @@ The application is organized into four layers:
 - `metadata/`: 8+ providers (TMDB, TVDB, OMDB, Trakt, Kitsu, Jikan, AniDB, TVmaze). The `MetadataGrabber` in `core/metadata_grabber.py` aggregates them.
 - `subtitle/`: 8+ providers (OpenSubtitles, Addic7ed, Jimaku, SubDL, etc.) plus `whisper_manager.py` for AI-based local subtitle generation. Aggregated in `core/subtitle_manager.py`.
 
-**Utility Layer (`utils/`)** — Cross-cutting concerns: `ffmpeg_manager.py` (FFmpeg detection/path), `gpu_detector.py` (NVENC/AMF/VAAPI/QSV/VideoToolbox detection + OS backend matrix), `settings_manager.py` (JSON-backed dataclass config), `theme_manager.py` (flat dark CSS theming; Light/Auto settings are not wired), `workers.py` (QThread worker pool), `download_manager.py` (resumable downloads with hash verification).
+**Utility Layer (`utils/`)** — Cross-cutting concerns: `ffmpeg_manager.py` (FFmpeg detection/path), `gpu_detector.py` (NVENC/AMF/VAAPI/QSV/VideoToolbox detection + OS backend matrix), `settings_manager.py` (JSON-backed dataclass config), `theme_manager.py` (flat dark CSS theming; Light/Auto not exposed until tokens exist), `workers.py` (QThread worker pool), `download_manager.py` (resumable downloads with hash verification).
 
 ### Key Patterns
 

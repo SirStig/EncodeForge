@@ -176,13 +176,10 @@ class SettingsPanel(QWidget):
         app_group = QGroupBox("Application")
         app_layout = _settings_form(app_group)
 
-        self.language_combo = QComboBox()
-        self.language_combo.addItems(["English", "Spanish", "French", "German", "Japanese"])
-        self.language_combo.setToolTip(
-            "Display language for the application interface.\n"
-            "A restart is required for the change to take effect."
-        )
-        app_layout.addRow("Language:", self.language_combo)
+        # App language, Light/Auto themes, and a global toolbar toggle are not
+        # implemented (flat dark only; no i18n; no traditional window toolbar).
+        # Keep those fields in SettingsManager for forward compatibility, but do
+        # not expose cosmetic-only controls here.
 
         self.check_updates_check = QCheckBox("Check for updates on startup")
         self.check_updates_check.setToolTip(
@@ -207,24 +204,22 @@ class SettingsPanel(QWidget):
 
         layout.addWidget(app_group)
 
-        # UI group
+        # UI group — only controls that actually change the running window
         ui_group = QGroupBox("User Interface")
         ui_layout = _settings_form(ui_group)
 
-        self.theme_combo = QComboBox()
-        self.theme_combo.addItems(["Dark", "Light", "Auto"])
-        self.theme_combo.setToolTip(
-            "Color scheme for the interface.\n"
-            "Auto follows your operating system's dark / light mode preference."
+        theme_label = QLabel("Dark")
+        theme_label.setToolTip(
+            "EncodeForge uses a flat dark theme.\n"
+            "Light and Auto themes are not available yet."
         )
-        ui_layout.addRow("Theme:", self.theme_combo)
-
-        self.show_toolbar_check = QCheckBox("Show toolbar")
-        self.show_toolbar_check.setToolTip("Display the quick-access toolbar at the top of the window.")
-        ui_layout.addRow("", self.show_toolbar_check)
+        ui_layout.addRow("Theme:", theme_label)
 
         self.show_statusbar_check = QCheckBox("Show status bar")
-        self.show_statusbar_check.setToolTip("Display the status bar at the bottom of the window.")
+        self.show_statusbar_check.setToolTip(
+            "Display the status bar at the bottom of the window "
+            "(FFmpeg/Whisper status and progress)."
+        )
         ui_layout.addRow("", self.show_statusbar_check)
 
         layout.addWidget(ui_group)
@@ -347,15 +342,8 @@ class SettingsPanel(QWidget):
         )
         encoder_layout.addRow("Output Container:", self.container_combo)
 
-        self.two_pass_check = QCheckBox("Enable two-pass encoding")
-        self.two_pass_check.setToolTip(
-            "Encode the video in two stages:\n"
-            "  Pass 1 — Analyse the whole video to understand its complexity.\n"
-            "  Pass 2 — Encode using that analysis for better bit distribution.\n\n"
-            "Results in better quality at the same file size, but takes roughly twice as long.\n"
-            "Most useful when targeting a specific file size rather than a CRF quality level."
-        )
-        encoder_layout.addRow("", self.two_pass_check)
+        # two_pass is persisted on EncoderSettings for future use but is not
+        # applied by ConversionHandler yet — hide until encode path supports it.
 
         self.preserve_metadata_check = QCheckBox("Preserve metadata")
         self.preserve_metadata_check.setToolTip(
@@ -1204,29 +1192,14 @@ class SettingsPanel(QWidget):
         logger.debug(f"No combo entry matching {value!r}; leaving current selection")
         return False
 
-    # Two-letter code <-> display name for the language selector. The stored
-    # value is a code, but the combo lists full names.
-    _LANGUAGE_CODES = {
-        "en": "English", "es": "Spanish", "fr": "French", "de": "German",
-        "it": "Italian", "pt": "Portuguese", "ru": "Russian", "ja": "Japanese",
-        "ko": "Korean", "zh": "Chinese",
-    }
-
     def _load_settings(self):
         """Load current settings into UI."""
         # General
-        stored_language = self.settings.application.language or "en"
-        self._select_combo_value(
-            self.language_combo,
-            self._LANGUAGE_CODES.get(stored_language.lower(), stored_language),
-        )
         self.check_updates_check.setChecked(self.settings.application.check_updates)
         self.auto_download_updates_check.setChecked(self.settings.application.auto_download_updates)
         self.clear_temp_check.setChecked(self.settings.application.clear_temp_on_exit)
 
         # UI
-        self.theme_combo.setCurrentText(self.settings.ui.theme.capitalize())
-        self.show_toolbar_check.setChecked(self.settings.ui.show_toolbar)
         self.show_statusbar_check.setChecked(self.settings.ui.show_statusbar)
 
         # Encoder
@@ -1237,7 +1210,6 @@ class SettingsPanel(QWidget):
         self.audio_codec_combo.setCurrentText(self.settings.encoder.audio_codec)
         self.audio_bitrate_spin.setValue(self.settings.encoder.audio_bitrate)
         self.container_combo.setCurrentText(self.settings.encoder.container)
-        self.two_pass_check.setChecked(self.settings.encoder.two_pass)
         self.preserve_metadata_check.setChecked(self.settings.encoder.preserve_metadata)
 
         # Subtitle
@@ -1297,22 +1269,14 @@ class SettingsPanel(QWidget):
 
     def _save_settings(self):
         """Save UI values to settings."""
-        # General
-        # Store the ISO code that matches the selected display name, rather than
-        # blindly truncating the label (which turned "Japanese" into "ja" but
-        # "Chinese" into "ch", neither of which could be loaded back).
-        selected_language = self.language_combo.currentText()
-        self.settings.application.language = next(
-            (code for code, name in self._LANGUAGE_CODES.items() if name == selected_language),
-            selected_language.lower()[:2],
-        )
+        # General — language / theme Light|Auto / toolbar / two_pass are not
+        # exposed; leave stored values untouched for forward compatibility.
         self.settings.application.check_updates = self.check_updates_check.isChecked()
         self.settings.application.auto_download_updates = self.auto_download_updates_check.isChecked()
         self.settings.application.clear_temp_on_exit = self.clear_temp_check.isChecked()
 
         # UI
-        self.settings.ui.theme = self.theme_combo.currentText().lower()
-        self.settings.ui.show_toolbar = self.show_toolbar_check.isChecked()
+        self.settings.ui.theme = "dark"
         self.settings.ui.show_statusbar = self.show_statusbar_check.isChecked()
 
         # Encoder
@@ -1323,7 +1287,6 @@ class SettingsPanel(QWidget):
         self.settings.encoder.audio_codec = self.audio_codec_combo.currentText()
         self.settings.encoder.audio_bitrate = self.audio_bitrate_spin.value()
         self.settings.encoder.container = self.container_combo.currentText()
-        self.settings.encoder.two_pass = self.two_pass_check.isChecked()
         self.settings.encoder.preserve_metadata = self.preserve_metadata_check.isChecked()
 
         # Subtitle — extract just the model name (before the size annotation)
