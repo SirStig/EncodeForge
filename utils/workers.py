@@ -519,7 +519,22 @@ class RenamerWorker(Worker):
             cs.renaming_pattern_tv = pat
             cs.renaming_pattern_movie = pat
         preview_settings = _renamer_preview_settings_from_ui(renaming_settings)
+        # Always pass persisted API keys into preview so configure_keys can
+        # rebuild providers if this Core (or an older one) started keyless.
+        for field in ("tmdb_api_key", "tvdb_api_key", "omdb_api_key", "trakt_api_key"):
+            val = (getattr(cs, field, None) or "").strip()
+            if val and field not in preview_settings:
+                preview_settings[field] = val
         core = EncodeForgeCore(settings=cs)
+        # Settings-save path: keys may have landed in SettingsManager after a
+        # previous empty-key Core; reconfigure so keyed providers are live.
+        core.configure_metadata_keys(
+            tmdb_key=cs.tmdb_api_key,
+            tvdb_key=cs.tvdb_api_key,
+            omdb_key=cs.omdb_api_key,
+            trakt_key=cs.trakt_api_key,
+            fanart_key=getattr(cs, "fanart_api_key", "") or "",
+        )
         preview_only = renaming_settings.get("preview_only", False)
         dry_run = renaming_settings.get("dry_run", False)
         create_backup = renaming_settings.get("create_backup", False)

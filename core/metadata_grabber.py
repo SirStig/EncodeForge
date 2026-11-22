@@ -66,7 +66,55 @@ class MetadataGrabber:
         self.trakt_key = trakt_key
         self.fanart_key = fanart_key
         self.mal_client_id = mal_client_id
-    
+
+    def configure_keys(
+        self,
+        tmdb_key: Optional[str] = None,
+        tvdb_key: Optional[str] = None,
+        omdb_key: Optional[str] = None,
+        trakt_key: Optional[str] = None,
+        fanart_key: Optional[str] = None,
+        mal_client_id: Optional[str] = None,
+    ) -> None:
+        """
+        Update API keys and rebuild keyed provider instances.
+
+        Providers are only created when a non-empty key is present at
+        construct time. Assigning ``self.tmdb_key = ...`` later left
+        ``self.tmdb`` as ``None``, so TMDB/OMDB/etc. stayed dead until
+        process restart. Pass a key (including ``""`` to clear) to rebuild
+        that provider; omit a parameter (``None``) to leave it unchanged.
+        """
+        if tmdb_key is not None:
+            key = (tmdb_key or "").strip()
+            if key != (self.tmdb_key or "").strip() or bool(key) != bool(self.tmdb):
+                self.tmdb = TMDBProvider(key) if key else None
+            self.tmdb_key = key
+
+        if tvdb_key is not None:
+            key = (tvdb_key or "").strip()
+            if key != (self.tvdb_key or "").strip() or bool(key) != bool(self.tvdb):
+                self.tvdb = TVDBProvider(key) if key else None
+            self.tvdb_key = key
+
+        if omdb_key is not None:
+            key = (omdb_key or "").strip()
+            if key != (self.omdb_key or "").strip() or bool(key) != bool(self.omdb):
+                self.omdb = OMDBProvider(key) if key else None
+            self.omdb_key = key
+
+        if trakt_key is not None:
+            key = (trakt_key or "").strip()
+            if key != (self.trakt_key or "").strip() or bool(key) != bool(self.trakt):
+                self.trakt = TraktProvider(key) if key else None
+            self.trakt_key = key
+
+        if fanart_key is not None:
+            self.fanart_key = (fanart_key or "").strip()
+
+        if mal_client_id is not None:
+            self.mal_client_id = (mal_client_id or "").strip()
+
     def get_available_providers(self) -> Dict[str, bool]:
         """
         Get list of available providers based on configured API keys
