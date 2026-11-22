@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **macOS packaging docs** — README now states official DMG builds are **Apple Silicon only** (no Intel Mac artifacts).
+- **Test foundation (P3-D)** — Unit CI now enforces `--cov=core --cov=utils --cov-fail-under=30`, locks C1/C2 via `audit_c1`/`audit_c2` markers, and adds Encoder/Subtitle widget smoke tests. A scheduled/on-demand workflow runs the FFmpeg integration suite that the PR matrix still excludes.
 
 ## [0.5.0] — 2026-07-22
 

@@ -931,6 +931,7 @@ class TestVersionConsistency:
 # C1 — GUI "auto"/"all" must expand like CLI "automatic"
 # --------------------------------------------------------------------------- #
 
+@pytest.mark.audit_c1
 class TestProviderTokenNormalization:
     """GUI/settings emit auto/all; handler used to only expand automatic."""
 
@@ -1033,6 +1034,7 @@ class TestProviderTokenNormalization:
 # C2 — Runtime API keys must rebuild provider instances
 # --------------------------------------------------------------------------- #
 
+@pytest.mark.audit_c2
 class TestMetadataProviderKeyReinit:
     """Setting TMDB/OMDB/etc. after an empty start must enable searches."""
 

@@ -1,0 +1,58 @@
+name: Integration Tests
+
+# FFmpeg-backed integration suite. Unit CI excludes these (they need a real
+# ffmpeg/ffprobe on PATH). Run nightly and on demand — not on every PR push,
+# so flaky network/whisper paths stay out of the merge gate.
+#
+# Scope: synthetic-media conversion/subtitle apply only
+#   pytest -m "integration and requires_ffmpeg and not requires_network and not requires_whisper"
+# Network + Whisper remain local/manual (see pytest.ini markers).
+
+on:
+  schedule:
+    # Daily ~06:17 UTC — offset from the hour to avoid thundering herds.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  integration-ffmpeg:
+    name: Integration (FFmpeg, Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install Qt system dependencies
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3 libxcb-cursor0
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Verify FFmpeg on PATH
+        run: |
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Run FFmpeg integration tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: >
+          pytest -m
+          "integration and requires_ffmpeg and not requires_network and not requires_whisper"
+          -q --tb=short
