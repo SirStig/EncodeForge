@@ -291,12 +291,20 @@ class SettingsPanel(QWidget):
         encoder_layout.addRow("", _hint("Lower = better quality, larger file. 18–28 covers most use cases."))
 
         self.hw_accel_combo = QComboBox()
-        self.hw_accel_combo.addItems(["None", "NVENC (NVIDIA)", "AMF (AMD)", "QSV (Intel)", "VideoToolbox (Apple)"])
+        self.hw_accel_combo.addItems([
+            "None",
+            "NVENC (NVIDIA)",
+            "AMF (AMD)",
+            "VAAPI (Linux)",
+            "QSV (Intel)",
+            "VideoToolbox (Apple)",
+        ])
         self.hw_accel_combo.setToolTip(
             "Use your GPU to encode significantly faster (5–10×).\n\n"
-            "NVENC        — NVIDIA GPUs (GTX 10xx or newer)\n"
-            "AMF          — AMD GPUs (RX 400 series or newer)\n"
-            "QSV          — Intel CPUs with integrated graphics (Broadwell or newer)\n"
+            "NVENC        — NVIDIA (Windows / Linux / macOS with NVIDIA)\n"
+            "AMF          — AMD Radeon on Windows (RX 400+)\n"
+            "VAAPI        — AMD / Intel on Linux via libva\n"
+            "QSV          — Intel Quick Sync (Windows / Linux)\n"
             "VideoToolbox — Apple Silicon and Intel Macs\n\n"
             "GPU encoding is faster but may produce slightly larger files than CPU at the same CRF."
         )

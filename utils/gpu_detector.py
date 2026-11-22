@@ -1,6 +1,9 @@
 """
 GPU Detection Utility for EncodeForge
-Cross-platform GPU detection for selecting appropriate PyTorch builds
+
+Detects GPUs for FFmpeg hardware-encoder selection (NVENC / AMF / QSV /
+VideoToolbox / VAAPI). Whisper uses faster-whisper / CTranslate2 — not PyTorch —
+so this module does not recommend torch wheels.
 """
 
 import logging
@@ -9,9 +12,19 @@ import subprocess
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# OS → FFmpeg hardware encode backends EncodeForge will attempt.
+# NVENC is cross-platform where an NVIDIA driver exists; AMF is Windows-only;
+# VAAPI covers Linux AMD/Intel; QSV is Win/Linux; VideoToolbox is macOS.
+OS_ENCODER_BACKENDS: Dict[str, List[str]] = {
+    "windows": ["nvenc", "amf", "qsv"],
+    "linux": ["nvenc", "vaapi", "qsv"],
+    "darwin": ["nvenc", "videotoolbox"],
+}
 
 
 @dataclass
@@ -77,6 +90,13 @@ def get_gpu_info(force_refresh: bool = False) -> List[GPUInfo]:
         return list(_gpu_cache)
 
 
+def clear_gpu_cache() -> None:
+    """Drop the process-wide GPU cache (tests / after driver changes)."""
+    global _gpu_cache
+    with _gpu_cache_lock:
+        _gpu_cache = None
+
+
 def has_cuda() -> bool:
     """Check if NVIDIA CUDA is available"""
     return any(g.vendor.lower() == "nvidia" for g in get_gpu_info())
@@ -94,53 +114,60 @@ def has_mps() -> bool:
     return any(g.vendor.lower() == "apple" for g in get_gpu_info())
 
 
-def recommend_torch_variant() -> str:
-    """
-    Recommend the best PyTorch variant for this system.
-    
-    Returns:
-        One of: 'cuda', 'rocm', 'mps', 'cpu'
-    """
-    system = platform.system().lower()
-    
-    # Check for Apple Silicon first (macOS specific)
-    if system == "darwin":
-        if has_mps():
-            return "mps"
-        return "cpu"
-    
-    # Check for NVIDIA CUDA
-    if has_cuda():
-        return "cuda"
-    
-    # Check for AMD ROCm (Linux only for now)
-    if system == "linux" and has_rocm():
-        return "rocm"
-    
-    # Fallback to CPU
-    return "cpu"
+def has_vaapi() -> bool:
+    """True when a Linux DRM render node suitable for VAAPI is present."""
+    return find_vaapi_device() is not None
 
 
-def get_torch_install_command() -> str:
+def find_vaapi_device() -> Optional[str]:
     """
-    Get the pip install command for the recommended PyTorch variant.
-    
-    Returns:
-        pip install command string
+    Return the preferred VAAPI device path (e.g. /dev/dri/renderD128), or None.
+
+    VAAPI is Linux-only. Prefers render nodes over legacy card nodes.
     """
-    variant = recommend_torch_variant()
-    
-    if variant == "cuda":
-        # CUDA 12.1 (compatible with most modern NVIDIA GPUs)
-        return "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121"
-    elif variant == "rocm":
-        # ROCm 5.7 (latest stable as of Oct 2024)
-        return "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm5.7"
-    elif variant == "mps":
-        # MPS support is in default PyTorch for macOS
-        return "pip install torch torchvision torchaudio"
-    else:  # cpu
-        return "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu"
+    if platform.system().lower() != "linux":
+        return None
+
+    dri = Path("/dev/dri")
+    if not dri.is_dir():
+        return None
+
+    render_nodes = sorted(p for p in dri.glob("renderD*") if p.exists())
+    if render_nodes:
+        return str(render_nodes[0])
+
+    card_nodes = sorted(
+        p for p in dri.glob("card*")
+        if p.exists() and p.name.count("-") == 0  # card0, not card0-DP-1
+    )
+    if card_nodes:
+        return str(card_nodes[0])
+
+    return None
+
+
+def supported_encoder_backends(system: Optional[str] = None) -> List[str]:
+    """
+    Return the FFmpeg hardware backends EncodeForge supports on this OS.
+
+    Args:
+        system: Override platform.system() value (windows/linux/darwin), for tests.
+    """
+    if system is None:
+        system = platform.system()
+    key = system.lower()
+    if key == "windows" or key.startswith("win"):
+        return list(OS_ENCODER_BACKENDS["windows"])
+    if key == "linux":
+        return list(OS_ENCODER_BACKENDS["linux"])
+    if key in ("darwin", "macos", "mac"):
+        return list(OS_ENCODER_BACKENDS["darwin"])
+    return ["nvenc"]  # unknown OS: NVIDIA path only if present
+
+
+def encoder_backend_matrix() -> Dict[str, List[str]]:
+    """Copy of the documented OS → backend matrix."""
+    return {os_name: list(backends) for os_name, backends in OS_ENCODER_BACKENDS.items()}
 
 
 def _detect_nvidia() -> List[GPUInfo]:
@@ -263,32 +290,7 @@ def _detect_amd() -> List[GPUInfo]:
         
         # Fallback: Check /sys/class/drm
         if not gpus:
-            try:
-                drm_path = Path("/sys/class/drm")
-                if drm_path.exists():
-                    for card_dir in drm_path.iterdir():
-                        if card_dir.name.startswith("card"):
-                            device_path = card_dir / "device"
-                            vendor_path = device_path / "vendor"
-                            
-                            if vendor_path.exists():
-                                vendor_id = vendor_path.read_text().strip()
-                                # AMD vendor ID is 0x1002
-                                if vendor_id == "0x1002":
-                                    # Try to get device name
-                                    device_name_path = device_path / "device"
-                                    if device_name_path.exists():
-                                        device_id = device_name_path.read_text().strip()
-                                        gpus.append(GPUInfo(
-                                            vendor="amd",
-                                            model=f"AMD GPU (Device {device_id})"
-                                        ))
-                
-                if gpus:
-                    logger.info(f"Detected {len(gpus)} AMD GPU(s) via /sys/class/drm")
-            
-            except Exception as e:
-                logger.debug(f"DRM detection error: {e}")
+            gpus.extend(_detect_drm_vendor("0x1002", "amd", "AMD"))
     
     elif system == "windows":
         # Try wmic first (deprecated on Windows 11 — fallback to PowerShell below)
@@ -333,6 +335,55 @@ def _detect_amd() -> List[GPUInfo]:
 
         for name in _amd_gpu_names:
             gpus.append(GPUInfo(vendor="amd", model=name))
+
+    return gpus
+
+
+def _detect_drm_vendor(vendor_id: str, vendor: str, label: str) -> List[GPUInfo]:
+    """Detect GPUs on Linux via /sys/class/drm matching a PCI vendor id."""
+    gpus: List[GPUInfo] = []
+    seen_device_ids = set()
+
+    try:
+        drm_path = Path("/sys/class/drm")
+        if not drm_path.exists():
+            return gpus
+
+        for card_dir in sorted(drm_path.iterdir()):
+            # Only top-level cards (card0), not connectors (card0-DP-1).
+            if not card_dir.name.startswith("card"):
+                continue
+            if "-" in card_dir.name:
+                continue
+
+            device_path = card_dir / "device"
+            vendor_path = device_path / "vendor"
+            if not vendor_path.exists():
+                continue
+
+            found_vendor = vendor_path.read_text().strip().lower()
+            if found_vendor != vendor_id.lower():
+                continue
+
+            device_id = "unknown"
+            device_id_path = device_path / "device"
+            if device_id_path.exists():
+                device_id = device_id_path.read_text().strip()
+
+            if device_id in seen_device_ids:
+                continue
+            seen_device_ids.add(device_id)
+
+            gpus.append(GPUInfo(
+                vendor=vendor,
+                model=f"{label} GPU (Device {device_id})"
+            ))
+
+        if gpus:
+            logger.info(f"Detected {len(gpus)} {label} GPU(s) via /sys/class/drm")
+
+    except Exception as e:
+        logger.debug(f"DRM {label} detection error: {e}")
 
     return gpus
 
@@ -388,7 +439,7 @@ def _detect_apple_silicon() -> Optional[GPUInfo]:
 
 
 def _detect_intel() -> List[GPUInfo]:
-    """Detect Intel integrated GPUs (optional)"""
+    """Detect Intel integrated / discrete GPUs (Windows + Linux)."""
     gpus = []
     system = platform.system().lower()
     
@@ -431,6 +482,11 @@ def _detect_intel() -> List[GPUInfo]:
         for name in _intel_gpu_names:
             gpus.append(GPUInfo(vendor="intel", model=name))
 
+    elif system == "linux":
+        # PCI vendor 0x8086 = Intel. Mirrors AMD's DRM fallback so QSV/VAAPI
+        # selection can see iGPU presence on Linux.
+        gpus.extend(_detect_drm_vendor("0x8086", "intel", "Intel"))
+
     return gpus
 
 
@@ -460,12 +516,9 @@ if __name__ == "__main__":
     print(f"CUDA available: {has_cuda()}")
     print(f"ROCm available: {has_rocm()}")
     print(f"MPS available: {has_mps()}")
+    print(f"VAAPI device: {find_vaapi_device()}")
     print()
-    
-    recommended = recommend_torch_variant()
-    print(f"Recommended PyTorch variant: {recommended}")
-    print()
-    
-    install_cmd = get_torch_install_command()
-    print("Install command:")
-    print(f"  {install_cmd}")
+    print(f"Supported encoder backends: {supported_encoder_backends()}")
+    print("OS encoder matrix:")
+    for os_name, backends in encoder_backend_matrix().items():
+        print(f"  {os_name}: {', '.join(backends)}")

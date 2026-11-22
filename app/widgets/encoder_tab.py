@@ -781,7 +781,13 @@ class EncoderTab(QWidget):
         best = min(quality_options, key=lambda x: abs(x[0] - cq))
         self.quality_combo.setCurrentText(best[1])
         self.hw_accel_check.setChecked(
-            bool(cs.use_nvenc or cs.use_amf or cs.use_qsv or cs.use_videotoolbox)
+            bool(
+                cs.use_nvenc
+                or cs.use_amf
+                or cs.use_vaapi
+                or cs.use_qsv
+                or cs.use_videotoolbox
+            )
         )
         sh_reverse = {
             "keep": "Keep/Passthrough",

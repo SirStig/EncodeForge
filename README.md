@@ -30,7 +30,7 @@ Encoding is GPU-accelerated wherever your hardware allows it, and AI subtitle tr
 ### Why EncodeForge?
 
 - **Batch Processing** — Convert entire video libraries while you sleep
-- **Hardware Accelerated** — Leverage your GPU for fast encoding via NVENC, AMF, Quick Sync, or VideoToolbox
+- **Hardware Accelerated** — Leverage your GPU for fast encoding via NVENC, AMF, VAAPI, Quick Sync, or VideoToolbox
 - **AI Subtitles** — Local transcription via faster-whisper with GPU acceleration; no cloud required
 - **Smart Renaming** — Pull metadata from 8 sources and rename your library in seconds
 - **Modern UI** — A custom flat dark interface built natively in PySide6
@@ -51,7 +51,7 @@ Encoding is GPU-accelerated wherever your hardware allows it, and AI subtitle tr
 
 ### Video Encoding
 
-- **Hardware Acceleration** — NVIDIA NVENC, AMD AMF, Intel Quick Sync, Apple VideoToolbox
+- **Hardware Acceleration** — NVIDIA NVENC, AMD AMF (Windows), VAAPI (Linux), Intel Quick Sync, Apple VideoToolbox
 - **Smart Codec Detection** — Automatically picks the best encoder available on your system
 - **Batch Processing** — Queue multiple files with real-time progress tracking
 - **Stream Preservation** — Copy streams without re-encoding when possible
@@ -166,14 +166,17 @@ Metadata renaming works without keys via free providers. Subtitle downloads from
 
 ### Hardware Acceleration
 
-EncodeForge auto-detects available GPU encoders on startup:
+EncodeForge auto-detects available GPU encoders on startup. Backends are OS-specific:
 
-| GPU | Encoder | Minimum |
-|-----|---------|---------|
-| NVIDIA | NVENC | GTX 600 series+ |
-| AMD | AMF | Recent Radeon (Windows) |
-| Intel | Quick Sync | 6th gen Core+ |
-| Apple | VideoToolbox | All modern Macs |
+| Backend | Windows | Linux | macOS | Notes |
+|---------|---------|-------|-------|-------|
+| **NVENC** | ✓ | ✓ | ✓* | NVIDIA GTX 600+ / equivalent |
+| **AMF** | ✓ | — | — | AMD Radeon (Windows drivers) |
+| **VAAPI** | — | ✓ | — | AMD or Intel via libva / Mesa |
+| **QSV** | ✓ | ✓ | — | Intel Quick Sync (6th gen+) |
+| **VideoToolbox** | — | — | ✓ | Apple Silicon and Intel Macs |
+
+\* NVENC on macOS only when an NVIDIA GPU and matching FFmpeg build are present (uncommon on modern Macs).
 
 ---
 

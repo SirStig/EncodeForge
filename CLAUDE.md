@@ -64,7 +64,7 @@ The application is organized into four layers:
 - `metadata/`: 8+ providers (TMDB, TVDB, OMDB, Trakt, Kitsu, Jikan, AniDB, TVmaze). The `MetadataGrabber` in `core/metadata_grabber.py` aggregates them.
 - `subtitle/`: 8+ providers (OpenSubtitles, Addic7ed, Jimaku, SubDL, etc.) plus `whisper_manager.py` for AI-based local subtitle generation. Aggregated in `core/subtitle_manager.py`.
 
-**Utility Layer (`utils/`)** — Cross-cutting concerns: `ffmpeg_manager.py` (FFmpeg detection/path), `gpu_detector.py` (NVENC/AMF/QSV/VideoToolbox detection), `settings_manager.py` (JSON-backed dataclass config), `theme_manager.py` (flat dark CSS theming; Light/Auto settings are not wired), `workers.py` (QThread worker pool), `download_manager.py` (resumable downloads with hash verification).
+**Utility Layer (`utils/`)** — Cross-cutting concerns: `ffmpeg_manager.py` (FFmpeg detection/path), `gpu_detector.py` (NVENC/AMF/VAAPI/QSV/VideoToolbox detection + OS backend matrix), `settings_manager.py` (JSON-backed dataclass config), `theme_manager.py` (flat dark CSS theming; Light/Auto settings are not wired), `workers.py` (QThread worker pool), `download_manager.py` (resumable downloads with hash verification).
 
 ### Key Patterns
 
@@ -76,7 +76,7 @@ The application is organized into four layers:
 
 ## FFmpeg Dependency
 
-FFmpeg is required at runtime and is not bundled. On first GUI launch, `main.py` calls `check_ffmpeg()` and shows `FFmpegSetupDialog` if not found. Hardware acceleration (NVENC, AMF, QSV, VideoToolbox) is auto-detected via `utils/gpu_detector.py` and cached.
+FFmpeg is required at runtime and is not bundled. On first GUI launch, `main.py` calls `check_ffmpeg()` and shows `FFmpegSetupDialog` if not found. Hardware acceleration is OS-aware: NVENC (all), AMF (Windows), VAAPI (Linux), QSV (Windows/Linux), VideoToolbox (macOS). GPU presence comes from `utils/gpu_detector.py`; FFmpeg detection/probing lives in `utils/ffmpeg_manager.py` (`core/ffmpeg_manager.py` is a thin re-export façade).
 
 ## Entry Points (from `setup.py`)
 

@@ -13,14 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **No bundled subtitle API keys** — OpenSubtitles and SubDL no longer ship a default consumer/API key in source. Provide your own key in Settings → Accounts, or set `ENCODEFORGE_OPENSUBTITLES_KEY` / `ENCODEFORGE_SUBDL_KEY`. The Subtitles tab banners and Settings fields explain when a key is missing; SubDL may still attempt its web-scraping fallback without a key.
 
+### Added
+
+- **VAAPI hardware encoding on Linux** — AMD and Intel GPUs on Linux can use `h264_vaapi` / `hevc_vaapi` (libva). Settings and Auto HW Accel expose a VAAPI backend; encode commands set `-vaapi_device` and `format=nv12,hwupload`.
+
 ### Fixed
 
 - **`pip install` missing styles/icons** — `package_data` used an empty-string key with no `MANIFEST.in`, so wheels and sdists omitted `resources/`. Added `MANIFEST.in`, a `resources` package, proper `package_data`, and a `pyproject.toml` build backend so CSS and icons install under `site-packages/resources/`.
+- **Intel GPU detection on Linux** — `_detect_intel` only queried Windows WMI/PowerShell. Linux now reads PCI vendor `0x8086` from `/sys/class/drm` (same path AMD already used).
 
 ### Changed
 
 - **macOS packaging docs** — README now states official DMG builds are **Apple Silicon only** (no Intel Mac artifacts).
 - **Test foundation (P3-D)** — Unit CI now enforces `--cov=core --cov=utils --cov-fail-under=30`, locks C1/C2 via `audit_c1`/`audit_c2` markers, and adds Encoder/Subtitle widget smoke tests. A scheduled/on-demand workflow runs the FFmpeg integration suite that the PR matrix still excludes.
+- **GPU / encoder OS matrix documented** — README, CLAUDE.md, and encoder docs spell out NVENC (all), AMF (Windows), VAAPI (Linux), QSV (Windows/Linux), VideoToolbox (macOS).
+- **Removed leftover PyTorch helpers** from `utils/gpu_detector.py` (`recommend_torch_variant`, `get_torch_install_command`). Whisper uses faster-whisper / CTranslate2.
 
 ---
 

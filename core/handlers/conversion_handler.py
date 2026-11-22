@@ -61,16 +61,26 @@ class ConversionHandler:
         """
         hwaccel_options = self.ffmpeg_mgr.get_hwaccel_options()
         logger.info(f"Hardware acceleration options: {hwaccel_options}")
-        logger.info(f"Settings - use_nvenc: {self.settings.use_nvenc}, use_amf: {self.settings.use_amf}, use_qsv: {self.settings.use_qsv}")
+        logger.info(
+            "Settings - use_nvenc: %s, use_amf: %s, use_vaapi: %s, use_qsv: %s, use_videotoolbox: %s",
+            self.settings.use_nvenc,
+            self.settings.use_amf,
+            self.settings.use_vaapi,
+            self.settings.use_qsv,
+            self.settings.use_videotoolbox,
+        )
         logger.info(f"Source is 10-bit: {is_10bit}")
 
         available_ids = set(hwaccel_options.get("encoder_ids", []))
 
         # Vendor preference order, paired with the setting that enables it.
+        # AMF is Windows; VAAPI is Linux (AMD/Intel). Prefer QSV over VAAPI when
+        # both exist so Intel Linux keeps Quick Sync when the driver supports it.
         vendors = (
             ("nvenc", "nvidia", self.settings.use_nvenc),
             ("amf", "amd", self.settings.use_amf),
             ("qsv", "intel", self.settings.use_qsv),
+            ("vaapi", "vaapi", self.settings.use_vaapi),
             ("videotoolbox", "apple", self.settings.use_videotoolbox),
         )
 
@@ -123,6 +133,7 @@ class ConversionHandler:
             "not found",
             "nvenc",
             "amf",
+            "vaapi",
             "qsv",
             "videotoolbox",
             "cuda",
@@ -740,9 +751,15 @@ class ConversionHandler:
             
             encoder_info = self._select_best_encoder(is_10bit=is_10bit)
             logger.info(f"Using encoder: {encoder_info['codec']} ({encoder_info['type']})")
-            
-            # Add pixel format conversion if needed
-            if encoder_info.get("needs_conversion", False):
+
+            video_filters: List[str] = []
+            using_vaapi = (
+                encoder_info["type"] == "hardware"
+                and encoder_info["codec"].endswith("vaapi")
+            )
+
+            # Soft → hard VAAPI encode needs format+hwupload; software paths use -pix_fmt.
+            if encoder_info.get("needs_conversion", False) and not using_vaapi:
                 logger.info("Adding pixel format conversion: 10-bit -> 8-bit (yuv420p)")
                 cmd.extend(["-pix_fmt", "yuv420p"])
             
@@ -765,6 +782,16 @@ class ConversionHandler:
                         "-qp", str(self.settings.amf_qp)    # Quality parameter from user settings
                     ])
                     logger.info(f"AMF quality: CQP mode, QP={self.settings.amf_qp}")
+                elif encoder_info["codec"].endswith("vaapi"):
+                    from utils.gpu_detector import find_vaapi_device
+
+                    device = find_vaapi_device() or "/dev/dri/renderD128"
+                    i_idx = cmd.index("-i")
+                    cmd[i_idx:i_idx] = ["-vaapi_device", device]
+                    # Upload frames to the VAAPI device after any CPU-side scale.
+                    video_filters.extend(["format=nv12", "hwupload"])
+                    cmd.extend(["-qp", str(self.settings.vaapi_qp)])
+                    logger.info(f"VAAPI quality: device={device}, QP={self.settings.vaapi_qp}")
                 elif encoder_info["codec"].endswith("qsv"):
                     cmd.extend([
                         "-preset", self.settings.qsv_preset,
@@ -883,10 +910,17 @@ class ConversionHandler:
             if self.settings.use_faststart and self.settings.output_format in ["mp4", "m4v"]:
                 cmd.extend(["-movflags", "+faststart"])
             
-            # Target resolution
+            # Target resolution (CPU scale before VAAPI hwupload when combined)
             if self.settings.target_resolution:
-                cmd.extend(["-vf", f"scale={self.settings.target_resolution}"])
-            
+                scale_filter = f"scale={self.settings.target_resolution}"
+                if using_vaapi:
+                    video_filters.insert(0, scale_filter)
+                else:
+                    video_filters.append(scale_filter)
+
+            if video_filters:
+                cmd.extend(["-vf", ",".join(video_filters)])
+
             # Output
             cmd.extend(["-y", str(output_path_obj)])
             

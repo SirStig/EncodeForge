@@ -64,10 +64,11 @@ The encoder tab connects to the main window's status bar:
 - Audio bitrate: 64-512 kbps
 
 #### Hardware Acceleration
-- NVENC (NVIDIA)
-- AMF (AMD)
-- QuickSync (Intel)
-- VideoToolbox (macOS)
+- NVENC (NVIDIA) — Windows / Linux / macOS*
+- AMF (AMD) — Windows only
+- VAAPI — Linux AMD / Intel
+- Quick Sync (Intel) — Windows / Linux
+- VideoToolbox — macOS
 
 #### Output Settings
 - Container format: MP4, MKV, WebM, AVI
