@@ -11,7 +11,7 @@
 *A free, open-source desktop app for Windows, macOS, and Linux*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)](https://sirstig.github.io/EncodeForge/downloads.html)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20(Apple%20Silicon)%20%7C%20Linux-blue)](https://sirstig.github.io/EncodeForge/downloads.html)
 [![GitHub release](https://img.shields.io/github/v/release/SirStig/EncodeForge)](https://github.com/SirStig/EncodeForge/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
@@ -178,13 +178,15 @@ EncodeForge auto-detects available GPU encoders on startup:
 | | Minimum | Recommended |
 |--|---------|-------------|
 | **Windows** | Windows 10 | Windows 11 |
-| **macOS** | macOS 11.0 | macOS 13.0+ |
+| **macOS** | macOS 13.0 (Apple Silicon) | macOS 13.0+ (Apple Silicon) |
 | **Linux** | Ubuntu 20.04 | Ubuntu 22.04+ |
 | **RAM** | 4 GB | 8 GB (16 GB for AI subtitles) |
 | **Storage** | 500 MB | 2 GB |
 | **Python** | 3.10+ | 3.11+ |
 
 > The Python row only applies if you're running from source (see [From Source](#from-source)). The pre-built binaries bundle their own interpreter.
+>
+> **macOS packaging note:** Official DMG builds target **Apple Silicon only** (`macos-latest` / arm64). Intel Mac binaries are not published.
 
 ---
 

@@ -1,0 +1,9 @@
+# Non-Python assets that must ship with sdist / wheel installs.
+# package_data alone is not enough for a reliable sdist; wheels still
+# need the resources package + package_data (see setup.py / pyproject.toml).
+graft resources
+include README.md
+include LICENSE
+include requirements.txt
+include requirements-dev.txt
+global-exclude *.py[cod] __pycache__ .DS_Store

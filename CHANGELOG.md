@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **`pip install` missing styles/icons** — `package_data` used an empty-string key with no `MANIFEST.in`, so wheels and sdists omitted `resources/`. Added `MANIFEST.in`, a `resources` package, proper `package_data`, and a `pyproject.toml` build backend so CSS and icons install under `site-packages/resources/`.
+
+### Changed
+
+- **macOS packaging docs** — README now states official DMG builds are **Apple Silicon only** (no Intel Mac artifacts).
+
 ## [0.5.0] — 2026-07-22
 
 First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line to a full release
