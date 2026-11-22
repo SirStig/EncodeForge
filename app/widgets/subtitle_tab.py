@@ -159,12 +159,7 @@ class SubtitleTab(QWidget):
         lists_grid.addWidget(StyledLabel("Providers:"), 0, 2, Qt.AlignmentFlag.AlignTop)
         self.provider_list = QListWidget()
         self.provider_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-        providers = ["All", "OpenSubtitles", "Addic7ed", "SubDL", "Subf2m", "YIFY Subtitles", "Podnapisi", "SubDivX", "Kitsunekko", "Jimaku"]
-        for provider in providers:
-            item = QListWidgetItem(provider)
-            self.provider_list.addItem(item)
-            if provider == "All":
-                item.setSelected(True)
+        self._populate_provider_list(self.provider_list, select_all=True)
         self.provider_list.setMaximumHeight(60)
         self.provider_list.setMinimumWidth(200)
         self.provider_list.setSizePolicy(
@@ -347,8 +342,8 @@ class SubtitleTab(QWidget):
             item = self.provider_list.item(i)
             if not item or not item.isSelected():
                 continue
-            t = item.text().lower()
-            if t == "all" or "opensubtitle" in t:
+            canonical = str(item.data(Qt.ItemDataRole.UserRole) or item.text()).lower()
+            if canonical == "all" or "opensubtitle" in canonical:
                 return True
         return False
 
@@ -502,7 +497,10 @@ class SubtitleTab(QWidget):
         all_item = self.provider_list.item(0)
         if all_item and all_item.isSelected():
             for i in range(1, self.provider_list.count()):
-                self.provider_list.item(i).setSelected(True)
+                item = self.provider_list.item(i)
+                # Quarantined rows are display-only (no ItemIsSelectable).
+                if item and (item.flags() & Qt.ItemFlag.ItemIsSelectable):
+                    item.setSelected(True)
         self._show_idle_subtitle_banner()
         self._update_subtitle_action_buttons()
 
@@ -567,6 +565,47 @@ class SubtitleTab(QWidget):
     def _on_search_worker_finished(self) -> None:
         self._dec_subtitle_bg()
 
+    def _populate_provider_list(
+        self,
+        widget: QListWidget,
+        *,
+        select_all: bool = False,
+        include_all: bool = True,
+        select_first_n: int = 0,
+    ) -> None:
+        """Fill a provider QListWidget with catalog rows; quarantine is non-selectable."""
+        from core.providers.subtitle.provider_status import ui_provider_entries
+
+        widget.clear()
+        selected_count = 0
+        for entry in ui_provider_entries():
+            if not include_all and entry["canonical"] == "All":
+                continue
+            item = QListWidgetItem(str(entry["label"]))
+            item.setData(Qt.ItemDataRole.UserRole, entry["canonical"])
+            if entry.get("reason"):
+                item.setToolTip(str(entry["reason"]))
+            if not entry.get("selectable", True):
+                # Keep ItemIsEnabled so the badge stays readable; drop Selectable.
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                item.setForeground(Qt.GlobalColor.gray)
+            else:
+                item.setFlags(
+                    Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+                )
+            widget.addItem(item)
+            if select_all and entry["canonical"] == "All":
+                item.setSelected(True)
+            elif (
+                not select_all
+                and select_first_n > 0
+                and entry.get("available")
+                and entry["canonical"] != "All"
+                and selected_count < select_first_n
+            ):
+                item.setSelected(True)
+                selected_count += 1
+
     def _on_search_result(self, result: Any):
         self.subs_table.setRowCount(0)
         self._subtitle_rows = []
@@ -581,6 +620,15 @@ class SubtitleTab(QWidget):
             QMessageBox.warning(self, "Subtitles", msg)
             self._update_subtitle_action_buttons()
             return
+        if result.get("status") == "empty":
+            msg = result.get(
+                "message",
+                "No subtitles were found. Try other languages or Whisper.",
+            )
+            self._set_subtitle_activity(msg, "error")
+            QMessageBox.information(self, "Subtitles", msg)
+            self._update_subtitle_action_buttons()
+            return
         if result.get("status") != "success":
             self._set_subtitle_activity("Search did not complete successfully.", "error")
             QMessageBox.warning(self, "Subtitles", "Search did not complete successfully.")
@@ -588,6 +636,7 @@ class SubtitleTab(QWidget):
             return
         subs_list = result.get("subtitles") or []
         if not subs_list:
+            # Defensive: success with an empty list must still tell the user.
             self._set_subtitle_activity("No subtitles found for this file and language selection.", "error")
             QMessageBox.information(
                 self,
@@ -900,26 +949,9 @@ class SubtitleTab(QWidget):
         
         self.provider_list = QListWidget()
         self.provider_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-        
-        providers = [
-            "OpenSubtitles",
-            "Addic7ed",
-            "SubDL",
-            "Subf2m",
-            "YIFY Subtitles",
-            "Podnapisi",
-            "SubDivX",
-            "Kitsunekko (Anime)",
-            "Jimaku (Japanese)"
-        ]
-        
-        for provider in providers:
-            item = QListWidgetItem(provider)
-            self.provider_list.addItem(item)
-            # Select first 3 by default
-            if providers.index(provider) < 3:
-                item.setSelected(True)
-        
+        self._populate_provider_list(
+            self.provider_list, select_all=False, include_all=False, select_first_n=3
+        )
         provider_layout.addWidget(self.provider_list)
         
         self.provider_group.setLayout(provider_layout)
@@ -1220,13 +1252,18 @@ class SubtitleTab(QWidget):
         if not languages:
             languages = ['eng']  # Default to English
         
-        # Get selected providers
+        # Get selected providers (canonical names; skip unavailable badges)
         providers = []
         if hasattr(self, 'provider_list'):
             for i in range(self.provider_list.count()):
                 item = self.provider_list.item(i)
-                if item and item.isSelected() and item.text() != 'All':
-                    providers.append(item.text().lower())
+                if not item or not item.isSelected():
+                    continue
+                canonical = item.data(Qt.ItemDataRole.UserRole)
+                label = str(canonical or item.text()).strip()
+                if label.lower() == 'all' or ' (unavailable)' in label.lower():
+                    continue
+                providers.append(label.lower())
         
         # Get mode
         mode = 'auto'

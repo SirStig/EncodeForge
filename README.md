@@ -61,8 +61,8 @@ Encoding is GPU-accelerated wherever your hardware allows it, and AI subtitle tr
 
 - **Local AI Transcription** — faster-whisper with GPU acceleration; runs completely offline
 - **90+ Languages** — Full multilingual transcription support
-- **8 Download Providers** — OpenSubtitles, Addic7ed, SubDL, Subf2m, YIFY, Podnapisi, SubDivX, Jimaku (Podnapisi, SubDivX, and Jimaku may return no results — site layouts changed; see CHANGELOG known limitations)
-- **Anime Support** — AniDB / Kitsu / Jikan for metadata; Jimaku is listed for anime subs but is currently unreliable
+- **8 Download Providers** — OpenSubtitles, Addic7ed, SubDL, Subf2m, YIFY are active; Podnapisi, SubDivX, and Jimaku are listed as unavailable (site layouts changed) until rewritten
+- **Anime Support** — AniDB / Kitsu / Jikan for metadata; Jimaku remains listed but quarantined
 - **Format Support** — SRT, ASS, SSA, VTT, and more
 
 ### Smart File Renaming
@@ -206,7 +206,7 @@ EncodeForge auto-detects available GPU encoders on startup:
 - ⏳ Advanced subtitle synchronization
 - ⏳ Metadata artwork grabber (Fanart.tv key field exists; no provider yet)
 - ⏳ Subtitle preview window
-- ⏳ Fix or retire broken subtitle scrapers (Podnapisi, SubDivX, Jimaku)
+- ⏳ Rewrite quarantined subtitle scrapers (Podnapisi, SubDivX, Jimaku) or remove them entirely
 
 ---
 

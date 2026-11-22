@@ -17,7 +17,15 @@ from core.providers.subtitle import (
     SubDivXProvider,
     SubDLProvider,
     Subf2mProvider,
-    YifyProvider
+    YifyProvider,
+)
+from core.providers.subtitle.provider_status import (
+    PROVIDER_CATALOG,
+    QUARANTINED_PROVIDERS,
+    available_provider_names,
+    is_provider_quarantined,
+    quarantine_reason,
+    ui_provider_entries,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,31 +54,45 @@ class SubtitleProviders:
         self.podnapisi = PodnapisiProvider()
         self.subdivx = SubDivXProvider()
 
-        self.providers = [
-            "OpenSubtitles.com", "Addic7ed", "SubDL", "Subf2m",
-            "YIFY", "Podnapisi", "SubDivX", "Jimaku"
-        ]
-        # None means "no restriction". Set enabled_providers to honour a user's
-        # provider selection; anything not listed is skipped entirely.
+        # Catalog order; quarantined names remain listed for honesty/UI badges.
+        self.providers = [p.name for p in PROVIDER_CATALOG]
+        # None means "all available providers". Quarantined scrapers are never
+        # queried even when the user picks "All".
         self.enabled_providers: Optional[List[str]] = None
         self.session_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-    
+
+    def list_provider_status(self) -> List[Dict]:
+        """Return UI-ready rows describing availability for every provider."""
+        return ui_provider_entries()
+
+    def available_providers(self) -> List[str]:
+        """Canonical names of providers that are safe to query."""
+        return available_provider_names()
+
     def is_provider_enabled(self, provider_name: str) -> bool:
         """
         Report whether a provider should be queried.
 
-        Matching is loose so UI labels ("OpenSubtitles") still select the
-        internal name ("OpenSubtitles.com").
+        Quarantined scrapers are always disabled. Matching is otherwise loose
+        so UI labels ("OpenSubtitles") still select "OpenSubtitles.com".
         """
+        if is_provider_quarantined(provider_name):
+            return False
+
         if not self.enabled_providers:
             return True
 
         target = provider_name.lower().replace(".com", "").strip()
         for enabled in self.enabled_providers:
+            if is_provider_quarantined(str(enabled)):
+                continue
             candidate = str(enabled).lower().replace(".com", "").strip()
-            if candidate in ("all", target) or target in candidate:
+            # Strip UI badge suffix: "Podnapisi (unavailable)"
+            if " (unavailable)" in candidate:
+                candidate = candidate.split(" (unavailable)", 1)[0].strip()
+            if candidate in ("all", target) or target in candidate or candidate in target:
                 return True
         return False
 
@@ -175,7 +197,7 @@ class SubtitleProviders:
                     seen_file_ids.add(file_id)
                     all_results.append(result)
         
-        if anilist_url:
+        if anilist_url and self.is_provider_enabled("Jimaku"):
             logger.info("→ Advanced search: Trying Jimaku with AniList URL")
             jimaku_results = self.search_jimaku(video_path, languages, anilist_url)
             for result in jimaku_results:
@@ -183,6 +205,11 @@ class SubtitleProviders:
                 if file_id and file_id not in seen_file_ids:
                     seen_file_ids.add(file_id)
                     all_results.append(result)
+        elif anilist_url and is_provider_quarantined("Jimaku"):
+            logger.info(
+                "→ Advanced search: Skipping Jimaku (%s)",
+                quarantine_reason("Jimaku") or "quarantined",
+            )
         
         all_results = self._rank_subtitles(all_results)
         logger.info(f"=== ADVANCED SEARCH COMPLETE: Total {len(all_results)} unique subtitle(s) found ===")
@@ -243,7 +270,12 @@ class SubtitleProviders:
             ("Jimaku", self.search_jimaku, None),
         ]
 
+        queried = 0
         for name, search_fn, predicate in provider_specs:
+            if is_provider_quarantined(name):
+                reason = quarantine_reason(name) or "quarantined"
+                logger.info(f"→ Skipping {name} ({reason})")
+                continue
             if not self.is_provider_enabled(name):
                 logger.info(f"→ Skipping {name} (disabled in settings)")
                 continue
@@ -251,6 +283,7 @@ class SubtitleProviders:
                 logger.debug(f"→ Skipping {name} (not applicable to {lang_codes})")
                 continue
 
+            queried += 1
             logger.info(f"→ Searching {name}...")
             if progress_callback:
                 progress_callback(name, all_results.copy(), False)  # Notify start
@@ -271,12 +304,16 @@ class SubtitleProviders:
             except Exception as e:
                 logger.error(f"  \u274c {name} search failed: {e}")
 
-        logger.info(f"=== SEARCH COMPLETE: Total {len(all_results)} subtitle(s) from {len(set(r.get('provider', 'unknown') for r in all_results))} provider(s) ===")
-        
+        logger.info(
+            f"=== SEARCH COMPLETE: Total {len(all_results)} subtitle(s) "
+            f"from {len(set(r.get('provider', 'unknown') for r in all_results))} "
+            f"provider(s); queried {queried} available provider(s) ==="
+        )
+
         if all_results:
             # Calculate scores and rank results
             all_results = self._rank_subtitles(all_results)
-            
+
             # Log provider breakdown
             provider_counts = {}
             for r in all_results:
@@ -285,15 +322,21 @@ class SubtitleProviders:
             logger.info("Provider breakdown:")
             for provider, count in provider_counts.items():
                 logger.info(f"  - {provider}: {count}")
-            
-            logger.info(f"✅ Top ranked subtitle: {all_results[0].get('provider')} - {all_results[0].get('file_name')} (score: {all_results[0].get('score', 0)})")
+
+            logger.info(
+                f"✅ Top ranked subtitle: {all_results[0].get('provider')} - "
+                f"{all_results[0].get('file_name')} (score: {all_results[0].get('score', 0)})"
+            )
         else:
-            logger.warning("No subtitles found from any provider!")
-        
+            logger.warning(
+                "No subtitles found from any available provider "
+                f"(queried {queried}; quarantined: {', '.join(sorted(QUARANTINED_PROVIDERS)) or 'none'})"
+            )
+
         # Send final update
         if progress_callback:
             progress_callback("Complete", all_results, True)
-        
+
         return all_results
     
     def _rank_subtitles(self, results: List[Dict]) -> List[Dict]:

@@ -1,0 +1,23 @@
+{
+  "status": true,
+  "subtitles": [
+    {
+      "lang": "en",
+      "release_name": "Breaking.Bad.S01E01.BluRay.en.srt",
+      "name": "Breaking Bad",
+      "sd_id": "sd-1001",
+      "url": "https://dl.subdl.com/subtitle/sd-1001",
+      "download_count": 1500,
+      "hi_count": 4.5
+    },
+    {
+      "lang": "fr",
+      "release_name": "Breaking.Bad.S01E01.BluRay.fr.srt",
+      "name": "Breaking Bad",
+      "sd_id": "sd-1002",
+      "url": "https://dl.subdl.com/subtitle/sd-1002",
+      "download_count": 200,
+      "hi_count": 3.0
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "id": "991122",
+      "attributes": {
+        "language": "en",
+        "download_count": 4200,
+        "ratings": 8.5,
+        "url": "https://www.opensubtitles.com/en/subtitles/991122",
+        "uploader": {"name": "EncodeForgeFixture"},
+        "files": [
+          {
+            "file_id": 555001,
+            "file_name": "Breaking.Bad.S01E01.1080p.en.srt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "991123",
+      "attributes": {
+        "language": "es",
+        "download_count": 900,
+        "ratings": 7.0,
+        "url": "https://www.opensubtitles.com/en/subtitles/991123",
+        "uploader": {"name": "EncodeForgeFixture"},
+        "files": [
+          {
+            "file_id": 555002,
+            "file_name": "Breaking.Bad.S01E01.1080p.es.srt"
+          }
+        ]
+      }
+    }
+  ]
+}
