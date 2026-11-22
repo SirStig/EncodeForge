@@ -64,7 +64,10 @@ def _hint(text: str) -> QLabel:
 
 def _link(text: str, url: str) -> QLabel:
     """Return a small clickable hyperlink label."""
-    lbl = QLabel(f'<a href="{url}" style="color:#6366f1;text-decoration:none;">{text}</a>')
+    from utils.design_tokens import default_tokens
+
+    accent = default_tokens().accent
+    lbl = QLabel(f'<a href="{url}" style="color:{accent};text-decoration:none;">{text}</a>')
     lbl.setOpenExternalLinks(True)
     lbl.setStyleSheet("font-size: 10px;")
     return lbl

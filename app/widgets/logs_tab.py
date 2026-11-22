@@ -145,7 +145,7 @@ class LogsTab(QWidget):
         
         layout.addLayout(info_layout)
         
-        # Styling handled by base glassmorphism theme
+        # Styling handled by base flat dark theme
     
     def _setup_timer(self):
         """Set up timer for auto-refresh"""

@@ -128,7 +128,7 @@ python build_nuitka.py
 
 That's it. Most options have sensible defaults, so you can dive straight in.
 
-> **Note:** Screenshots on the [project site](https://sirstig.github.io/EncodeForge/#screenshots) (`docs/screenshots/`) show an older menu-bar UI, not the current frameless sidebar layout.
+> **Note:** Screenshots on the [project site](https://sirstig.github.io/EncodeForge/#screenshots) (`docs/screenshots/`) are legacy menu-bar captures. The current app uses frameless sidebar chrome and a flat dark token theme — see `docs/screenshots/README.md`.
 
 ### Scripting from the CLI
 

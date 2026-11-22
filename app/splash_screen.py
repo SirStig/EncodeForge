@@ -9,7 +9,6 @@ from app import __version__ as APP_VERSION
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap, QPalette, QColor, QFont
-from pathlib import Path
 
 from utils.platform_fonts import ui_font
 
@@ -96,25 +95,12 @@ class SplashScreen(QWidget):
         layout.addStretch(1)
     
     def _load_styles(self):
-        """Load CSS styles for the splash screen."""
+        """Load CSS styles for the splash screen from the shared token set."""
         try:
-            from PySide6.QtCore import QFile, QTextStream
-            
-            css_file = Path(__file__).parent.parent / "resources" / "styles" / "splash_screen.css"
-            if css_file.exists():
-                file = QFile(str(css_file))
-                if file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text):
-                    stream = QTextStream(file)
-                    css_content = stream.readAll()
-                    file.close()
-                    
-                    # Apply the CSS
-                    self.setStyleSheet(css_content)
-                    logger.debug("Splash screen styles loaded successfully")
-                else:
-                    logger.warning("Failed to open splash_screen.css file")
-            else:
-                logger.warning("splash_screen.css file not found")
+            from utils.app_stylesheet import build_splash_stylesheet
+
+            self.setStyleSheet(build_splash_stylesheet())
+            logger.debug("Splash screen styles loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load splash screen styles: {e}")
     

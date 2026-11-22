@@ -1,34 +1,34 @@
-/* Splash — flat dark theme */
+/* Splash — flat dark theme (DesignTokens placeholders) */
 
 QWidget {
-    background-color: #1a1a1a;
-    border: 1px solid #2e2e2e;
-    border-radius: 4px;
-    color: #cccccc;
+    background-color: __bg_base__;
+    border: 1px solid __border_subtle__;
+    border-radius: __radius_md__;
+    color: __text_primary__;
 }
 
 QLabel#title_label {
-    color: #cccccc;
+    color: __text_primary__;
     background: transparent;
 }
 
 QLabel#version_label {
-    color: #6e6e6e;
+    color: __text_muted__;
     background: transparent;
 }
 
 QLabel#status_label {
-    color: #9d9d9d;
+    color: __text_secondary__;
     background: transparent;
 }
 
 QLabel#tagline_label {
-    color: #6e6e6e;
+    color: __text_muted__;
     background: transparent;
 }
 
 QProgressBar {
-    background: #252526;
+    background: __bg_elevated__;
     border: none;
     border-radius: 2px;
     min-height: 3px;
@@ -36,6 +36,6 @@ QProgressBar {
 }
 
 QProgressBar::chunk {
-    background: #6366f1;
+    background: __accent__;
     border-radius: 2px;
 }

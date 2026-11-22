@@ -5,7 +5,7 @@ Bottom-right toast for available updates.
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QVBoxLayout
 
-from app.widgets.custom_widgets import GlassmorphicButton, PrimaryButton, StyledLabel
+from app.widgets.custom_widgets import StyledButton, PrimaryButton, StyledLabel
 
 
 class UpdateToast(QFrame):
@@ -40,7 +40,7 @@ class UpdateToast(QFrame):
         row = QHBoxLayout()
         row.setSpacing(8)
 
-        notes_btn = GlassmorphicButton("What's new")
+        notes_btn = StyledButton("What's new")
         notes_btn.clicked.connect(self.notes_clicked.emit)
         row.addWidget(notes_btn)
 
@@ -48,7 +48,7 @@ class UpdateToast(QFrame):
         dl_btn.clicked.connect(self.download_clicked.emit)
         row.addWidget(dl_btn)
 
-        later_btn = GlassmorphicButton("Later")
+        later_btn = StyledButton("Later")
         later_btn.clicked.connect(self.later_clicked.emit)
         row.addWidget(later_btn)
 

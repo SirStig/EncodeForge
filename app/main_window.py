@@ -26,9 +26,8 @@ from PySide6.QtWidgets import (
 from app import __version__ as APP_VERSION
 from app.widgets.app_title_bar import AppTitleBar
 from app.widgets.custom_widgets import (
-    GlassmorphicButton,
-    GlassmorphicMainWindow,
-    GlassmorphicStatusBar,
+    AppMainWindow,
+    AppStatusBar,
     SectionDivider,
     StyledLabel,
 )
@@ -58,14 +57,14 @@ except Exception:
     LogsTab = None
 
 
-class MainWindow(GlassmorphicMainWindow):
+class MainWindow(AppMainWindow):
     def __init__(self):
         super().__init__()
         self._title_bar = None
         self.setWindowTitle("EncodeForge")
         
-        # Enable transparency for glassmorphism effect
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)  # Keep opaque for now
+        # Frameless window stays opaque (flat dark theme; no translucent glass)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         
         # Set proper window sizing with responsive constraints
         self.setMinimumSize(1000, 640)
@@ -554,7 +553,7 @@ class MainWindow(GlassmorphicMainWindow):
 
     # -------------------- Status & callbacks --------------------
     def _create_statusbar(self):
-        self.statusbar = GlassmorphicStatusBar()
+        self.statusbar = AppStatusBar()
         self.statusbar.setObjectName("app_bottom_bar")
         self.setStatusBar(self.statusbar)
         self.status_label = StyledLabel("Ready")

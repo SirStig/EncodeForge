@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QTextEdit, QVBoxLayout
 
-from app.widgets.custom_widgets import GlassmorphicButton, PrimaryButton, StyledLabel
+from app.widgets.custom_widgets import StyledButton, PrimaryButton, StyledLabel
 from utils.update_checker import ReleaseInfo
 
 
@@ -52,7 +52,7 @@ class UpdateAvailableDialog(QDialog):
 
         row = QHBoxLayout()
         row.addStretch()
-        close_btn = GlassmorphicButton("Close")
+        close_btn = StyledButton("Close")
         close_btn.clicked.connect(self.reject)
         row.addWidget(close_btn)
 

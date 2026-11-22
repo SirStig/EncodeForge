@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from utils.design_tokens import DesignTokens
+from utils.design_tokens import DesignTokens, default_tokens
 
 
 def _project_root() -> Path:
@@ -13,7 +13,20 @@ def _theme_base_path() -> Path:
     return _project_root() / "resources" / "styles" / "theme_base.css"
 
 
+def _splash_path() -> Path:
+    return _project_root() / "resources" / "styles" / "splash_screen.css"
+
+
+def apply_token_placeholders(css: str, tokens: DesignTokens) -> str:
+    """Replace ``__token_name__`` placeholders with values from the token set."""
+    out = css
+    for key, value in tokens.as_mapping().items():
+        out = out.replace(f"__{key}__", value)
+    return out
+
+
 def build_app_stylesheet(tokens: DesignTokens) -> str:
+    """Compose the flat-dark app stylesheet from theme_base.css + chrome overlay."""
     base_path = _theme_base_path()
     with open(base_path, "r", encoding="utf-8") as f:
         base = f.read()
@@ -55,7 +68,7 @@ QToolButton#titlebar_control {{
 }}
 
 QToolButton#titlebar_control:hover {{
-    background: #37373d;
+    background: {t.bg_hover};
     border: 1px solid transparent;
     color: {t.text_primary};
 }}
@@ -74,7 +87,7 @@ QToolButton#titlebar_menu {{
 }}
 
 QToolButton#titlebar_menu:hover {{
-    background: #37373d;
+    background: {t.bg_hover};
     color: {t.text_primary};
 }}
 
@@ -188,23 +201,23 @@ QCheckBox::indicator {{
     width: 15px;
     height: 15px;
     border-radius: 3px;
-    background: #252526;
-    border: 1.5px solid #4e4e52;
+    background: {t.bg_elevated};
+    border: 1.5px solid {t.border_muted};
 }}
 
 QCheckBox::indicator:hover {{
-    border-color: #7577f3;
+    border-color: {t.accent_hover};
 }}
 
 QCheckBox::indicator:checked {{
-    background: #6366f1;
-    border-color: #6366f1;
+    background: {t.accent};
+    border-color: {t.accent};
     image: url({check_svg});
 }}
 
 QCheckBox::indicator:disabled {{
-    background: #1e1e1e;
-    border-color: #2e2e2e;
+    background: {t.bg_sidebar};
+    border-color: {t.border_subtle};
 }}
 
 QToolButton#statusbar_indicator {{
@@ -224,11 +237,11 @@ QToolButton#statusbar_indicator:hover {{
 }}
 
 QToolButton#statusbar_indicator[status="ok"] {{
-    color: #7a9e7a;
+    color: {t.status_ok};
 }}
 
 QToolButton#statusbar_indicator[status="warn"] {{
-    color: #9e8a6a;
+    color: {t.status_warn};
 }}
 
 QTabBar::tab {{
@@ -251,4 +264,12 @@ QFrame#update_toast QLabel#update_toast_subtitle {{
     color: {t.text_secondary};
 }}
 """
-    return base.rstrip() + "\n" + overlay
+    return apply_token_placeholders(base, tokens).rstrip() + "\n" + overlay
+
+
+def build_splash_stylesheet(tokens: DesignTokens | None = None) -> str:
+    """Splash CSS with the same token set as the main app theme."""
+    t = tokens if tokens is not None else default_tokens()
+    path = _splash_path()
+    with open(path, "r", encoding="utf-8") as f:
+        return apply_token_placeholders(f.read(), t)

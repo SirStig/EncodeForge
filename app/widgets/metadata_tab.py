@@ -77,7 +77,7 @@ class MetadataTab(QWidget):
         self.refresh_providers()
         # A backup from a previous session's rename may still be undoable.
         self.undo_btn.setEnabled(bool(list_backups()))
-        logger.debug("Metadata tab initialized - using base glassmorphism theme")
+        logger.debug("Metadata tab initialized - using base flat dark theme")
 
     def _setup_ui(self):
         main_layout = QVBoxLayout(self)
