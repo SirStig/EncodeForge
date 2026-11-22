@@ -142,7 +142,20 @@ python cli.py rename /path/to/library -y                 # rename in place
 python cli.py rename /path/to/library -d /path/to/sorted --action move
 ```
 
-Run `python cli.py encode --help` / `python cli.py rename --help` for the full option lists. The `subtitle` CLI subcommand is not implemented yet — use the GUI for that (see [Roadmap](#roadmap)).
+Run `python cli.py encode --help` / `python cli.py rename --help` for the full option lists.
+
+### Scripting Subtitles from the CLI
+
+`cli.py subtitle` uses the same download / Whisper path as the Subtitles tab (including saved language, model, and provider defaults):
+
+```bash
+python cli.py subtitle /path/to/video.mkv                 # download best match
+python cli.py subtitle /path/to/library -l es             # Spanish download
+python cli.py subtitle /path/to/video.mkv --generate --model small
+python cli.py subtitle /path/to/video.mkv --provider opensubtitles
+```
+
+Run `python cli.py subtitle --help` for the full option list.
 
 ---
 
@@ -208,7 +221,7 @@ EncodeForge auto-detects available GPU encoders on startup. Backends are OS-spec
 - ✅ Shared core backend (GUI & CLI)
 - ✅ Nuitka compilation for all platforms
 - ✅ Scriptable CLI encoding (`cli.py encode`) and renaming (`cli.py rename`)
-- ⏳ CLI support for `subtitle` command (stub today; use the GUI)
+- ✅ CLI `subtitle` (download + Whisper) sharing GUI settings merge
 - ⏳ Light & Auto theme options (hidden until a light token set exists)
 - ⏳ Two-pass encoding (hidden until ConversionHandler supports it)
 - ⏳ Enhanced concurrent task processing

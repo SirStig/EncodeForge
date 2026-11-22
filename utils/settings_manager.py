@@ -10,12 +10,83 @@ import threading
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from core import path_manager
 from core.handlers.models import ConversionSettings
 
 logger = logging.getLogger(__name__)
+
+
+def subtitle_core_from_settings(subtitle_settings: Dict[str, Any]):
+    """
+    Build an EncodeForgeCore for subtitle download/generate, matching the GUI.
+
+    Applies language / Whisper model / provider selection from ``subtitle_settings``
+    onto ``get_merged_conversion_settings()`` so CLI and Subtitles-tab workers
+    share one merge path (Qt-free; safe to import from ``cli.py``).
+    """
+    from core.encodeforge_core import EncodeForgeCore
+
+    sm = get_settings_manager()
+    cs = sm.get_merged_conversion_settings()
+    langs = subtitle_settings.get("languages") or ["eng"]
+    cs.subtitle_languages = list(langs)
+
+    wm = subtitle_settings.get("whisper_model", "medium")
+    if isinstance(wm, str):
+        cs.whisper_model = wm.split()[0].strip().lower() if wm else "medium"
+    core = EncodeForgeCore(settings=cs)
+
+    # Honour the provider selection made in the Subtitles tab / CLI. Without
+    # this, deselecting providers had no effect and every configured provider
+    # was queried regardless.
+    providers = subtitle_settings.get("providers")
+    if providers and getattr(core, "subtitle_providers", None) is not None:
+        core.subtitle_providers.enabled_providers = list(providers)
+        logger.info("Subtitle providers restricted to: %s", providers)
+
+    return core
+
+
+def build_subtitle_settings_dict(
+    *,
+    language: Optional[str] = None,
+    whisper_model: Optional[str] = None,
+    providers: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Compose the subtitle-settings dict used by ``subtitle_core_from_settings``.
+
+    Defaults come from the saved ``SubtitleSettings`` section (same source the
+    Subtitles tab uses for Whisper model / provider list). Explicit arguments
+    override those defaults.
+    """
+    from core.providers.subtitle.base_provider import to_iso639_2
+
+    sm = get_settings_manager()
+    saved = sm.subtitle
+
+    if language:
+        lang_code = to_iso639_2(language) or language.strip().lower()
+    else:
+        lang_code = to_iso639_2(saved.language or "English") or "eng"
+
+    model = whisper_model
+    if not model:
+        model = (saved.whisper_model or "medium").split()[0].strip().lower()
+
+    if providers is not None:
+        provider_list = list(providers)
+    else:
+        provider_list = [str(p).strip().lower() for p in (saved.providers or []) if p]
+
+    return {
+        "languages": [lang_code],
+        "providers": provider_list,
+        "mode": (saved.mode or "download").lower(),
+        "whisper_model": model,
+    }
 
 
 def _app_version() -> str:

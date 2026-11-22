@@ -2,8 +2,8 @@
 """
 EncodeForge CLI
 
-``encode``, ``rename``, and ``gui`` share EncodeForgeCore with the desktop app.
-``subtitle`` is still a placeholder and exits with a notice.
+``encode``, ``subtitle``, ``rename``, and ``gui`` share EncodeForgeCore with
+the desktop app.
 """
 
 import sys
@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 
 def _collect_video_files(input_path: str, recursive: bool = True):
+    """Return sorted video paths from a file or directory."""
     src = Path(input_path)
     if src.is_dir():
         it = src.rglob('*') if recursive else src.iterdir()
@@ -64,7 +65,7 @@ def _resolve_encode_output(input_file: Path, output: str | None, output_format: 
 @click.group()
 @click.version_option(version=APP_VERSION)
 def cli():
-    """EncodeForge — desktop app plus scriptable `encode`/`rename`. `subtitle` is not yet implemented."""
+    """EncodeForge — desktop app plus scriptable `encode`/`subtitle`/`rename`."""
     pass
 
 
@@ -177,17 +178,92 @@ def encode(input_path, output, codec, preset, use_nvenc, use_qsv, use_amf, crf,
 
 @cli.command()
 @click.argument('input_path', type=click.Path(exists=True))
-@click.option('--language', '-l', default='en', help='Subtitle language code')
-@click.option('--generate', is_flag=True, help='Generate subtitles using Whisper AI')
-@click.option('--model', default='base', help='Whisper model (tiny, base, small, medium, large)')
-@click.option('--provider', help='Subtitle provider (opensubtitles, addic7ed, etc.)')
-def subtitle(input_path, language, generate, model, provider):
-    """Download or generate subtitles (not available in this release — use the GUI)."""
-    click.echo(
-        click.style(f"The subtitle command is not implemented in v{APP_VERSION}.", fg="yellow", bold=True)
+@click.option('--language', '-l', default=None,
+              help='Subtitle language code or name (default: saved settings, usually English).')
+@click.option('--generate', is_flag=True,
+              help='Generate subtitles with Whisper AI instead of downloading.')
+@click.option('--model', default=None,
+              help='Whisper model (tiny, base, small, medium, large-v2, …). '
+                   'Default: saved settings (Subtitles tab / Settings).')
+@click.option('--provider', default=None,
+              help='Restrict download to one provider (opensubtitles, addic7ed, subdl, …). '
+                   'Default: providers saved in settings.')
+@click.option('--recursive/--no-recursive', default=True,
+              help='When INPUT_PATH is a folder, scan it recursively (default: on).')
+def subtitle(input_path, language, generate, model, provider, recursive):
+    """
+    Download or generate subtitles for video files.
+
+    Uses the same settings merge as the Subtitles tab: saved language / Whisper
+    model / providers, with CLI flags as overrides. INPUT_PATH is a video file
+    or a folder of videos.
+    """
+    from utils.settings_manager import (
+        build_subtitle_settings_dict,
+        subtitle_core_from_settings,
     )
-    click.echo("Use the desktop application: python main.py   or   python cli.py gui")
-    raise SystemExit(2)
+
+    files = _collect_video_files(input_path, recursive=recursive)
+    if not files:
+        click.echo(click.style("No video files found.", fg="yellow"))
+        raise SystemExit(1)
+
+    providers = [provider] if provider else None
+    subs = build_subtitle_settings_dict(
+        language=language,
+        whisper_model=model,
+        providers=providers,
+    )
+    core = subtitle_core_from_settings(subs)
+    languages = subs.get("languages") or ["eng"]
+    lang = languages[0]
+
+    mode_label = "Whisper generate" if generate else "download"
+    click.echo(f"Processing {len(files)} file(s) ({mode_label}, language={lang})…")
+
+    failures = 0
+    for path in files:
+        name = Path(path).name
+        if generate:
+            result = core.generate_subtitles(path, language=lang)
+            if result.get("status") == "success":
+                info = result.get("subtitle") or {}
+                out = info.get("path") or info.get("subtitle_path") or result.get("subtitle_path") or ""
+                detail = f"  →  {out}" if out else ""
+                click.echo(click.style("  ok  ", fg="green") + f"{name}{detail}")
+                if result.get("message"):
+                    click.echo(f"       {result['message'].splitlines()[0]}")
+            else:
+                failures += 1
+                click.echo(
+                    click.style(" fail ", fg="red")
+                    + f"{name}  —  {result.get('message', 'unknown error')}"
+                )
+            continue
+
+        result = core.download_subtitles(path, languages=languages)
+        if result.get("status") == "success":
+            downloaded = result.get("subtitles_downloaded") or []
+            paths = []
+            for item in downloaded:
+                p = item.get("subtitle_path") or item.get("path")
+                if p:
+                    paths.append(p)
+            detail = f"  →  {paths[0]}" if paths else ""
+            click.echo(click.style("  ok  ", fg="green") + f"{name}{detail}")
+            if result.get("message"):
+                click.echo(f"       {result['message']}")
+        else:
+            failures += 1
+            click.echo(
+                click.style(" fail ", fg="red")
+                + f"{name}  —  {result.get('message', 'unknown error')}"
+            )
+
+    total = len(files)
+    ok = total - failures
+    click.echo(f"\n{ok}/{total} succeeded" + (f", {failures} failed" if failures else ""))
+    raise SystemExit(1 if failures else 0)
 
 
 @cli.command()
@@ -223,7 +299,6 @@ def rename(input_path, tmdb_key, tvdb_key, omdb_key, trakt_key, provider, patter
     from utils.settings_manager import get_settings_manager
 
     files = _collect_video_files(input_path, recursive=recursive)
-
     if not files:
         click.echo(click.style("No video files found.", fg="yellow"))
         raise SystemExit(1)

@@ -35,7 +35,8 @@ from app.widgets.custom_widgets import (
     StyledTextEdit,
 )
 from utils.notifications import get_notification_manager
-from utils.workers import SubtitleWorker, Worker, _subtitle_core_from_settings
+from utils.settings_manager import subtitle_core_from_settings as _subtitle_core_from_settings
+from utils.workers import SubtitleWorker, Worker
 
 logger = logging.getLogger(__name__)
 
