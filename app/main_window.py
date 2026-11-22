@@ -430,6 +430,13 @@ class MainWindow(GlassmorphicMainWindow):
         # P1-A / C2: rebuild keyed metadata providers when API keys change
         # after an empty start — without this, self.tmdb/etc. stay None.
         self._sync_metadata_api_keys(sm)
+        # P1-C / H4: refresh Metadata tab so newly saved API keys appear in
+        # the provider combo and renamer filename options match Settings.
+        if self.metadata_tab is not None:
+            if hasattr(self.metadata_tab, "refresh_providers"):
+                self.metadata_tab.refresh_providers()
+            if hasattr(self.metadata_tab, "sync_filename_options"):
+                self.metadata_tab.sync_filename_options()
         logger.debug("Settings applied to running application")
 
     def _sync_metadata_api_keys(self, sm) -> None:

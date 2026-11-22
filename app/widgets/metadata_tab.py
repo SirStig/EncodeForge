@@ -73,8 +73,7 @@ class MetadataTab(QWidget):
         self._rename_history: Dict[str, str] = {}
         self._setup_ui()
         self._connect_signals()
-        sm = get_settings_manager()
-        self.pattern_input.setText(sm.renamer.pattern)
+        self.sync_filename_options()
         self.refresh_providers()
         # A backup from a previous session's rename may still be undoable.
         self.undo_btn.setEnabled(bool(list_backups()))
@@ -553,6 +552,15 @@ class MetadataTab(QWidget):
                 parts.append(f"S{season}E{episode}")
         return " ".join(parts)
     
+    def sync_filename_options(self) -> None:
+        """Load renamer pattern and filename option checkboxes from settings."""
+        r = get_settings_manager().renamer
+        self.pattern_input.setText(r.pattern)
+        self.replace_spaces_check.setChecked(bool(r.replace_spaces))
+        self.lowercase_check.setChecked(bool(r.lowercase))
+        self.remove_special_check.setChecked(bool(r.remove_special))
+        self.preserve_extension_check.setChecked(bool(r.preserve_extension))
+
     def refresh_providers(self) -> None:
         """Rebuild the provider combo from current settings."""
         sm = get_settings_manager()

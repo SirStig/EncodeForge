@@ -134,3 +134,70 @@ class TestApplyRename:
         assert moved.read_text() == "DATA"
         # action was "copy" — the original must still be there.
         assert video.exists()
+
+
+class TestSettingsRefresh:
+    """P1-C / H4: settings save must refresh Metadata tab providers + options."""
+
+    def test_sync_filename_options_loads_renamer_settings(self, tab):
+        from utils.settings_manager import get_settings_manager
+
+        sm = get_settings_manager()
+        sm.renamer.pattern = "{title} ({year})"
+        sm.renamer.replace_spaces = True
+        sm.renamer.lowercase = True
+        sm.renamer.remove_special = True
+        sm.renamer.preserve_extension = False
+
+        tab.sync_filename_options()
+
+        assert tab.pattern_input.text() == "{title} ({year})"
+        assert tab.replace_spaces_check.isChecked() is True
+        assert tab.lowercase_check.isChecked() is True
+        assert tab.remove_special_check.isChecked() is True
+        assert tab.preserve_extension_check.isChecked() is False
+
+    def test_refresh_providers_adds_keyed_provider_after_key_saved(self, tab):
+        from utils.settings_manager import get_settings_manager
+
+        assert tab.provider_combo.findData("tmdb") < 0
+
+        sm = get_settings_manager()
+        sm.conversion.tmdb_api_key = "test-tmdb-key"
+        tab.refresh_providers()
+
+        assert tab.provider_combo.findData("tmdb") >= 0
+
+    def test_on_settings_changed_refreshes_metadata_tab(
+        self, qapp, isolated_app_data, qt_widget
+    ):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        from app.main_window import MainWindow
+        from app.widgets.metadata_tab import MetadataTab
+        from utils.settings_manager import get_settings_manager
+
+        metadata_tab = qt_widget(MetadataTab(QThreadPool()))
+        assert metadata_tab.provider_combo.findData("omdb") < 0
+        assert metadata_tab.lowercase_check.isChecked() is False
+
+        sm = get_settings_manager()
+        sm.conversion.omdb_api_key = "test-omdb-key"
+        sm.renamer.lowercase = True
+        sm.renamer.replace_spaces = True
+        sm.renamer.pattern = "{title} - {episode_title}"
+
+        host = SimpleNamespace(
+            threadpool=MagicMock(),
+            subtitle_tab=None,
+            metadata_tab=metadata_tab,
+            _sync_metadata_api_keys=MagicMock(),
+        )
+        MainWindow._on_settings_changed(host)
+        host._sync_metadata_api_keys.assert_called_once()
+
+        assert metadata_tab.provider_combo.findData("omdb") >= 0
+        assert metadata_tab.lowercase_check.isChecked() is True
+        assert metadata_tab.replace_spaces_check.isChecked() is True
+        assert metadata_tab.pattern_input.text() == "{title} - {episode_title}"
