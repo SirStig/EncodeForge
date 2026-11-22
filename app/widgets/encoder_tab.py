@@ -13,7 +13,7 @@ from typing import Any, Dict
 
 import qtawesome as qta
 from PySide6.QtCore import Qt, QThreadPool, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
@@ -315,6 +315,7 @@ class EncoderTab(QWidget):
         # Enable context menu
         self.files_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.files_table.customContextMenuRequested.connect(self._show_context_menu)
+        self.files_table.enableDragDrop(self._drag_enter_event, self._drop_event)
         
         table_layout.addWidget(self.files_table, 1)  # Give table the stretch factor
         
@@ -488,6 +489,22 @@ class EncoderTab(QWidget):
             '.webm', '.m4v', '.mpg', '.mpeg', '.3gp'
         }
         return file_path.suffix.lower() in video_extensions
+
+    def _drag_enter_event(self, event: QDragEnterEvent):
+        """Accept file/folder URL drags onto the encoder queue."""
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def _drop_event(self, event: QDropEvent):
+        """Add dropped video files or folders to the encoder queue."""
+        urls = event.mimeData().urls()
+        for url in urls:
+            file_path = Path(url.toLocalFile())
+            if file_path.is_file() and self._is_video_file(file_path):
+                self._add_file_to_table(file_path)
+            elif file_path.is_dir():
+                self._add_folder_to_table(file_path)
+        event.acceptProposedAction()
     
     def _add_file_to_table(self, file_path: Path):
         """Add file to the single files table."""
