@@ -110,28 +110,10 @@ def _renamer_preview_settings_from_ui(renaming_settings: Dict[str, Any]) -> Dict
 
 
 def _subtitle_core_from_settings(subtitle_settings: Dict[str, Any]):
-    from core.encodeforge_core import EncodeForgeCore
-    from utils.settings_manager import get_settings_manager
+    """GUI compatibility wrapper — canonical helper lives in settings_manager."""
+    from utils.settings_manager import subtitle_core_from_settings
 
-    sm = get_settings_manager()
-    cs = sm.get_merged_conversion_settings()
-    langs = subtitle_settings.get("languages") or ["eng"]
-    cs.subtitle_languages = list(langs)
-
-    wm = subtitle_settings.get("whisper_model", "medium")
-    if isinstance(wm, str):
-        cs.whisper_model = wm.split()[0].strip().lower() if wm else "medium"
-    core = EncodeForgeCore(settings=cs)
-
-    # Honour the provider selection made in the Subtitles tab. It was being
-    # built by the UI and then dropped here, so deselecting providers had no
-    # effect and every configured provider was queried regardless.
-    providers = subtitle_settings.get("providers")
-    if providers and getattr(core, "subtitle_providers", None) is not None:
-        core.subtitle_providers.enabled_providers = list(providers)
-        logger.info(f"Subtitle providers restricted to: {providers}")
-
-    return core
+    return subtitle_core_from_settings(subtitle_settings)
 
 
 class WorkerSignals(QObject):

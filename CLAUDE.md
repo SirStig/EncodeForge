@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 EncodeForge is a PySide6 desktop application for video encoding, subtitle management, and media renaming. GUI and CLI share the same core business logic. The UI is a custom flat dark theme (not Fluent Design / PyQt-Fluent-Widgets). Active development targets the `0.5.0` line.
 
-CLI reality: `encode`, `rename`, and `gui` are implemented; `subtitle` is a stub that exits with status 2.
+CLI reality: `encode`, `subtitle`, `rename`, and `gui` are implemented.
 
 ## Commands
 

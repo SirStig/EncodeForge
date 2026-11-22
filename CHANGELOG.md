@@ -9,15 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **CLI `subtitle` command** — Download subtitles or generate them with Whisper (`--generate`), sharing the same settings merge as the Subtitles tab (saved language / model / providers, with `--language` / `--model` / `--provider` overrides).
+- **CLI `encode`** — Wired to `EncodeForgeCore` / `ConversionHandler` (codec, CRF, preset, optional NVENC/QSV/AMF, output path/dir, overwrite, recursive folder scan, `--dry-run`). Software encode is the default unless a hardware flag is set.
+- **VAAPI hardware encoding on Linux** — AMD and Intel GPUs on Linux can use `h264_vaapi` / `hevc_vaapi` (libva). Settings and Auto HW Accel expose a VAAPI backend; encode commands set `-vaapi_device` and `format=nv12,hwupload`.
+
 ### Security
 
 - **No bundled subtitle API keys** — OpenSubtitles and SubDL no longer ship a default consumer/API key in source. Provide your own key in Settings → Accounts, or set `ENCODEFORGE_OPENSUBTITLES_KEY` / `ENCODEFORGE_SUBDL_KEY`. The Subtitles tab banners and Settings fields explain when a key is missing; SubDL may still attempt its web-scraping fallback without a key.
 - **AniDB titles over HTTPS** — The anime-titles dump is fetched via `https://anidb.net/…`. AniDB’s XML detail API remains HTTP-only (`http://api.anidb.net:9001/httpapi`); that host has no working HTTPS endpoint (certificate/port mismatch), so EncodeForge keeps the documented cleartext URL for detail lookups only.
-
-### Added
-
-- **CLI `encode`** — Wired to `EncodeForgeCore` / `ConversionHandler` (codec, CRF, preset, optional NVENC/QSV/AMF, output path/dir, overwrite, recursive folder scan, `--dry-run`). Software encode is the default unless a hardware flag is set.
-- **VAAPI hardware encoding on Linux** — AMD and Intel GPUs on Linux can use `h264_vaapi` / `hevc_vaapi` (libva). Settings and Auto HW Accel expose a VAAPI backend; encode commands set `-vaapi_device` and `format=nv12,hwupload`.
 
 ### Fixed
 
@@ -109,7 +110,7 @@ First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line 
 ### Known limitations
 
 - Several subtitle scrapers (Podnapisi, SubDivX, Jimaku) target site layouts that have since changed. They are **quarantined**: shown as unavailable in the Subtitles tab and skipped during search until rewritten (no silent empty “success”).
-- CLI: `encode`, `rename`, and `gui` work and share `EncodeForgeCore` with the desktop app; `subtitle` is still a stub that exits with status 2 (use the GUI).
+- CLI: `encode`, `subtitle`, `rename`, and `gui` work and share `EncodeForgeCore` with the desktop app.
 - Theme Light/Auto, app language, toolbar, and two-pass encoding are not offered in Settings until implemented; status bar visibility is wired.
 - Screenshots under `docs/screenshots/` are legacy menu-bar / three-table captures (see `docs/screenshots/README.md`); the shipping UI is frameless sidebar + flat dark tokens.
 
