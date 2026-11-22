@@ -65,9 +65,9 @@ class TestMatchPickerDialog:
 
 class TestMetadataTabMatchLock:
     @pytest.fixture
-    def tab(self, qapp, isolated_app_data):
+    def tab(self, qapp, isolated_app_data, qt_widget):
         from app.widgets.metadata_tab import MetadataTab
-        return MetadataTab(QThreadPool())
+        return qt_widget(MetadataTab(QThreadPool()))
 
     def test_manual_match_locks_the_row_against_bulk_refetch(self, tab, qapp, tmp_path):
         video = tmp_path / "Show.S01E05.1080p.mkv"

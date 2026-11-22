@@ -20,9 +20,9 @@ from PySide6.QtWidgets import QMessageBox, QTableWidgetItem  # noqa: E402
 
 
 @pytest.fixture
-def tab(qapp, isolated_app_data):
+def tab(qapp, isolated_app_data, qt_widget):
     from app.widgets.metadata_tab import MetadataTab
-    return MetadataTab(QThreadPool())
+    return qt_widget(MetadataTab(QThreadPool()))
 
 
 def _seed_row(tab, file_path: Path, metadata: dict):
