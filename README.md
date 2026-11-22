@@ -33,7 +33,7 @@ Encoding is GPU-accelerated wherever your hardware allows it, and AI subtitle tr
 - **Hardware Accelerated** — Leverage your GPU for fast encoding via NVENC, AMF, Quick Sync, or VideoToolbox
 - **AI Subtitles** — Local transcription via faster-whisper with GPU acceleration; no cloud required
 - **Smart Renaming** — Pull metadata from 8 sources and rename your library in seconds
-- **Modern UI** — A custom dark glassmorphism interface built natively in PySide6
+- **Modern UI** — A custom flat dark interface built natively in PySide6
 - **Scriptable** — Batch-rename from the command line with `cli.py rename`, sharing the same engine as the GUI
 - **Cross-Platform** — Windows, macOS, and Linux
 
@@ -61,8 +61,8 @@ Encoding is GPU-accelerated wherever your hardware allows it, and AI subtitle tr
 
 - **Local AI Transcription** — faster-whisper with GPU acceleration; runs completely offline
 - **90+ Languages** — Full multilingual transcription support
-- **8 Download Providers** — OpenSubtitles, Addic7ed, SubDL, Subf2m, YIFY, Podnapisi, SubDivX, Jimaku
-- **Anime Support** — Jimaku provider for English/Japanese anime subtitles
+- **8 Download Providers** — OpenSubtitles, Addic7ed, SubDL, Subf2m, YIFY, Podnapisi, SubDivX, Jimaku (Podnapisi, SubDivX, and Jimaku may return no results — site layouts changed; see CHANGELOG known limitations)
+- **Anime Support** — AniDB / Kitsu / Jikan for metadata; Jimaku is listed for anime subs but is currently unreliable
 - **Format Support** — SRT, ASS, SSA, VTT, and more
 
 ### Smart File Renaming
@@ -75,8 +75,8 @@ Encoding is GPU-accelerated wherever your hardware allows it, and AI subtitle tr
 
 ### Modern Interface
 
-- **Glassmorphism Design** — Clean, modern tabbed layout with translucent panels
-- **Dark Theme** — Tuned for long sessions (light/auto themes are in progress — see [Roadmap](#roadmap))
+- **Flat Dark Design** — Clean, modern tabbed layout with a frameless sidebar chrome
+- **Dark Theme** — Tuned for long sessions (Light/Auto selectors exist in Settings but are not wired — see [Roadmap](#roadmap))
 - **Real-Time Progress** — Detailed per-file and overall progress tracking
 - **Queue Management** — Add, reorder, and remove jobs at any time
 - **Comprehensive Logging** — Exportable logs for troubleshooting
@@ -123,10 +123,12 @@ python build_nuitka.py
 1. Launch EncodeForge (`python main.py` or run the downloaded binary)
 2. On first launch, the app will help you locate or download FFmpeg
 3. Pick a tab — **Encoder**, **Subtitles**, or **Renamer**
-4. Add files via drag-and-drop or the file browser
+4. Add files via the file browser (sidebar **Add Files** / **Add Folder**; Renamer also accepts drag-and-drop)
 5. Configure your settings and click **Start**
 
 That's it. Most options have sensible defaults, so you can dive straight in.
+
+> **Note:** Screenshots on the [project site](https://sirstig.github.io/EncodeForge/#screenshots) (`docs/screenshots/`) show an older menu-bar UI, not the current frameless sidebar layout.
 
 ### Scripting Renames from the CLI
 
@@ -188,19 +190,21 @@ EncodeForge auto-detects available GPU encoders on startup:
 
 ## Roadmap
 
-- ✅ Modern glassmorphism desktop UI
+- ✅ Flat dark PySide6 desktop UI
 - ✅ GPU-accelerated faster-whisper for local AI subtitles
 - ✅ Shared core backend (GUI & CLI)
 - ✅ Nuitka compilation for all platforms
 - ✅ Scriptable CLI renaming (`cli.py rename`)
-- ⏳ CLI support for `encode` and `subtitle` commands
+- ⏳ CLI support for `encode` and `subtitle` commands (stubs today; use the GUI)
 - ⏳ Light & Auto theme options (selector exists in Settings; not yet wired up)
+- ⏳ Two-pass encoding (setting saved but not applied)
 - ⏳ Enhanced concurrent task processing
 - ⏳ Plugin system architecture
 - ⏳ Jellyfin & Plex direct integration
 - ⏳ Advanced subtitle synchronization
-- ⏳ Metadata artwork grabber
+- ⏳ Metadata artwork grabber (Fanart.tv key field exists; no provider yet)
 - ⏳ Subtitle preview window
+- ⏳ Fix or retire broken subtitle scrapers (Podnapisi, SubDivX, Jimaku)
 
 ---
 

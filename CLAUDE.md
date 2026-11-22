@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EncodeForge is a PySide6 desktop application for video encoding, subtitle management, and media renaming. It supports both a GUI and a CLI interface that share the same core business logic. The project is currently in a `pyside-refactor` branch, actively migrating and rebuilding the UI with modern Fluent Design.
+EncodeForge is a PySide6 desktop application for video encoding, subtitle management, and media renaming. GUI and CLI share the same core business logic. The UI is a custom flat dark theme (not Fluent Design / PyQt-Fluent-Widgets). Active development targets the `0.5.0` line.
+
+CLI reality: `rename` and `gui` are implemented; `encode` and `subtitle` are stubs that exit with status 2.
 
 ## Commands
 
@@ -62,7 +64,7 @@ The application is organized into four layers:
 - `metadata/`: 8+ providers (TMDB, TVDB, OMDB, Trakt, Kitsu, Jikan, AniDB, TVmaze). The `MetadataGrabber` in `core/metadata_grabber.py` aggregates them.
 - `subtitle/`: 8+ providers (OpenSubtitles, Addic7ed, Jimaku, SubDL, etc.) plus `whisper_manager.py` for AI-based local subtitle generation. Aggregated in `core/subtitle_manager.py`.
 
-**Utility Layer (`utils/`)** — Cross-cutting concerns: `ffmpeg_manager.py` (FFmpeg detection/path), `gpu_detector.py` (NVENC/AMF/QSV/VideoToolbox detection), `settings_manager.py` (JSON-backed dataclass config), `theme_manager.py` (glassmorphism CSS theming), `workers.py` (QThread worker pool), `download_manager.py` (resumable downloads with hash verification).
+**Utility Layer (`utils/`)** — Cross-cutting concerns: `ffmpeg_manager.py` (FFmpeg detection/path), `gpu_detector.py` (NVENC/AMF/QSV/VideoToolbox detection), `settings_manager.py` (JSON-backed dataclass config), `theme_manager.py` (flat dark CSS theming; Light/Auto settings are not wired), `workers.py` (QThread worker pool), `download_manager.py` (resumable downloads with hash verification).
 
 ### Key Patterns
 
