@@ -238,6 +238,7 @@ class TestEncoderSelection:
         settings = ConversionSettings()
         settings.use_nvenc = flags.get("nvenc", False)
         settings.use_amf = flags.get("amf", False)
+        settings.use_vaapi = flags.get("vaapi", False)
         settings.use_qsv = flags.get("qsv", False)
         settings.use_videotoolbox = flags.get("vt", False)
 
@@ -265,6 +266,17 @@ class TestEncoderSelection:
         result = self._select(["h264_amf", "hevc_amf"], is_10bit=False, amf=True)
         assert result["codec"] == "h264_amf"
         assert result["platform"] == "amd"
+
+    def test_vaapi_selected_on_linux_path(self):
+        result = self._select(["h264_vaapi", "hevc_vaapi"], is_10bit=False, vaapi=True)
+        assert result["codec"] == "h264_vaapi"
+        assert result["platform"] == "vaapi"
+
+    def test_qsv_preferred_over_vaapi_when_both_enabled(self):
+        result = self._select(
+            ["h264_vaapi", "h264_qsv"], is_10bit=False, vaapi=True, qsv=True
+        )
+        assert result["codec"] == "h264_qsv"
 
     def test_disabled_hardware_falls_back_to_software(self):
         result = self._select(["h264_amf", "hevc_amf"], is_10bit=False)
@@ -764,12 +776,14 @@ class TestWorkerBehaviour:
 
 
 @pytest.mark.parametrize("backend,expected", [
-    ("NVENC (NVIDIA)", (True, False, False, False)),
-    ("AMF (AMD)", (False, True, False, False)),
-    ("QSV (Intel)", (False, False, True, False)),
-    ("VideoToolbox (Apple)", (False, False, False, True)),
-    ("Auto", (True, True, True, True)),
-    ("None", (False, False, False, False)),
+    # (nvenc, amf, vaapi, qsv, videotoolbox)
+    ("NVENC (NVIDIA)", (True, False, False, False, False)),
+    ("AMF (AMD)", (False, True, False, False, False)),
+    ("VAAPI (Linux)", (False, False, True, False, False)),
+    ("QSV (Intel)", (False, False, False, True, False)),
+    ("VideoToolbox (Apple)", (False, False, False, False, True)),
+    ("Auto", (True, True, True, True, True)),
+    ("None", (False, False, False, False, False)),
 ])
 def test_hardware_backend_selection(backend, expected):
     """Every backend used to map to NVENC regardless of what the user picked."""
@@ -779,8 +793,13 @@ def test_hardware_backend_selection(backend, expected):
     settings = merge_encoder_ui_into_conversion_settings(
         ConversionSettings(), {"hw_accel": True, "hw_accel_backend": backend}
     )
-    actual = (settings.use_nvenc, settings.use_amf,
-              settings.use_qsv, settings.use_videotoolbox)
+    actual = (
+        settings.use_nvenc,
+        settings.use_amf,
+        settings.use_vaapi,
+        settings.use_qsv,
+        settings.use_videotoolbox,
+    )
     assert actual == expected
 
 
@@ -791,8 +810,13 @@ def test_hardware_disabled_clears_all_backends():
     settings = merge_encoder_ui_into_conversion_settings(
         ConversionSettings(), {"hw_accel": False, "hw_accel_backend": "AMF (AMD)"}
     )
-    assert not any([settings.use_nvenc, settings.use_amf,
-                    settings.use_qsv, settings.use_videotoolbox])
+    assert not any([
+        settings.use_nvenc,
+        settings.use_amf,
+        settings.use_vaapi,
+        settings.use_qsv,
+        settings.use_videotoolbox,
+    ])
 
 
 # --------------------------------------------------------------------------- #

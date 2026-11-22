@@ -412,8 +412,10 @@ class FFmpegManager:
             hw_encoders = [
                 ("h264_nvenc", "NVIDIA H.264"),
                 ("hevc_nvenc", "NVIDIA H.265"),
-                ("h264_amf", "AMD H.264"),
-                ("hevc_amf", "AMD H.265"),
+                ("h264_amf", "AMD AMF H.264"),
+                ("hevc_amf", "AMD AMF H.265"),
+                ("h264_vaapi", "VAAPI H.264"),
+                ("hevc_vaapi", "VAAPI H.265"),
                 ("h264_qsv", "Intel Quick Sync H.264"),
                 ("hevc_qsv", "Intel Quick Sync H.265"),
                 ("h264_videotoolbox", "Apple VideoToolbox H.264"),
@@ -461,6 +463,32 @@ class FFmpegManager:
                 "null",
                 "-",
             ]
+
+            # VAAPI needs a DRM device and an upload filter; bare -c:v fails.
+            if encoder_name.endswith("_vaapi"):
+                from utils.gpu_detector import find_vaapi_device
+
+                device = find_vaapi_device()
+                if not device:
+                    self._encoder_test_cache[encoder_name] = (False, time.time())
+                    return False
+                cmd = [
+                    path,
+                    "-vaapi_device",
+                    device,
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "color=black:size=320x240:duration=0.1",
+                    "-vf",
+                    "format=nv12,hwupload",
+                    "-c:v",
+                    encoder_name,
+                    "-f",
+                    "null",
+                    "-",
+                ]
+
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=5
             )
@@ -594,6 +622,7 @@ class FFmpegManager:
         vendors = (
             ("nvenc", ["cuda", "cuvid"], "nvenc"),
             ("amf", ["amf"], "amf"),
+            ("vaapi", ["vaapi"], "vaapi"),
             ("qsv", ["qsv"], "qsv"),
             ("videotoolbox", ["videotoolbox"], "videotoolbox"),
         )
@@ -652,14 +681,25 @@ class FFmpegManager:
         if hardware_info is None:
             hardware_info = self.detect_hardware()
         available = self._version_info.get("encoders", [])
+        # Priority: NVIDIA > AMD AMF (Win) / VAAPI (Linux) > Intel QSV > Apple > software
         if hardware_info["gpu"]["nvidia"] and "NVIDIA H.264" in available:
             return "h264_nvenc"
-        if hardware_info["gpu"]["amd"] and "AMD H.264" in available:
-            return "h264_amf"
-        if hardware_info["cpu"]["supports_qsv"] and "Intel Quick Sync H.264" in available:
+        if hardware_info["gpu"]["amd"]:
+            if "AMD AMF H.264" in available or "AMD H.264" in available:
+                return "h264_amf"
+            if "VAAPI H.264" in available:
+                return "h264_vaapi"
+        if (
+            (hardware_info["cpu"]["supports_qsv"] or hardware_info["gpu"]["intel"])
+            and "Intel Quick Sync H.264" in available
+        ):
             return "h264_qsv"
+        if hardware_info["gpu"]["intel"] and "VAAPI H.264" in available:
+            return "h264_vaapi"
         if hardware_info["gpu"]["apple"] and "Apple VideoToolbox H.264" in available:
             return "h264_videotoolbox"
+        if "VAAPI H.264" in available:
+            return "h264_vaapi"
         return "libx264"
 
     # ------------------------------------------------------------------ #

@@ -21,13 +21,15 @@ class ConversionSettings:
     nvenc_preset: str = "p4"
     nvenc_cq: int = 23
     nvenc_codec: str = "h264_nvenc"  # Default to H.264 NVENC
-    use_amf: bool = False  # AMD
+    use_amf: bool = False  # AMD AMF (Windows)
     amf_qp: int = 23  # AMD quality parameter
     amf_preset: str = "balanced"  # AMD preset
-    use_qsv: bool = False  # Intel Quick Sync
+    use_vaapi: bool = False  # VAAPI (Linux AMD/Intel)
+    vaapi_qp: int = 23  # VAAPI constant QP
+    use_qsv: bool = False  # Intel Quick Sync (Windows/Linux)
     qsv_quality: int = 23  # Intel quality parameter
     qsv_preset: str = "medium"  # Intel preset
-    use_videotoolbox: bool = False  # Apple
+    use_videotoolbox: bool = False  # Apple VideoToolbox (macOS)
     videotoolbox_bitrate: str = "5M"  # Apple bitrate
     
     # Subtitle options

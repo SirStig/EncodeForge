@@ -44,6 +44,7 @@ def merge_encoder_ui_into_conversion_settings(settings, encoder_settings: Dict[s
         backend_flags = {
             "nvenc": "use_nvenc",
             "amf": "use_amf",
+            "vaapi": "use_vaapi",
             "qsv": "use_qsv",
             "videotoolbox": "use_videotoolbox",
         }
