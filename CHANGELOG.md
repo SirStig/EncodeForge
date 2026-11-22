@@ -77,7 +77,7 @@ First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line 
 
 ### Known limitations
 
-- Several subtitle scrapers (Podnapisi, SubDivX, Jimaku) target site layouts that have since changed and may return no results. They fail quietly rather than erroring.
+- Several subtitle scrapers (Podnapisi, SubDivX, Jimaku) target site layouts that have since changed. They are **quarantined**: shown as unavailable in the Subtitles tab and skipped during search until rewritten (no silent empty “success”).
 - CLI: `rename` and `gui` work and share `EncodeForgeCore` with the desktop app; `encode` and `subtitle` are stubs that exit with status 2 (use the GUI for those).
 - Theme selection (Light/Auto), two-pass encoding, toolbar/statusbar toggles, and a few other settings are still displayed but not yet wired up.
 - Fanart.tv appears in Settings (API key field) but has no provider implementation; artwork grab from Fanart is not available.

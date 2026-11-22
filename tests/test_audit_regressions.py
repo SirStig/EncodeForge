@@ -725,16 +725,19 @@ class TestProviderSelection:
         from core.subtitle_manager import SubtitleProviders
         providers = SubtitleProviders()
         assert providers.is_provider_enabled("OpenSubtitles.com") is True
-        assert providers.is_provider_enabled("Jimaku") is True
+        # Quarantined scrapers stay listed for honesty but are never queried.
+        assert providers.is_provider_enabled("Jimaku") is False
+        assert providers.is_provider_enabled("Podnapisi") is False
+        assert providers.is_provider_enabled("SubDivX") is False
 
     def test_restriction_is_honoured(self):
         from core.subtitle_manager import SubtitleProviders
         providers = SubtitleProviders()
-        providers.enabled_providers = ["Jimaku"]
+        providers.enabled_providers = ["SubDL"]
 
-        assert providers.is_provider_enabled("Jimaku") is True
+        assert providers.is_provider_enabled("SubDL") is True
         assert providers.is_provider_enabled("OpenSubtitles.com") is False
-        assert providers.is_provider_enabled("SubDL") is False
+        assert providers.is_provider_enabled("Addic7ed") is False
 
     def test_ui_label_matches_internal_name(self):
         """The UI says "OpenSubtitles"; the manager calls it "OpenSubtitles.com"."""

@@ -8,6 +8,12 @@ from .base_provider import BaseSubtitleProvider
 from .jimaku_provider import JimakuProvider
 from .opensubtitles_manager import OpenSubtitlesManager
 from .podnapisi_provider import PodnapisiProvider
+from .provider_status import (
+    PROVIDER_CATALOG,
+    QUARANTINED_PROVIDERS,
+    is_provider_quarantined,
+    ui_provider_entries,
+)
 from .subdivx_provider import SubDivXProvider
 from .subdl_provider import SubDLProvider
 from .subf2m_provider import Subf2mProvider
@@ -24,6 +30,10 @@ __all__ = [
     'PodnapisiProvider',
     'SubDivXProvider',
     'OpenSubtitlesManager',
-    'WhisperManager'
+    'WhisperManager',
+    'PROVIDER_CATALOG',
+    'QUARANTINED_PROVIDERS',
+    'is_provider_quarantined',
+    'ui_provider_entries',
 ]
 

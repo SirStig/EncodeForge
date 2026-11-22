@@ -286,6 +286,19 @@ class SubtitleHandler:
                     "filename": result.get("file_name", "")
                 })
             
+            if not results:
+                # Do not report empty as success — callers must surface a message.
+                return {
+                    "status": "empty",
+                    "message": (
+                        "No subtitles found from available providers. "
+                        "Try other languages, or use Whisper to generate subtitles."
+                    ),
+                    "count": 0,
+                    "subtitles": [],
+                    "complete": True,
+                }
+
             return {
                 "status": "success",
                 "message": f"Found {len(results)} subtitle(s)",
@@ -343,6 +356,17 @@ class SubtitleHandler:
                     "filename": result.get("filename", "")
                 })
             
+            if not results:
+                return {
+                    "status": "empty",
+                    "message": (
+                        "Advanced search found no subtitles from available providers. "
+                        "Try other languages, or use Whisper to generate subtitles."
+                    ),
+                    "count": 0,
+                    "subtitles": [],
+                }
+
             return {
                 "status": "success",
                 "message": f"Advanced search found {len(results)} unique subtitle(s)",
@@ -426,11 +450,11 @@ class SubtitleHandler:
             
             # Search for subtitles
             search_results = self.search_subtitles(video_path, languages)
-            
-            if search_results["status"] != "success" or search_results["count"] == 0:
+
+            if search_results.get("count", 0) == 0 or search_results.get("status") != "success":
                 return {
                     "status": "error",
-                    "message": "No subtitles found",
+                    "message": search_results.get("message") or "No subtitles found",
                     "subtitles_downloaded": []
                 }
             
