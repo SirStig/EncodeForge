@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - **No bundled subtitle API keys** — OpenSubtitles and SubDL no longer ship a default consumer/API key in source. Provide your own key in Settings → Accounts, or set `ENCODEFORGE_OPENSUBTITLES_KEY` / `ENCODEFORGE_SUBDL_KEY`. The Subtitles tab banners and Settings fields explain when a key is missing; SubDL may still attempt its web-scraping fallback without a key.
+- **AniDB titles over HTTPS** — The anime-titles dump is fetched via `https://anidb.net/…`. AniDB’s XML detail API remains HTTP-only (`http://api.anidb.net:9001/httpapi`); that host has no working HTTPS endpoint (certificate/port mismatch), so EncodeForge keeps the documented cleartext URL for detail lookups only.
 
 ### Added
 
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`pip install` missing styles/icons** — `package_data` used an empty-string key with no `MANIFEST.in`, so wheels and sdists omitted `resources/`. Added `MANIFEST.in`, a `resources` package, proper `package_data`, and a `pyproject.toml` build backend so CSS and icons install under `site-packages/resources/`.
 - **Intel GPU detection on Linux** — `_detect_intel` only queried Windows WMI/PowerShell. Linux now reads PCI vendor `0x8086` from `/sys/class/drm` (same path AMD already used).
+- **Fonts on non-Windows** — Splash and Logs no longer hard-require Segoe UI / Consolas. UI and mono helpers pick OS-appropriate faces (SF Pro / Helvetica Neue / Ubuntu / Noto; Menlo / DejaVu Sans Mono) with fallbacks, and the base theme CSS carries the same stack.
 
 ### Changed
 
@@ -28,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test foundation (P3-D)** — Unit CI now enforces `--cov=core --cov=utils --cov-fail-under=30`, locks C1/C2 via `audit_c1`/`audit_c2` markers, and adds Encoder/Subtitle widget smoke tests. A scheduled/on-demand workflow runs the FFmpeg integration suite that the PR matrix still excludes.
 - **GPU / encoder OS matrix documented** — README, CLAUDE.md, and encoder docs spell out NVENC (all), AMF (Windows), VAAPI (Linux), QSV (Windows/Linux), VideoToolbox (macOS).
 - **Removed leftover PyTorch helpers** from `utils/gpu_detector.py` (`recommend_torch_variant`, `get_torch_install_command`). Whisper uses faster-whisper / CTranslate2.
+- **FFmpeg Apple Silicon download** — In-app download uses `eugeneware/ffmpeg-static` `darwin-arm64` / `darwin-x64` binaries (not evermeet). Linux aarch64 already maps to johnvansickle’s arm64 static build; README and packaging scripts note that official CI packages remain x86_64 while local ARM packaging is supported.
 
 ---
 
@@ -96,7 +99,7 @@ First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line 
 - **Packaging** — `pip install .` now ships the entry-point modules; previously all three console scripts failed with `ModuleNotFoundError`.
 - **CI** — Now runs the test suite on every branch across Linux, macOS, and Windows. The macOS workflow, which still built a JavaFX/Maven project that no longer exists, was replaced with one that builds the current app.
 - **API keys** — The bundled OpenSubtitles and SubDL keys can be overridden via `ENCODEFORGE_OPENSUBTITLES_KEY` and `ENCODEFORGE_SUBDL_KEY`. A user-supplied OpenSubtitles key is now actually used; previously the bundled key always took precedence. Keys are no longer written to debug logs.
-- **OMDb and AniDB** are now contacted over HTTPS.
+- **OMDb** is contacted over HTTPS. **AniDB** titles dump uses HTTPS; the AniDB XML detail API remains HTTP-only (AniDB limitation).
 - **Release process** — `prepare_release.sh`, which only printed instructions, is now `RELEASING.md`.
 
 ### Known limitations

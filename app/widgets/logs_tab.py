@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Signal
-from PySide6.QtGui import QFont, QTextCursor
+from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from core import path_manager
+from utils.platform_fonts import mono_font
 
 logger = logging.getLogger(__name__)
 
@@ -124,11 +125,8 @@ class LogsTab(QWidget):
         self.log_display.setReadOnly(True)
         self.log_display.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         
-        # Set monospace font
-        font = QFont("Consolas", 9)
-        if not font.exactMatch():
-            font = QFont("Courier New", 9)
-        self.log_display.setFont(font)
+        # OS-aware monospace stack (Consolas / Menlo / DejaVu Sans Mono, …)
+        self.log_display.setFont(mono_font(9))
         
         log_layout.addWidget(self.log_display)
         layout.addWidget(log_group)

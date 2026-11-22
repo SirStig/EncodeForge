@@ -16,8 +16,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
-# Platform download URLs (Apple Silicon aware). Kept in one place so the setup
-# dialog and EncodeForgeCore.download_ffmpeg share the same story.
+# Platform download URLs. Kept in one place so the setup dialog and
+# EncodeForgeCore.download_ffmpeg share the same story.
+# - macOS: eugeneware/ffmpeg-static ships separate darwin-arm64 (Apple Silicon)
+#   and darwin-x64 binaries (evermeet.cx was Intel-oriented / version-pinned).
+# - Linux: johnvansickle static builds for amd64 and arm64 (aarch64).
+# - Windows: Gyan essentials zip.
 _STATIC_BASE = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1"
 
 

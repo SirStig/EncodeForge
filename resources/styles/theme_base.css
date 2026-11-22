@@ -18,6 +18,9 @@ QWidget {
     background-color: transparent;
     color: #cccccc;
     font-size: 12px;
+    /* Windows → macOS → Linux common UI faces; Qt picks the first installed. */
+    font-family: "Segoe UI", ".AppleSystemUIFont", "SF Pro Text", "Helvetica Neue",
+        "Ubuntu", "Noto Sans", "DejaVu Sans", sans-serif;
 }
 
 /* ─── SIDEBAR ───────────────────────────── */

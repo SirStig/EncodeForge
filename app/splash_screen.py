@@ -11,6 +11,8 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap, QPalette, QColor, QFont
 from pathlib import Path
 
+from utils.platform_fonts import ui_font
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,24 +60,21 @@ class SplashScreen(QWidget):
         # Logo/App name
         title_label = QLabel("EncodeForge")
         title_label.setAlignment(Qt.AlignCenter)
-        title_font = QFont("Segoe UI", 36, QFont.Bold)
-        title_label.setFont(title_font)
+        title_label.setFont(ui_font(36, QFont.Weight.Bold))
         title_label.setObjectName("title_label")
         layout.addWidget(title_label)
         
         # Version
         version_label = QLabel(f"Version {APP_VERSION}")
         version_label.setAlignment(Qt.AlignCenter)
-        version_font = QFont("Segoe UI", 12)
-        version_label.setFont(version_font)
+        version_label.setFont(ui_font(12))
         version_label.setObjectName("version_label")
         layout.addWidget(version_label)
         
         # Status label
         self.status_label = QLabel("Initializing...")
         self.status_label.setAlignment(Qt.AlignCenter)
-        status_font = QFont("Segoe UI", 11)
-        self.status_label.setFont(status_font)
+        self.status_label.setFont(ui_font(11))
         self.status_label.setObjectName("status_label")
         layout.addWidget(self.status_label)
         
@@ -89,8 +88,7 @@ class SplashScreen(QWidget):
         # Tagline
         tagline_label = QLabel("Video Encoding • Subtitles • Smart Renaming")
         tagline_label.setAlignment(Qt.AlignCenter)
-        tagline_font = QFont("Segoe UI", 10)
-        tagline_label.setFont(tagline_font)
+        tagline_label.setFont(ui_font(10))
         tagline_label.setObjectName("tagline_label")
         layout.addWidget(tagline_label)
         

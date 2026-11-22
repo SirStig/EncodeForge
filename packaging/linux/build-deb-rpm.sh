@@ -34,6 +34,9 @@ mkdir -p "${STAGE}/usr/share/applications" "${STAGE}/usr/share/pixmaps"
 cp "${ROOT}/packaging/linux/encodeforge.desktop" "${STAGE}/usr/share/applications/encodeforge.desktop"
 cp "${ROOT}/resources/icons/app-icon.png" "${STAGE}/usr/share/pixmaps/encodeforge.png"
 
+# Official GitHub Actions packages are x86_64 only. Running this script on an
+# aarch64 host produces arm64 .deb / native-arch .rpm artifacts for local or
+# self-hosted ARM releases — CI does not publish those yet.
 ARCH="$(uname -m)"
 FPM_ARCH="${ARCH}"
 [[ "${ARCH}" == "x86_64" ]] && FPM_ARCH="amd64"

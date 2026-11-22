@@ -14,6 +14,9 @@ if [[ -z "${DIST}" || ! -d "${DIST}" ]]; then
   exit 1
 fi
 
+# Official CI AppImages are x86_64. On aarch64 this script fetches the matching
+# appimagetool-${ARCH} and emits an ARM AppImage; that path is supported for
+# local/self-hosted builds but is not part of the published release matrix yet.
 ARCH="$(uname -m)"
 
 # Nuitka's standalone mode never bundles glibc itself (doing so is broadly

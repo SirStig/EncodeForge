@@ -390,6 +390,46 @@ def test_download_urls_matrix_is_platform_aware():
         assert urls["ffprobe_url"]
 
 
+@pytest.mark.parametrize(
+    "system,machine,url_substr,direct",
+    [
+        ("Darwin", "arm64", "ffmpeg-darwin-arm64", True),
+        ("Darwin", "x86_64", "ffmpeg-darwin-x64", True),
+        ("Linux", "aarch64", "ffmpeg-release-arm64-static", False),
+        ("Linux", "x86_64", "ffmpeg-release-amd64-static", False),
+        ("Windows", "AMD64", "ffmpeg-7.1-essentials_build.zip", False),
+    ],
+)
+def test_download_urls_select_arch(monkeypatch, system, machine, url_substr, direct):
+    """P4-C: Apple Silicon + Linux aarch64 get distinct download URLs."""
+    import platform
+
+    from utils.ffmpeg_manager import get_download_urls
+
+    monkeypatch.setattr(platform, "system", lambda: system)
+    monkeypatch.setattr(platform, "machine", lambda: machine)
+    urls = get_download_urls()
+    assert urls["supported"] is True
+    assert urls["system"] == system
+    assert url_substr in urls["url"]
+    assert urls["direct_binary"] is direct
+    if direct:
+        assert urls["ffprobe_url"]
+        assert "ffprobe-darwin-" in urls["ffprobe_url"]
+        assert ("arm64" if "arm" in machine else "x64") in urls["ffprobe_url"]
+    else:
+        assert urls["ffprobe_url"] is None
+
+
+def test_anidb_uses_https_for_titles_http_for_api():
+    """P4-C: titles dump is HTTPS; detail API remains HTTP-only (AniDB limit)."""
+    from core.providers.metadata.anidb_provider import AniDBProvider
+
+    assert AniDBProvider.TITLES_URL.startswith("https://")
+    assert AniDBProvider.API_URL.startswith("http://")
+    assert AniDBProvider.API_URL.startswith("https://") is False
+
+
 def test_java_embed_path_removed_from_unified_manager():
     """P2-A: FFMPEG_RUNTIME_DIR / Java bridge embed path must not exist."""
     import inspect

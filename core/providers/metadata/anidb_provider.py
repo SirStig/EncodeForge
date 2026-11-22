@@ -28,9 +28,13 @@ logger = logging.getLogger(__name__)
 class AniDBProvider(BaseMetadataProvider):
     """AniDB (anime database) provider using HTTP API"""
 
+    # AniDB's XML detail API is HTTP-only (api.anidb.net:9001). HTTPS on that
+    # host fails certificate/port checks — see wiki.anidb.net/HTTP_API_Definition
+    # and HTTPS Everywhere (api.anidb.net listed as mismatch). Prefer HTTPS for
+    # every other AniDB URL we touch (titles dump below).
     API_URL = "http://api.anidb.net:9001/httpapi"
-    # HTTPS: the response is gzip-decompressed and XML-parsed, so an on-path
-    # attacker would otherwise control the bytes fed to both.
+    # Titles dump is served over HTTPS; search hits this first, so most traffic
+    # never needs the cleartext detail API until a match AID is known.
     TITLES_URL = "https://anidb.net/api/anime-titles.xml.gz"
     # Registered AniDB client credentials
     # See: https://wiki.anidb.net/HTTP_API_Definition
