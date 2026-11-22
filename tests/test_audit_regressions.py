@@ -10,6 +10,7 @@ import json
 import tarfile
 import zipfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -842,3 +843,105 @@ class TestVersionConsistency:
         assert f"## [{__version__}]" in changelog, (
             f"CHANGELOG.md has no section for {__version__}"
         )
+
+
+# --------------------------------------------------------------------------- #
+# C1 — GUI "auto"/"all" must expand like CLI "automatic"
+# --------------------------------------------------------------------------- #
+
+class TestProviderTokenNormalization:
+    """GUI/settings emit auto/all; handler used to only expand automatic."""
+
+    @pytest.mark.parametrize("token", ["auto", "all", "automatic", "Auto", " ALL "])
+    def test_normalize_selected_provider_maps_expand_all_tokens(self, token):
+        from core.handlers.renaming_handler import normalize_selected_provider
+
+        assert normalize_selected_provider(token) == "automatic"
+
+    def test_normalize_leaves_specific_provider(self):
+        from core.handlers.renaming_handler import normalize_selected_provider
+
+        assert normalize_selected_provider("tmdb") == "tmdb"
+        assert normalize_selected_provider("TVDB") == "tvdb"
+
+    @pytest.mark.parametrize("token", ["auto", "all", "automatic"])
+    def test_selected_provider_auto_expands_to_multiple_providers(self, token):
+        """Regression for C1: GUI default provider=\"auto\" must try free
+        providers, not treat the literal token as a provider id."""
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+
+        renamer = MagicMock()
+        renamer.detect_media_type.return_value = "tv"
+        renamer.parse_tv_filename.return_value = {
+            "title": "Show",
+            "season": 1,
+            "episode": 1,
+        }
+
+        def fake_search(title, season, episode, provider=None):
+            return {
+                "show_title": "Show",
+                "season": season,
+                "episode": episode,
+                "episode_title": f"via-{provider}",
+                "source": provider,
+            }
+
+        renamer.search_tv_show.side_effect = fake_search
+
+        handler = RenamingHandler(ConversionSettings(), renamer)
+        result = handler.preview_rename(
+            ["Show.S01E01.mkv"],
+            settings_dict={"selected_provider": token},
+        )
+
+        assert result["status"] == "success"
+        providers_called = [
+            call.kwargs.get("provider") for call in renamer.search_tv_show.call_args_list
+        ]
+        # Must not treat the expand-all token as a single provider id.
+        assert token.lower() not in providers_called
+        assert "auto" not in providers_called
+        assert "all" not in providers_called
+        assert "automatic" not in providers_called
+        # Free providers (no API key) are always attempted when expanding.
+        assert "tvmaze" in providers_called
+        assert "anidb" in providers_called
+        assert len(providers_called) > 1
+
+    def test_specific_provider_does_not_expand(self):
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+
+        renamer = MagicMock()
+        renamer.detect_media_type.return_value = "tv"
+        renamer.parse_tv_filename.return_value = {
+            "title": "Show",
+            "season": 1,
+            "episode": 1,
+        }
+        renamer.search_tv_show.return_value = {
+            "show_title": "Show",
+            "season": 1,
+            "episode": 1,
+            "episode_title": "Only",
+            "source": "tvmaze",
+        }
+
+        handler = RenamingHandler(ConversionSettings(), renamer)
+        handler.preview_rename(
+            ["Show.S01E01.mkv"],
+            settings_dict={"selected_provider": "tvmaze"},
+        )
+
+        providers_called = [
+            call.kwargs.get("provider") for call in renamer.search_tv_show.call_args_list
+        ]
+        assert providers_called == ["tvmaze"]
+
+    def test_worker_maps_gui_auto_to_automatic(self):
+        from utils.workers import _renamer_preview_settings_from_ui
+
+        d = _renamer_preview_settings_from_ui({"provider": "auto"})
+        assert d["selected_provider"] == "automatic"

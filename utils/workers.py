@@ -89,17 +89,20 @@ def merge_encoder_ui_into_conversion_settings(settings, encoder_settings: Dict[s
 
 
 def _renamer_preview_settings_from_ui(renaming_settings: Dict[str, Any]) -> Dict[str, Any]:
+    from core.handlers.renaming_handler import normalize_selected_provider
+
     d: Dict[str, Any] = {}
     prov = renaming_settings.get("provider")
     if prov:
-        d["selected_provider"] = prov
+        # GUI sends "auto"/"all"; handler also normalizes — keep both aligned.
+        d["selected_provider"] = normalize_selected_provider(prov)
     api = (renaming_settings.get("api_key") or "").strip()
     key_field = {
         "tmdb": "tmdb_api_key",
         "tvdb": "tvdb_api_key",
         "omdb": "omdb_api_key",
         "trakt": "trakt_api_key",
-    }.get(prov or "", "")
+    }.get((prov or "").strip().lower(), "")
     if key_field and api:
         d[key_field] = api
     return d
