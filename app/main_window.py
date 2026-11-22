@@ -427,7 +427,35 @@ class MainWindow(GlassmorphicMainWindow):
                 self.subtitle_tab._show_idle_subtitle_banner()
             if hasattr(self.subtitle_tab, "_update_subtitle_action_buttons"):
                 self.subtitle_tab._update_subtitle_action_buttons()
+        # P1-A / C2: rebuild keyed metadata providers when API keys change
+        # after an empty start — without this, self.tmdb/etc. stay None.
+        self._sync_metadata_api_keys(sm)
         logger.debug("Settings applied to running application")
+
+    def _sync_metadata_api_keys(self, sm) -> None:
+        """Rebuild MetadataGrabber keyed providers from saved conversion keys."""
+        from core.encodeforge_core import EncodeForgeCore
+        from core.metadata_grabber import MetadataGrabber
+
+        c = sm.conversion
+        keys = dict(
+            tmdb_key=c.tmdb_api_key or "",
+            tvdb_key=c.tvdb_api_key or "",
+            omdb_key=c.omdb_api_key or "",
+            trakt_key=c.trakt_api_key or "",
+            fanart_key=c.fanart_api_key or "",
+        )
+        # Prefer reconfiguring a live Core if one is already held; otherwise
+        # keep a session grabber in sync so settings-save exercises C2.
+        core = getattr(self, "_encodeforge_core", None)
+        if isinstance(core, EncodeForgeCore):
+            core.configure_metadata_keys(**keys)
+            return
+        grabber = getattr(self, "_metadata_grabber", None)
+        if isinstance(grabber, MetadataGrabber):
+            grabber.configure_keys(**keys)
+        else:
+            self._metadata_grabber = MetadataGrabber(**keys)
 
     def _switch_mode(self, idx: int):
         """Switch between different modes/tabs."""

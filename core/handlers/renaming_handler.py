@@ -430,20 +430,25 @@ class RenamingHandler:
             # Get selected provider (no media type override - let auto-detection work)
             selected_provider = "automatic"
             
-            # Update settings if provided
+            # Update settings if provided. Keys must rebuild provider instances
+            # (configure_keys) — assigning renamer.tmdb_key alone left self.tmdb
+            # as None when the grabber started without a key (C2 / P1-A).
             if settings_dict:
+                key_kwargs = {}
                 if "tmdb_api_key" in settings_dict:
                     self.settings.tmdb_api_key = settings_dict["tmdb_api_key"]
-                    self.renamer.tmdb_key = settings_dict["tmdb_api_key"]
+                    key_kwargs["tmdb_key"] = settings_dict["tmdb_api_key"]
                 if "tvdb_api_key" in settings_dict:
                     self.settings.tvdb_api_key = settings_dict["tvdb_api_key"]
-                    self.renamer.tvdb_key = settings_dict["tvdb_api_key"]
+                    key_kwargs["tvdb_key"] = settings_dict["tvdb_api_key"]
                 if "omdb_api_key" in settings_dict:
                     self.settings.omdb_api_key = settings_dict.get("omdb_api_key", "")
-                    self.renamer.omdb_key = settings_dict.get("omdb_api_key", "")
+                    key_kwargs["omdb_key"] = settings_dict.get("omdb_api_key", "")
                 if "trakt_api_key" in settings_dict:
                     self.settings.trakt_api_key = settings_dict.get("trakt_api_key", "")
-                    self.renamer.trakt_key = settings_dict.get("trakt_api_key", "")
+                    key_kwargs["trakt_key"] = settings_dict.get("trakt_api_key", "")
+                if key_kwargs:
+                    self.renamer.configure_keys(**key_kwargs)
                 if "selected_provider" in settings_dict:
                     selected_provider = settings_dict["selected_provider"]
 

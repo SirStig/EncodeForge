@@ -10,7 +10,7 @@ import json
 import tarfile
 import zipfile
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -945,3 +945,135 @@ class TestProviderTokenNormalization:
 
         d = _renamer_preview_settings_from_ui({"provider": "auto"})
         assert d["selected_provider"] == "automatic"
+
+
+# --------------------------------------------------------------------------- #
+# C2 — Runtime API keys must rebuild provider instances
+# --------------------------------------------------------------------------- #
+
+class TestMetadataProviderKeyReinit:
+    """Setting TMDB/OMDB/etc. after an empty start must enable searches."""
+
+    def test_configure_keys_builds_providers_after_empty_start(self):
+        from core.metadata_grabber import MetadataGrabber
+        from core.providers.metadata import OMDBProvider, TMDBProvider, TraktProvider, TVDBProvider
+
+        grabber = MetadataGrabber()
+        assert grabber.tmdb is None
+        assert grabber.tvdb is None
+        assert grabber.omdb is None
+        assert grabber.trakt is None
+        assert grabber.get_available_providers()["tmdb"] is False
+
+        grabber.configure_keys(
+            tmdb_key="tmdb-secret",
+            tvdb_key="tvdb-secret",
+            omdb_key="omdb-secret",
+            trakt_key="trakt-secret",
+        )
+
+        assert isinstance(grabber.tmdb, TMDBProvider)
+        assert isinstance(grabber.tvdb, TVDBProvider)
+        assert isinstance(grabber.omdb, OMDBProvider)
+        assert isinstance(grabber.trakt, TraktProvider)
+        assert grabber.tmdb.api_key == "tmdb-secret"
+        assert grabber.get_available_providers()["tmdb"] is True
+        assert grabber.get_available_providers()["omdb"] is True
+
+    def test_configure_keys_clears_provider_when_key_removed(self):
+        from core.metadata_grabber import MetadataGrabber
+
+        grabber = MetadataGrabber(tmdb_key="was-set")
+        assert grabber.tmdb is not None
+
+        grabber.configure_keys(tmdb_key="")
+        assert grabber.tmdb is None
+        assert grabber.tmdb_key == ""
+        assert grabber.get_available_providers()["tmdb"] is False
+
+    def test_configure_keys_leaves_omitted_providers_unchanged(self):
+        from core.metadata_grabber import MetadataGrabber
+
+        grabber = MetadataGrabber(tmdb_key="keep-me", omdb_key="")
+        assert grabber.tmdb is not None
+        assert grabber.omdb is None
+
+        grabber.configure_keys(omdb_key="now-set")
+        assert grabber.tmdb is not None
+        assert grabber.tmdb_key == "keep-me"
+        assert grabber.omdb is not None
+        assert grabber.omdb_key == "now-set"
+
+    def test_core_configure_metadata_keys_after_empty_start(self):
+        from core.encodeforge_core import EncodeForgeCore
+        from core.handlers.models import ConversionSettings
+
+        core = EncodeForgeCore(ConversionSettings())
+        assert core.renamer.tmdb is None
+        assert core.renamer.omdb is None
+
+        core.configure_metadata_keys(tmdb_key="tmdb-live", omdb_key="omdb-live")
+        assert core.settings.tmdb_api_key == "tmdb-live"
+        assert core.settings.omdb_api_key == "omdb-live"
+        assert core.renamer.tmdb is not None
+        assert core.renamer.omdb is not None
+        assert core.renamer.tmdb.api_key == "tmdb-live"
+
+    def test_preview_rename_rebuilds_providers_from_settings_dict(self):
+        """Regression for C2: keys in settings_dict must not only update strings."""
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+        from core.metadata_grabber import MetadataGrabber
+
+        grabber = MetadataGrabber()  # empty start — keyed providers are None
+        assert grabber.tmdb is None
+
+        handler = RenamingHandler(ConversionSettings(), grabber)
+        grabber.detect_media_type = MagicMock(return_value="movie")
+        grabber.parse_movie_filename = MagicMock(
+            return_value={"title": "Inception", "year": 2010}
+        )
+
+        searched = {}
+
+        def fake_search_movie(title, year=None, provider=None):
+            searched["called"] = True
+            searched["has_tmdb_instance"] = grabber.tmdb is not None
+            return {
+                "title": "Inception",
+                "year": 2010,
+                "source": "tmdb",
+            }
+
+        grabber.search_movie = fake_search_movie
+        # Avoid FFprobe / hash fallbacks touching the filesystem.
+        handler._extract_metadata_from_file = MagicMock(return_value=None)
+        handler._infer_from_folder_context = MagicMock(return_value=None)
+        handler._identify_by_hash = MagicMock(return_value=None)
+
+        result = handler.preview_rename(
+            ["Inception.2010.mkv"],
+            settings_dict={
+                "selected_provider": "tmdb",
+                "tmdb_api_key": "runtime-tmdb-key",
+            },
+        )
+
+        assert result["status"] == "success"
+        assert grabber.tmdb is not None
+        assert grabber.tmdb_key == "runtime-tmdb-key"
+        assert grabber.tmdb.api_key == "runtime-tmdb-key"
+        assert searched.get("called") is True
+        assert searched.get("has_tmdb_instance") is True
+
+    def test_string_only_key_assignment_was_insufficient(self):
+        """Document the pre-fix failure mode: string update without rebuild."""
+        from core.metadata_grabber import MetadataGrabber
+
+        grabber = MetadataGrabber()
+        grabber.tmdb_key = "late-key"  # old preview_rename behaviour
+        assert grabber.tmdb is None  # provider still missing
+        assert grabber.search_movie("Inception", 2010, provider="tmdb") is None
+
+        grabber.configure_keys(tmdb_key="late-key")
+        assert grabber.tmdb is not None

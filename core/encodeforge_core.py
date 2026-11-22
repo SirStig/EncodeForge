@@ -65,11 +65,6 @@ class EncodeForgeCore:
         self.renamer = MetadataGrabber(
             tmdb_key=self.settings.tmdb_api_key,
             tvdb_key=self.settings.tvdb_api_key,
-            # OMDB/Trakt were never passed here, so MetadataGrabber built
-            # self.omdb/self.trakt as None at construction time regardless of
-            # a configured key — preview_rename's later `self.renamer.omdb_key
-            # = ...` only updates the string, not the (already-None) provider
-            # instance, so those two providers silently never ran.
             omdb_key=self.settings.omdb_api_key,
             trakt_key=self.settings.trakt_api_key,
             fanart_key=self.settings.fanart_api_key,
@@ -83,6 +78,42 @@ class EncodeForgeCore:
         
         # Skip expensive FFmpeg detection during initialization for faster startup
         # FFmpeg will be detected on first use (lazy detection)
+
+    def configure_metadata_keys(
+        self,
+        tmdb_key: Optional[str] = None,
+        tvdb_key: Optional[str] = None,
+        omdb_key: Optional[str] = None,
+        trakt_key: Optional[str] = None,
+        fanart_key: Optional[str] = None,
+        mal_client_id: Optional[str] = None,
+    ) -> None:
+        """
+        Apply metadata API keys and rebuild keyed provider instances.
+
+        Call after Settings save or whenever keys change on a live Core that
+        may have been constructed with empty keys. Omitting a parameter
+        leaves that key unchanged.
+        """
+        if tmdb_key is not None:
+            self.settings.tmdb_api_key = tmdb_key
+        if tvdb_key is not None:
+            self.settings.tvdb_api_key = tvdb_key
+        if omdb_key is not None:
+            self.settings.omdb_api_key = omdb_key
+        if trakt_key is not None:
+            self.settings.trakt_api_key = trakt_key
+        if fanart_key is not None:
+            self.settings.fanart_api_key = fanart_key
+
+        self.renamer.configure_keys(
+            tmdb_key=tmdb_key,
+            tvdb_key=tvdb_key,
+            omdb_key=omdb_key,
+            trakt_key=trakt_key,
+            fanart_key=fanart_key,
+            mal_client_id=mal_client_id,
+        )
     
     @property
     def whisper_mgr(self):
