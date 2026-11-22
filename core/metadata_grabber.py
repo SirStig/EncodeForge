@@ -21,6 +21,28 @@ from core.providers.metadata import (
 
 logger = logging.getLogger(__name__)
 
+# Keyless-first auto order (product preference): free providers before keyed APIs.
+# Missing keys are soft-skipped by the grabber / renaming handler.
+TV_AUTO_PROVIDERS = (
+    "tvmaze",
+    "anidb",
+    "kitsu",
+    "jikan",
+    "tvdb",
+    "tmdb",
+    "trakt",
+    "omdb",
+)
+MOVIE_AUTO_PROVIDERS = (
+    "anidb",
+    "kitsu",
+    "jikan",
+    "tmdb",
+    "omdb",
+    "trakt",
+)
+KEYED_PROVIDERS = frozenset({"tmdb", "tvdb", "omdb", "trakt"})
+
 
 class MetadataGrabber:
     """
@@ -32,7 +54,7 @@ class MetadataGrabber:
     - Jikan/MyAnimeList (Anime - read-only)
     - TVmaze (TV Shows)
     
-    API Key Providers (Free Keys):
+    API Key Providers (Free Keys — optional upgrades):
     - TMDB (Movies & TV)
     - TVDB (TV Shows)
     - OMDB (Movies & TV)
@@ -186,12 +208,27 @@ class MetadataGrabber:
         """
         return self.anidb.parse_movie_filename(filename)
     
+    def _provider_instance(self, name: str):
+        """Return the live provider instance for *name*, or None if unavailable."""
+        return {
+            "tvmaze": self.tvmaze,
+            "anidb": self.anidb,
+            "kitsu": self.kitsu,
+            "jikan": self.jikan,
+            "tvdb": self.tvdb,
+            "tmdb": self.tmdb,
+            "trakt": self.trakt,
+            "omdb": self.omdb,
+        }.get(name)
+
     def search_tv_show(self, title: str, season: int = 1, episode: int = 1, provider: str = "auto") -> Optional[Dict]:
         """
         Search for TV show metadata across all available providers.
         Providers are tried in priority order; no anime vs. TV detection.
 
-        Provider priority: TVDB → TVmaze → TMDB → Trakt → OMDB → AniDB → Kitsu → Jikan
+        Auto priority (keyless-first): TVmaze → AniDB → Kitsu → Jikan →
+        TVDB → TMDB → Trakt → OMDB. Keyed providers without a configured
+        key are soft-skipped.
         """
         # Specific provider requested
         if provider != "auto":
@@ -216,19 +253,12 @@ class MetadataGrabber:
                 return candidates[0] if candidates else None
             return None
 
-        # Auto: try all providers in priority order
-        ordered = [
-            ("tvdb", self.tvdb),
-            ("tvmaze", self.tvmaze),
-            ("tmdb", self.tmdb),
-            ("trakt", self.trakt),
-            ("omdb", self.omdb),
-            ("anidb", self.anidb),
-            ("kitsu", self.kitsu),
-            ("jikan", self.jikan),
-        ]
-        for name, prov in ordered:
+        # Auto: try all providers in keyless-first priority order
+        for name in TV_AUTO_PROVIDERS:
+            prov = self._provider_instance(name)
             if prov is None:
+                if name in KEYED_PROVIDERS:
+                    logger.debug("Soft-skipping %s TV search (no API key)", name)
                 continue
             try:
                 result = prov.search_tv(title, season, episode)
@@ -245,7 +275,8 @@ class MetadataGrabber:
         Search for movie metadata across all available providers.
         Providers are tried in priority order; no anime vs. movie detection.
 
-        Provider priority: TMDB → Trakt → OMDB → AniDB → Kitsu → Jikan
+        Auto priority (keyless-first): AniDB → Kitsu → Jikan → TMDB →
+        OMDB → Trakt. Keyed providers without a configured key are soft-skipped.
         """
         # Specific provider requested
         if provider != "auto":
@@ -266,17 +297,12 @@ class MetadataGrabber:
                 return candidates[0] if candidates else None
             return None
 
-        # Auto: try all providers in priority order
-        ordered = [
-            ("tmdb", self.tmdb),
-            ("trakt", self.trakt),
-            ("omdb", self.omdb),
-            ("anidb", self.anidb),
-            ("kitsu", self.kitsu),
-            ("jikan", self.jikan),
-        ]
-        for name, prov in ordered:
+        # Auto: try all providers in keyless-first priority order
+        for name in MOVIE_AUTO_PROVIDERS:
+            prov = self._provider_instance(name)
             if prov is None:
+                if name in KEYED_PROVIDERS:
+                    logger.debug("Soft-skipping %s movie search (no API key)", name)
                 continue
             try:
                 result = prov.search_movie(title, year)
@@ -327,19 +353,12 @@ class MetadataGrabber:
 
     def search_tv_show_candidates(self, title: str, season: int = 1, episode: int = 1) -> "list[Dict]":
         """Every TV candidate across all configured providers, best first — for a manual match picker."""
-        ordered = [
-            ("tvdb", self.tvdb), ("tvmaze", self.tvmaze), ("tmdb", self.tmdb),
-            ("trakt", self.trakt), ("omdb", self.omdb),
-            ("anidb", self.anidb), ("kitsu", self.kitsu), ("jikan", self.jikan),
-        ]
+        ordered = [(name, self._provider_instance(name)) for name in TV_AUTO_PROVIDERS]
         return self._gather_candidates(ordered, "search_tv", title, season, episode)
 
     def search_movie_candidates(self, title: str, year: Optional[int] = None) -> "list[Dict]":
         """Every movie candidate across all configured providers, best first — for a manual match picker."""
-        ordered = [
-            ("tmdb", self.tmdb), ("trakt", self.trakt), ("omdb", self.omdb),
-            ("anidb", self.anidb), ("kitsu", self.kitsu), ("jikan", self.jikan),
-        ]
+        ordered = [(name, self._provider_instance(name)) for name in MOVIE_AUTO_PROVIDERS]
         return self._gather_candidates(ordered, "search_movie", title, year)
 
     def _score_result(self, result: Dict) -> int:

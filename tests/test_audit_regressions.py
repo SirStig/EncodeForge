@@ -1077,3 +1077,238 @@ class TestMetadataProviderKeyReinit:
 
         grabber.configure_keys(tmdb_key="late-key")
         assert grabber.tmdb is not None
+
+
+# --------------------------------------------------------------------------- #
+# P1-B — Keyless-first free metadata providers
+# --------------------------------------------------------------------------- #
+
+class TestKeylessFirstMetadataProviders:
+    """Default auto path must work with empty API keys via free providers."""
+
+    def test_tv_auto_providers_are_keyless_first(self):
+        from core.metadata_grabber import KEYED_PROVIDERS, TV_AUTO_PROVIDERS
+
+        free = [p for p in TV_AUTO_PROVIDERS if p not in KEYED_PROVIDERS]
+        keyed = [p for p in TV_AUTO_PROVIDERS if p in KEYED_PROVIDERS]
+        assert free == ["tvmaze", "anidb", "kitsu", "jikan"]
+        assert keyed == ["tvdb", "tmdb", "trakt", "omdb"]
+        # Every free provider appears before every keyed one.
+        assert max(TV_AUTO_PROVIDERS.index(p) for p in free) < min(
+            TV_AUTO_PROVIDERS.index(p) for p in keyed
+        )
+
+    def test_movie_auto_providers_include_free_before_keyed(self):
+        from core.metadata_grabber import KEYED_PROVIDERS, MOVIE_AUTO_PROVIDERS
+
+        free = [p for p in MOVIE_AUTO_PROVIDERS if p not in KEYED_PROVIDERS]
+        keyed = [p for p in MOVIE_AUTO_PROVIDERS if p in KEYED_PROVIDERS]
+        assert free == ["anidb", "kitsu", "jikan"]
+        assert keyed == ["tmdb", "omdb", "trakt"]
+        assert max(MOVIE_AUTO_PROVIDERS.index(p) for p in free) < min(
+            MOVIE_AUTO_PROVIDERS.index(p) for p in keyed
+        )
+
+    def test_tv_auto_with_empty_keys_only_calls_free_providers(self):
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+        from core.metadata_grabber import KEYED_PROVIDERS, TV_AUTO_PROVIDERS
+
+        renamer = MagicMock()
+        renamer.detect_media_type.return_value = "tv"
+        renamer.parse_tv_filename.return_value = {
+            "title": "Show",
+            "season": 1,
+            "episode": 1,
+        }
+        renamer.search_tv_show.side_effect = lambda *a, provider=None, **k: {
+            "show_title": "Show",
+            "season": 1,
+            "episode": 1,
+            "episode_title": f"via-{provider}",
+            "source": provider,
+        }
+
+        settings = ConversionSettings()  # all API keys empty
+        handler = RenamingHandler(settings, renamer)
+        handler._extract_metadata_from_file = MagicMock(return_value=None)
+        handler._infer_from_folder_context = MagicMock(return_value=None)
+        handler._identify_by_hash = MagicMock(return_value=None)
+
+        result = handler.preview_rename(
+            ["Show.S01E01.mkv"],
+            settings_dict={"selected_provider": "auto"},
+        )
+
+        assert result["status"] == "success"
+        providers_called = [
+            call.kwargs.get("provider") for call in renamer.search_tv_show.call_args_list
+        ]
+        assert providers_called == [p for p in TV_AUTO_PROVIDERS if p not in KEYED_PROVIDERS]
+        assert "tvmaze" in providers_called
+        assert "tmdb" not in providers_called
+        assert "trakt" not in providers_called
+        assert "omdb" not in providers_called
+        assert result["metadata"][0].get("episode_title") or result["metadata"][0].get(
+            "show_title"
+        )
+
+    def test_tv_trakt_and_omdb_branches_run_when_keys_present(self):
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+
+        renamer = MagicMock()
+        renamer.detect_media_type.return_value = "tv"
+        renamer.parse_tv_filename.return_value = {
+            "title": "Show",
+            "season": 1,
+            "episode": 1,
+        }
+        called = []
+
+        def fake_search(title, season, episode, provider=None):
+            called.append(provider)
+            return {
+                "show_title": "Show",
+                "season": season,
+                "episode": episode,
+                "episode_title": f"via-{provider}",
+                "source": provider,
+            }
+
+        renamer.search_tv_show.side_effect = fake_search
+
+        settings = ConversionSettings(
+            tmdb_api_key="",
+            tvdb_api_key="",
+            omdb_api_key="omdb-key",
+            trakt_api_key="trakt-key",
+        )
+        handler = RenamingHandler(settings, renamer)
+        handler._extract_metadata_from_file = MagicMock(return_value=None)
+        handler._infer_from_folder_context = MagicMock(return_value=None)
+        handler._identify_by_hash = MagicMock(return_value=None)
+
+        handler.preview_rename(
+            ["Show.S01E01.mkv"],
+            settings_dict={"selected_provider": "automatic"},
+        )
+
+        assert "trakt" in called
+        assert "omdb" in called
+        assert "tvmaze" in called
+
+    def test_movie_auto_with_empty_keys_uses_free_providers(self):
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+        from core.metadata_grabber import KEYED_PROVIDERS, MOVIE_AUTO_PROVIDERS
+
+        renamer = MagicMock()
+        renamer.detect_media_type.return_value = "movie"
+        renamer.parse_movie_filename.return_value = {
+            "title": "Cowboy Bebop",
+            "year": 2001,
+        }
+        renamer.search_movie.side_effect = lambda title, year=None, provider=None: {
+            "title": "Cowboy Bebop: The Movie",
+            "year": 2001,
+            "source": provider,
+        }
+
+        handler = RenamingHandler(ConversionSettings(), renamer)
+        handler._extract_metadata_from_file = MagicMock(return_value=None)
+        handler._infer_from_folder_context = MagicMock(return_value=None)
+        handler._identify_by_hash = MagicMock(return_value=None)
+
+        result = handler.preview_rename(
+            ["Cowboy.Bebop.2001.mkv"],
+            settings_dict={"selected_provider": "auto"},
+        )
+
+        assert result["status"] == "success"
+        providers_called = [
+            call.kwargs.get("provider") for call in renamer.search_movie.call_args_list
+        ]
+        assert providers_called == [
+            p for p in MOVIE_AUTO_PROVIDERS if p not in KEYED_PROVIDERS
+        ]
+        assert "anidb" in providers_called
+        assert "kitsu" in providers_called
+        assert "jikan" in providers_called
+        assert "tmdb" not in providers_called
+        assert result["metadata"][0].get("title")
+
+    def test_movie_auto_includes_keyed_when_keys_present(self):
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+        from core.metadata_grabber import MOVIE_AUTO_PROVIDERS
+
+        renamer = MagicMock()
+        renamer.detect_media_type.return_value = "movie"
+        renamer.parse_movie_filename.return_value = {
+            "title": "Inception",
+            "year": 2010,
+        }
+        renamer.search_movie.side_effect = lambda title, year=None, provider=None: {
+            "title": "Inception",
+            "year": 2010,
+            "source": provider,
+        }
+
+        settings = ConversionSettings(
+            tmdb_api_key="tmdb-key",
+            omdb_api_key="omdb-key",
+            trakt_api_key="trakt-key",
+        )
+        handler = RenamingHandler(settings, renamer)
+        handler._extract_metadata_from_file = MagicMock(return_value=None)
+        handler._infer_from_folder_context = MagicMock(return_value=None)
+        handler._identify_by_hash = MagicMock(return_value=None)
+
+        handler.preview_rename(
+            ["Inception.2010.mkv"],
+            settings_dict={"selected_provider": "automatic"},
+        )
+
+        providers_called = [
+            call.kwargs.get("provider") for call in renamer.search_movie.call_args_list
+        ]
+        assert providers_called == list(MOVIE_AUTO_PROVIDERS)
+
+    def test_grabber_auto_soft_skips_missing_keys(self):
+        from core.metadata_grabber import MetadataGrabber
+
+        grabber = MetadataGrabber()  # no keys
+        assert grabber.tmdb is None
+        assert grabber.omdb is None
+        assert grabber.trakt is None
+        assert grabber.tvdb is None
+
+        grabber.tvmaze.search_tv = MagicMock(
+            return_value={"show_title": "Free Show", "source": "tvmaze"}
+        )
+        grabber.anidb.search_tv = MagicMock(return_value=None)
+        grabber.kitsu.search_tv = MagicMock(return_value=None)
+        grabber.jikan.search_tv = MagicMock(return_value=None)
+
+        result = grabber.search_tv_show("Free Show", 1, 1, provider="auto")
+        assert result is not None
+        assert result["source"] == "tvmaze"
+        grabber.tvmaze.search_tv.assert_called_once()
+
+    def test_grabber_movie_auto_reaches_free_providers(self):
+        from core.metadata_grabber import MetadataGrabber
+
+        grabber = MetadataGrabber()
+        grabber.anidb.search_movie = MagicMock(return_value=None)
+        grabber.kitsu.search_movie = MagicMock(return_value=None)
+        grabber.jikan.search_movie = MagicMock(
+            return_value={"title": "Anime Film", "source": "jikan"}
+        )
+
+        result = grabber.search_movie("Anime Film", 2001, provider="auto")
+        assert result is not None
+        assert result["source"] == "jikan"
+        grabber.anidb.search_movie.assert_called_once()
+        grabber.kitsu.search_movie.assert_called_once()
+        grabber.jikan.search_movie.assert_called_once()

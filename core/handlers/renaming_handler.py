@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from core.metadata_grabber import KEYED_PROVIDERS, MOVIE_AUTO_PROVIDERS, TV_AUTO_PROVIDERS
 from core.rename_executor import RenamePair, execute_renames, find_sidecar_files
 from core.rename_pattern import sanitize_filename
 
@@ -18,6 +19,17 @@ logger = logging.getLogger(__name__)
 # GUI/settings use "auto" / "all"; CLI historically used "automatic".
 # All three mean "try providers in priority order."
 _EXPAND_ALL_PROVIDER_TOKENS = frozenset({"auto", "all", "automatic"})
+
+_PROVIDER_DISPLAY_NAMES = {
+    "tmdb": "TMDB",
+    "tvdb": "TVDB",
+    "tvmaze": "TVmaze",
+    "trakt": "Trakt",
+    "omdb": "OMDB",
+    "anidb": "AniDB",
+    "kitsu": "Kitsu",
+    "jikan": "Jikan",
+}
 
 
 def normalize_selected_provider(provider: Optional[str]) -> str:
@@ -39,6 +51,19 @@ class RenamingHandler:
     def __init__(self, settings: ConversionSettings, renamer):
         self.settings = settings
         self.renamer = renamer
+
+    def _provider_key_configured(self, prov: str) -> bool:
+        """True when a keyed provider has a non-empty API key in settings."""
+        key_attr = {
+            "tmdb": "tmdb_api_key",
+            "tvdb": "tvdb_api_key",
+            "omdb": "omdb_api_key",
+            "trakt": "trakt_api_key",
+        }.get(prov)
+        if not key_attr:
+            return True  # free providers need no key
+        value = getattr(self.settings, key_attr, None)
+        return bool(value and str(value).strip())
 
     @property
     def _ffprobe(self) -> str:
@@ -375,8 +400,8 @@ class RenamingHandler:
             words = set(re.findall(r"[a-z']+", title.lower()))
             return bool(words & japanese_indicators)
 
-        # First pass: Look for results from providers known to give English titles
-        preferred_sources = ['tvdb', 'tvmaze', 'tmdb', 'trakt', 'omdb', 'anidb', 'kitsu', 'jikan']
+        # First pass: prefer English-friendly sources (free first, then keyed)
+        preferred_sources = ['tvmaze', 'tvdb', 'tmdb', 'trakt', 'omdb', 'anidb', 'kitsu', 'jikan']
         for result in results_list:
             source = result.get('source', '').lower()
             title = result.get('show_title', '') or result.get('title', '')
@@ -521,13 +546,10 @@ class RenamingHandler:
                                 search_query += f", Episode: '{parsed['episode_title']}'"
                             logger.info(f"  Search query: {search_query}")
                             
-                            # Search based on selected provider
-                            providers_to_try = []
-                            
+                            # Search based on selected provider (keyless-first for automatic)
                             if selected_provider == "automatic":
-                                providers_to_try = ["tvdb", "tvmaze", "tmdb", "trakt", "omdb", "anidb", "kitsu", "jikan"]
+                                providers_to_try = list(TV_AUTO_PROVIDERS)
                             else:
-                                # Use specific provider
                                 providers_to_try = [selected_provider]
                             
                             # Try ALL providers and store results from each
@@ -548,61 +570,32 @@ class RenamingHandler:
                                     
                                     # TODO: Future - use episode_title for enhanced matching
                                     # Episode titles can help identify exact episodes when S##E## is uncertain
-                                    
-                                    if prov == "tmdb" and self.settings.tmdb_api_key:
+
+                                    if prov in KEYED_PROVIDERS and not self._provider_key_configured(prov):
+                                        logger.debug(
+                                            "Soft-skipping %s TV search (no API key)",
+                                            prov,
+                                        )
+                                        continue
+
+                                    if prov in (
+                                        "tvmaze",
+                                        "anidb",
+                                        "kitsu",
+                                        "jikan",
+                                        "tmdb",
+                                        "tvdb",
+                                        "trakt",
+                                        "omdb",
+                                    ):
                                         prov_info = self.renamer.search_tv_show(
                                             title,
                                             season,
                                             episode,
-                                            provider="tmdb",
+                                            provider=prov,
                                         )
                                         if prov_info:
-                                            prov_name = "TMDB"
-                                    elif prov == "tvdb" and self.settings.tvdb_api_key:
-                                        prov_info = self.renamer.search_tv_show(
-                                            title,
-                                            season,
-                                            episode,
-                                            provider="tvdb"
-                                        )
-                                        if prov_info:
-                                            prov_name = "TVDB"
-                                    elif prov == "anidb":
-                                        prov_info = self.renamer.search_tv_show(
-                                            title,
-                                            season,
-                                            episode,
-                                            provider="anidb"
-                                        )
-                                        if prov_info:
-                                            prov_name = "AniDB"
-                                    elif prov == "kitsu":
-                                        prov_info = self.renamer.search_tv_show(
-                                            title,
-                                            season,
-                                            episode,
-                                            provider="kitsu"
-                                        )
-                                        if prov_info:
-                                            prov_name = "Kitsu"
-                                    elif prov == "jikan":
-                                        prov_info = self.renamer.search_tv_show(
-                                            title,
-                                            season,
-                                            episode,
-                                            provider="jikan",
-                                        )
-                                        if prov_info:
-                                            prov_name = "Jikan"
-                                    elif prov == "tvmaze":
-                                        prov_info = self.renamer.search_tv_show(
-                                            title,
-                                            season,
-                                            episode,
-                                            provider="tvmaze"
-                                        )
-                                        if prov_info:
-                                            prov_name = "TVmaze"
+                                            prov_name = _PROVIDER_DISPLAY_NAMES[prov]
                                     
                                     # Store raw metadata from this provider (don't format yet - Java will do that)
                                     if prov_info and prov_name:
@@ -619,13 +612,8 @@ class RenamingHandler:
                                         file_provider_results[prov_name] = {}
                                 except Exception as e:
                                     logger.error(f"{prov} lookup failed: {e}")
-                                    name_map = {
-                                        "tmdb": "TMDB", "tvdb": "TVDB", "tvmaze": "TVmaze",
-                                        "trakt": "Trakt", "omdb": "OMDB",
-                                        "anidb": "AniDB", "kitsu": "Kitsu", "jikan": "Jikan",
-                                    }
-                                    if prov in name_map:
-                                        file_provider_results[name_map[prov]] = {}
+                                    if prov in _PROVIDER_DISPLAY_NAMES:
+                                        file_provider_results[_PROVIDER_DISPLAY_NAMES[prov]] = {}
                             
                             # Store results from ALL providers for THIS file (including empty ones for alignment)
                             for prov_name, prov_info in file_provider_results.items():
@@ -661,8 +649,8 @@ class RenamingHandler:
                                 info = dict(info)
                                 info['episode2'] = parsed['episode2']
                                 prov_key = {
-                                    "TMDB": "tmdb", "TVDB": "tvdb", "TVmaze": "tvmaze", "Trakt": "trakt",
-                                    "OMDB": "omdb", "AniDB": "anidb", "Kitsu": "kitsu", "Jikan": "jikan",
+                                    display: key
+                                    for key, display in _PROVIDER_DISPLAY_NAMES.items()
                                 }.get(provider)
                                 if prov_key:
                                     try:
@@ -681,14 +669,10 @@ class RenamingHandler:
                         if not parsed:
                             error = "❌ ERROR: Could not parse movie information."
                         else:
-                            # Search based on selected provider
-                            providers_to_try = []
-                            
+                            # Search based on selected provider (keyless-first for automatic)
                             if selected_provider == "automatic":
-                                # Try all available providers for best match
-                                providers_to_try = ["tmdb", "omdb", "trakt"]
+                                providers_to_try = list(MOVIE_AUTO_PROVIDERS)
                             else:
-                                # Use specific provider
                                 providers_to_try = [selected_provider]
                             
                             # Try ALL providers and store results from each
@@ -701,29 +685,28 @@ class RenamingHandler:
                                 prov_name = None
                                     
                                 try:
-                                    if prov == "tmdb" and self.settings.tmdb_api_key:
-                                        prov_info = self.renamer.search_movie(
-                                            parsed["title"],
-                                            parsed.get("year")
+                                    if prov in KEYED_PROVIDERS and not self._provider_key_configured(prov):
+                                        logger.debug(
+                                            "Soft-skipping %s movie search (no API key)",
+                                            prov,
                                         )
-                                        if prov_info:
-                                            prov_name = "TMDB"
-                                    elif prov == "omdb" and getattr(self.settings, 'omdb_api_key', None):
+                                        continue
+
+                                    if prov in (
+                                        "anidb",
+                                        "kitsu",
+                                        "jikan",
+                                        "tmdb",
+                                        "omdb",
+                                        "trakt",
+                                    ):
                                         prov_info = self.renamer.search_movie(
                                             parsed["title"],
                                             parsed.get("year"),
-                                            provider="omdb"
+                                            provider=prov,
                                         )
                                         if prov_info:
-                                            prov_name = "OMDB"
-                                    elif prov == "trakt" and getattr(self.settings, 'trakt_api_key', None):
-                                        prov_info = self.renamer.search_movie(
-                                            parsed["title"],
-                                            parsed.get("year"),
-                                            provider="trakt"
-                                        )
-                                        if prov_info:
-                                            prov_name = "Trakt"
+                                            prov_name = _PROVIDER_DISPLAY_NAMES[prov]
                                     
                                     # Store result from this provider
                                     if prov_info and prov_name:
@@ -740,13 +723,8 @@ class RenamingHandler:
                                         file_provider_results[prov_name] = {}
                                 except Exception as e:
                                     logger.error(f"{prov} movie lookup failed: {e}")
-                                    # Track failed provider with empty result
-                                    if prov == "tmdb":
-                                        file_provider_results["TMDB"] = {}
-                                    elif prov == "omdb":
-                                        file_provider_results["OMDB"] = {}
-                                    elif prov == "trakt":
-                                        file_provider_results["Trakt"] = {}
+                                    if prov in _PROVIDER_DISPLAY_NAMES:
+                                        file_provider_results[_PROVIDER_DISPLAY_NAMES[prov]] = {}
                             
                             # Store results from ALL providers for THIS file (including empty ones for alignment)
                             for prov_name, prov_info in file_provider_results.items():
