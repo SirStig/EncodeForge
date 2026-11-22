@@ -61,10 +61,31 @@ jobs:
 
       - name: Run unit tests
         # Integration tests reach the live internet and need FFmpeg, so they are
-        # deselected here; run them locally or in a scheduled job.
+        # deselected here; the scheduled workflow (.github/workflows/integration.yml)
+        # runs the FFmpeg integration marker set nightly / on demand.
+        #
+        # Coverage floor applies to core/ + utils/ only (app/ GUI is smoke-tested
+        # separately). Fail-under is set below the current ~38% baseline so OS /
+        # Python matrix noise does not flake the gate, but still blocks big drops.
+        #
+        # C1/C2 audit regressions stay in this suite (markers audit_c1 / audit_c2);
+        # the next step re-runs them explicitly so a future broad `-m` deselect
+        # cannot silently drop the locks.
+        shell: bash
         env:
           QT_QPA_PLATFORM: offscreen
-        run: pytest -m "not integration and not requires_network and not requires_ffmpeg" -q
+        run: >
+          pytest -m "not integration and not requires_network and not requires_ffmpeg"
+          -q
+          --cov=core --cov=utils
+          --cov-report=term-missing:skip-covered
+          --cov-fail-under=30
+
+      - name: Lock C1/C2 audit regressions
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest -m "audit_c1 or audit_c2" -q --tb=short
 
   build-windows:
     name: Windows (Nuitka one-file .exe)
