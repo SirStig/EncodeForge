@@ -59,8 +59,15 @@ setup(
         ],
     },
     include_package_data=True,
+    # resources/ is a real package (see resources/__init__.py) so these
+    # patterns land in site-packages/resources/ next to app/, utils/, etc.
+    # The empty-string package_data key used previously never shipped the
+    # CSS/icons into wheels; MANIFEST.in + pyproject.toml reinforce this.
     package_data={
-        "": ["resources/**/*"],
+        "resources": [
+            "icons/*",
+            "styles/*",
+        ],
     },
     classifiers=[
         "Development Status :: 4 - Beta",

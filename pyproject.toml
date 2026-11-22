@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Metadata, entry points, and dynamic version/requirements stay in setup.py so
+# the version can be read from app/__init__.py without importing PySide6 at
+# build time. This file pins the PEP 517 backend and package-data rules that
+# make `pip install .` ship resources/.
+
+[project]
+name = "encodeforge"
+dynamic = [
+    "version",
+    "dependencies",
+    "readme",
+    "authors",
+    "description",
+    "urls",
+    "requires-python",
+    "classifiers",
+    "keywords",
+    "license",
+    "scripts",
+    "gui-scripts",
+]
+
+[tool.setuptools]
+include-package-data = true
+py-modules = ["main", "cli"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "docs*", "EncodeForge*"]
+
+[tool.setuptools.package-data]
+resources = [
+    "icons/*",
+    "styles/*",
+]
