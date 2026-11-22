@@ -193,7 +193,9 @@ EncodeForge auto-detects available GPU encoders on startup. Backends are OS-spec
 
 > The Python row only applies if you're running from source (see [From Source](#from-source)). The pre-built binaries bundle their own interpreter.
 >
-> **macOS packaging note:** Official DMG builds target **Apple Silicon only** (`macos-latest` / arm64). Intel Mac binaries are not published.
+> **macOS packaging note:** Official DMG builds target **Apple Silicon only** (`macos-latest` / arm64). Intel Mac binaries are not published. The in-app FFmpeg downloader still selects a native `darwin-arm64` (or `darwin-x64`) static binary for whichever Mac you run on.
+>
+> **Linux aarch64 note:** Official CI packages are **x86_64** only (`manylinux_2_28_x86_64`). The packaging scripts under `packaging/linux/` detect `aarch64`/`arm64` and can produce arm64 `.deb`/`.rpm`/AppImage artifacts when you build on an ARM host. The in-app FFmpeg downloader already pulls johnvansickle's `arm64` static build on aarch64.
 
 ---
 
