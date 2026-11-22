@@ -945,6 +945,24 @@ class ConversionHandler:
                     logger.info("  Target format: mov_text (MP4 compatibility)")
                 else:
                     logger.info("  Target format: copy (MKV/WebM)")
+
+            if self.settings.dry_run:
+                self.current_output_path = None
+                if progress_callback:
+                    progress_callback({
+                        'file': input_file.name,
+                        'status': 'dry_run',
+                        'progress': 100,
+                        'message': f'Would convert → {output_path_obj.name}',
+                    })
+                return {
+                    "status": "success",
+                    "dry_run": True,
+                    "message": f"Would convert {input_file.name} → {output_path_obj.name}",
+                    "output_path": str(output_path_obj),
+                    "encoder": encoder_info["codec"],
+                    "command": cmd,
+                }
             
             # Execute conversion
             # On Unix, start FFmpeg in its own process group so we can kill the entire tree
