@@ -312,17 +312,38 @@ class SubtitleTab(QWidget):
         if self._subtitle_bg_tasks == 0 and self._batch_failures:
             self._show_batch_failure_summary()
 
-    def _opensubtitles_logged_in(self) -> bool:
+    def _conversion_settings(self):
         try:
             from utils.settings_manager import get_settings_manager
 
-            c = get_settings_manager().get_merged_conversion_settings()
-            return bool(
-                (c.opensubtitles_username or "").strip()
-                and (c.opensubtitles_password or "").strip()
-            )
+            return get_settings_manager().get_merged_conversion_settings()
         except Exception:
+            return None
+
+    def _opensubtitles_api_key_configured(self) -> bool:
+        import os
+
+        c = self._conversion_settings()
+        if c and (c.opensubtitles_api_key or "").strip():
+            return True
+        return bool(os.environ.get("ENCODEFORGE_OPENSUBTITLES_KEY", "").strip())
+
+    def _subdl_api_key_configured(self) -> bool:
+        import os
+
+        c = self._conversion_settings()
+        if c and (getattr(c, "subdl_api_key", "") or "").strip():
+            return True
+        return bool(os.environ.get("ENCODEFORGE_SUBDL_KEY", "").strip())
+
+    def _opensubtitles_logged_in(self) -> bool:
+        c = self._conversion_settings()
+        if not c:
             return False
+        return bool(
+            (c.opensubtitles_username or "").strip()
+            and (c.opensubtitles_password or "").strip()
+        )
 
     def _providers_include_opensubtitles(self) -> bool:
         if not hasattr(self, "provider_list"):
@@ -333,6 +354,18 @@ class SubtitleTab(QWidget):
                 continue
             canonical = str(item.data(Qt.ItemDataRole.UserRole) or item.text()).lower()
             if canonical == "all" or "opensubtitle" in canonical:
+                return True
+        return False
+
+    def _providers_include_subdl(self) -> bool:
+        if not hasattr(self, "provider_list"):
+            return False
+        for i in range(self.provider_list.count()):
+            item = self.provider_list.item(i)
+            if not item or not item.isSelected():
+                continue
+            t = item.text().lower()
+            if t == "all" or t == "subdl":
                 return True
         return False
 
@@ -351,10 +384,24 @@ class SubtitleTab(QWidget):
     def _show_idle_subtitle_banner(self) -> None:
         if not hasattr(self, "opensubs_status"):
             return
-        if self._providers_include_opensubtitles() and not self._opensubtitles_logged_in():
-            self.opensubs_status.setText(
-                "OpenSubtitles: add username & password in Settings for downloads (reduces 403 / quota issues)."
+        tips = []
+        if self._providers_include_opensubtitles():
+            if not self._opensubtitles_api_key_configured():
+                tips.append(
+                    "OpenSubtitles needs an API key in Settings → Accounts "
+                    "(or ENCODEFORGE_OPENSUBTITLES_KEY)."
+                )
+            elif not self._opensubtitles_logged_in():
+                tips.append(
+                    "OpenSubtitles: add username & password in Settings for higher download quotas."
+                )
+        if self._providers_include_subdl() and not self._subdl_api_key_configured():
+            tips.append(
+                "SubDL needs an API key in Settings → Accounts "
+                "(or ENCODEFORGE_SUBDL_KEY) for API search."
             )
+        if tips:
+            self.opensubs_status.setText(" ".join(tips))
             self.opensubs_status.setStyleSheet("color: #e8a040;")
         else:
             self.opensubs_status.setText("")
@@ -377,29 +424,46 @@ class SubtitleTab(QWidget):
         if not hasattr(self, "apply_btn"):
             return
         busy = self._subtitle_bg_tasks > 0
-        os_remote_block = (
-            self._selected_subtitle_is_remote_opensubtitles()
-            and not self._opensubtitles_logged_in()
+        os_key_missing = (
+            self._providers_include_opensubtitles()
+            and not self._opensubtitles_api_key_configured()
         )
-        batch_os_block = (
-            self._providers_include_opensubtitles() and not self._opensubtitles_logged_in()
+        os_remote_block = self._selected_subtitle_is_remote_opensubtitles() and (
+            not self._opensubtitles_api_key_configured()
+            or not self._opensubtitles_logged_in()
+        )
+        batch_os_block = self._providers_include_opensubtitles() and (
+            not self._opensubtitles_api_key_configured()
+            or not self._opensubtitles_logged_in()
         )
         if hasattr(self, "search_btn"):
             self.search_btn.setEnabled(not busy)
         self.apply_btn.setEnabled((not busy) and (not os_remote_block))
         self.batch_apply_btn.setEnabled((not busy) and (not batch_os_block))
         if os_remote_block:
-            self.apply_btn.setToolTip(
-                "This subtitle is from OpenSubtitles and must be downloaded with an account. "
-                "Add your opensubtitles.com username and password in Settings."
-            )
+            if not self._opensubtitles_api_key_configured():
+                self.apply_btn.setToolTip(
+                    "OpenSubtitles requires a consumer API key. "
+                    "Add it in Settings → Accounts (or ENCODEFORGE_OPENSUBTITLES_KEY)."
+                )
+            else:
+                self.apply_btn.setToolTip(
+                    "This subtitle is from OpenSubtitles and needs a logged-in account. "
+                    "Add your opensubtitles.com username and password in Settings."
+                )
         else:
             self.apply_btn.setToolTip("")
         if batch_os_block:
-            self.batch_apply_btn.setToolTip(
-                "Your provider list includes OpenSubtitles. Add an OpenSubtitles account in Settings, "
-                "or deselect OpenSubtitles / choose specific providers without it."
-            )
+            if os_key_missing:
+                self.batch_apply_btn.setToolTip(
+                    "OpenSubtitles is selected but no API key is configured. "
+                    "Add one in Settings → Accounts, or deselect OpenSubtitles."
+                )
+            else:
+                self.batch_apply_btn.setToolTip(
+                    "Your provider list includes OpenSubtitles. Add an OpenSubtitles account in Settings, "
+                    "or deselect OpenSubtitles / choose specific providers without it."
+                )
         else:
             self.batch_apply_btn.setToolTip("")
 
@@ -754,15 +818,25 @@ class SubtitleTab(QWidget):
         if self.file_table.rowCount() == 0:
             QMessageBox.warning(self, "Subtitles", "No files in the list.")
             return
-        if self._providers_include_opensubtitles() and not self._opensubtitles_logged_in():
-            QMessageBox.warning(
-                self,
-                "Subtitles",
-                "Batch apply uses your selected providers. OpenSubtitles is included but no account "
-                "is configured in Settings.\n\n"
-                "Add your opensubtitles.com username and password, or deselect OpenSubtitles.",
-            )
-            return
+        if self._providers_include_opensubtitles():
+            if not self._opensubtitles_api_key_configured():
+                QMessageBox.warning(
+                    self,
+                    "Subtitles",
+                    "OpenSubtitles is selected but no API key is configured.\n\n"
+                    "Add a consumer API key in Settings → Accounts "
+                    "(or set ENCODEFORGE_OPENSUBTITLES_KEY), or deselect OpenSubtitles.",
+                )
+                return
+            if not self._opensubtitles_logged_in():
+                QMessageBox.warning(
+                    self,
+                    "Subtitles",
+                    "Batch apply uses your selected providers. OpenSubtitles is included but no account "
+                    "is configured in Settings.\n\n"
+                    "Add your opensubtitles.com username and password, or deselect OpenSubtitles.",
+                )
+                return
         subs = self._get_subtitle_settings()
         mode = self._apply_mode_to_core(self.apply_mode_combo.currentText())
         self._set_subtitle_activity("Batch: searching and downloading…", "busy")

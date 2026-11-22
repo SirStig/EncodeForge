@@ -670,8 +670,10 @@ class SettingsPanel(QWidget):
             "tvdb": self.tvdb_key_edit,
             "omdb": self.omdb_key_edit,
             "trakt": self.trakt_key_edit,
+            "opensubtitles": getattr(self, "os_key_edit", None),
+            "subdl": getattr(self, "subdl_key_edit", None),
         }
-        if provider not in key_map:
+        if provider not in key_map or key_map[provider] is None:
             return
         key = key_map[provider].text().strip()
         lbl = getattr(self, f"_{provider}_status_lbl", None)
@@ -698,12 +700,79 @@ class SettingsPanel(QWidget):
             elif provider == "trakt":
                 from core.providers.metadata.trakt_provider import TraktProvider
                 return TraktProvider(key).validate_api_key()
+            elif provider == "opensubtitles":
+                return self._probe_opensubtitles_key(key)
+            elif provider == "subdl":
+                return self._probe_subdl_key(key)
+            return False, "Unknown provider"
 
         from utils.workers import Worker
         w = Worker(_validate)
         w.signals.result.connect(lambda r, _lbl=lbl: self._apply_key_status(_lbl, r[0], r[1]))
         w.signals.error.connect(lambda _e, _lbl=lbl: self._apply_key_status(_lbl, False, "Error"))
         QThreadPool.globalInstance().start(w)
+
+    @staticmethod
+    def _probe_opensubtitles_key(key: str):
+        """Lightweight auth check against OpenSubtitles /infos."""
+        import json
+        import urllib.error
+        import urllib.request
+
+        from core.providers.subtitle.opensubtitles_manager import OpenSubtitlesManager
+
+        url = f"{OpenSubtitlesManager.API_URL}/infos"
+        headers = {
+            "User-Agent": OpenSubtitlesManager.USER_AGENT,
+            "Accept": "application/json",
+            "Api-Key": key,
+        }
+        try:
+            req = urllib.request.Request(url, headers=headers, method="GET")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode())
+            if isinstance(data, dict):
+                return True, "Key accepted"
+            return True, "OK"
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                return False, "Invalid key"
+            return False, f"HTTP {e.code}"
+        except Exception as e:
+            return False, str(e)[:40] or "Error"
+
+    @staticmethod
+    def _probe_subdl_key(key: str):
+        """Probe SubDL with a harmless film_name query."""
+        import json
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+
+        params = urllib.parse.urlencode(
+            {"api_key": key, "film_name": "Inception", "type": "movie"}
+        )
+        url = f"https://api.subdl.com/api/v1/subtitles?{params}"
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "EncodeForge",
+                    "Accept": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode())
+            if isinstance(data, dict) and data.get("status") is False:
+                msg = str(data.get("message") or data.get("error") or "Rejected")
+                return False, msg[:40]
+            return True, "Key accepted"
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                return False, "Invalid key"
+            return False, f"HTTP {e.code}"
+        except Exception as e:
+            return False, str(e)[:40] or "Error"
 
     @staticmethod
     def _apply_key_status(lbl: QLabel, valid: bool, message: str) -> None:
@@ -803,28 +872,67 @@ class SettingsPanel(QWidget):
 
         layout.addWidget(meta)
 
-        subs = QGroupBox("OpenSubtitles Account (optional)")
+        subs = QGroupBox("Subtitle API Keys")
         subs_form = _settings_form(subs)
         subs.setToolTip(
-            "Log in to your OpenSubtitles account for higher download quotas.\n"
-            "Anonymous users are limited to a few downloads per day.\n"
-            "Free account at opensubtitles.com"
+            "OpenSubtitles and SubDL require your own API keys.\n"
+            "Keys can also be set via ENCODEFORGE_OPENSUBTITLES_KEY and\n"
+            "ENCODEFORGE_SUBDL_KEY. No keys are bundled with EncodeForge."
+        )
+
+        self.os_key_edit = QLineEdit()
+        self.os_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.os_key_edit.setPlaceholderText("OpenSubtitles consumer API key…")
+        self.os_key_edit.setToolTip(
+            "Required for OpenSubtitles search/download.\n"
+            "Register a free consumer key at opensubtitles.com/en/consumers\n"
+            "Or set ENCODEFORGE_OPENSUBTITLES_KEY in the environment."
+        )
+        subs_form.addRow(
+            "OpenSubtitles key:",
+            self._make_api_key_row(
+                self.os_key_edit,
+                "opensubtitles",
+                "https://www.opensubtitles.com/en/consumers",
+            ),
         )
 
         self.os_user_edit = QLineEdit()
         self.os_user_edit.setPlaceholderText("Your opensubtitles.com username…")
-        self.os_user_edit.setToolTip("Username for your opensubtitles.com account.")
-        subs_form.addRow("Username:", self.os_user_edit)
+        self.os_user_edit.setToolTip(
+            "Optional — raises download quota from ~5/day to ~20/day."
+        )
+        subs_form.addRow("OS username:", self.os_user_edit)
 
         self.os_pass_edit = QLineEdit()
         self.os_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.os_pass_edit.setPlaceholderText("Your opensubtitles.com password…")
-        self.os_pass_edit.setToolTip("Password for your opensubtitles.com account. Stored locally only.")
-        subs_form.addRow("Password:", self.os_pass_edit)
+        self.os_pass_edit.setToolTip(
+            "Optional OpenSubtitles password. Stored locally only."
+        )
+        subs_form.addRow("OS password:", self.os_pass_edit)
         subs_form.addRow("", _link(
-            "Create free account → opensubtitles.com",
+            "Create free OpenSubtitles account →",
             "https://www.opensubtitles.com/en/users/sign_up"
         ))
+
+        self.subdl_key_edit = QLineEdit()
+        self.subdl_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.subdl_key_edit.setPlaceholderText("SubDL API key…")
+        self.subdl_key_edit.setToolTip(
+            "Required for SubDL API search.\n"
+            "Get a free key at subdl.com\n"
+            "Or set ENCODEFORGE_SUBDL_KEY in the environment.\n"
+            "Without a key, only the web-scraping fallback may run."
+        )
+        subs_form.addRow(
+            "SubDL key:",
+            self._make_api_key_row(
+                self.subdl_key_edit,
+                "subdl",
+                "https://subdl.com/",
+            ),
+        )
 
         layout.addWidget(subs)
         layout.addStretch()
@@ -1174,8 +1282,10 @@ class SettingsPanel(QWidget):
         self.trakt_key_edit.setText(c.trakt_api_key)
         self.fanart_key_edit.setText(c.fanart_api_key)
         self.anidb_key_edit.setText(c.anidb_api_key)
+        self.os_key_edit.setText(c.opensubtitles_api_key)
         self.os_user_edit.setText(c.opensubtitles_username)
         self.os_pass_edit.setText(c.opensubtitles_password)
+        self.subdl_key_edit.setText(getattr(c, "subdl_api_key", "") or "")
 
     def _save_settings(self):
         """Save UI values to settings."""
@@ -1243,8 +1353,10 @@ class SettingsPanel(QWidget):
         c.trakt_api_key = self.trakt_key_edit.text().strip()
         c.fanart_api_key = self.fanart_key_edit.text().strip()
         c.anidb_api_key = self.anidb_key_edit.text().strip()
+        c.opensubtitles_api_key = self.os_key_edit.text().strip()
         c.opensubtitles_username = self.os_user_edit.text().strip()
         c.opensubtitles_password = self.os_pass_edit.text().strip()
+        c.subdl_api_key = self.subdl_key_edit.text().strip()
         c.additional_ffmpeg_args = self.ffmpeg_extra_edit.toPlainText().strip()
 
         # Advanced

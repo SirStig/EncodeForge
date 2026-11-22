@@ -27,12 +27,6 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
     
     API_URL = "https://api.opensubtitles.com/api/v1"
     USER_AGENT = "Encode Forge"  # MUST match registered Consumer name exactly
-    
-    # Bundled fallback consumer key. It ships inside every build and is public
-    # in the repository history, so it is shared across the whole user base and
-    # subject to a single rate-limit bucket. A user-supplied key or the
-    # ENCODEFORGE_OPENSUBTITLES_KEY environment variable always takes priority.
-    CONSUMER_API_KEY = "N5GIH7h6rpgt9HpG9wqwtXqCoLM07Ot0"
 
     def __init__(self, api_key: str = "", username: str = "", password: str = ""):
         """
@@ -40,51 +34,44 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
 
         OpenSubtitles uses TWO-LEVEL authentication:
 
-        1. CONSUMER API KEY (App-level - Developer registers):
-           - Identifies Encode Forge as the consumer of the API
-           - Limits: 40 requests/10s, 5 downloads/day per IP
+        1. CONSUMER API KEY (required):
+           - Register a free consumer key at opensubtitles.com/en/consumers
+           - Or set ENCODEFORGE_OPENSUBTITLES_KEY / Settings → Accounts
+           - Limits: 40 requests/10s, 5 downloads/day per IP without login
 
-        2. USER LOGIN (User-level - OPTIONAL):
-           - Users can login with their OpenSubtitles username/password
-           - Increases to 20 downloads/day per user account
-           - No registration needed - uses existing OpenSubtitles account
-
-        For open-source apps:
-        - You register Consumer API key once (as developer)
-        - Users optionally provide their username/password for higher limits
+        2. USER LOGIN (optional):
+           - Username/password raise the download quota to ~20/day
 
         Args:
-            api_key: (DEPRECATED - use username/password instead)
+            api_key: Consumer API key (Settings or caller). Env override used if empty.
             username: User's OpenSubtitles username (optional)
             password: User's OpenSubtitles password (optional)
         """
         super().__init__()
-        # Priority: explicitly configured key > environment override > bundled
-        # fallback. The previous order put the class constant first, which is
-        # always truthy — so a user's own key could never take effect and there
-        # was no way to recover if the bundled key was revoked.
+        # No bundled key — shipping one shared credential in source made every
+        # install fight over the same rate-limit bucket and leaked the secret
+        # into git history. Settings and ENCODEFORGE_OPENSUBTITLES_KEY only.
         self.consumer_api_key = (
             (api_key or "").strip()
             or os.environ.get("ENCODEFORGE_OPENSUBTITLES_KEY", "").strip()
-            or self.CONSUMER_API_KEY
         )
         self.username = username.strip() if username else ""
         self.password = password.strip() if password else ""
         self.user_token = None
-        
-        # Log initialization status
+
         if not self.consumer_api_key:
-            logger.warning("⚠️ OpenSubtitles disabled - no Consumer API key")
-            logger.warning("  Developer must register at: https://www.opensubtitles.com/en/consumers")
-            logger.warning("  Set CONSUMER_API_KEY in opensubtitles_manager.py")
+            logger.info(
+                "OpenSubtitles disabled — no API key. "
+                "Add one in Settings → Accounts or set ENCODEFORGE_OPENSUBTITLES_KEY. "
+                "Free key: https://www.opensubtitles.com/en/consumers"
+            )
         else:
             logger.info("OpenSubtitles initialized with Consumer API key")
             if self.username and self.password:
-                logger.info("  User login provided - attempting authentication...")
-                logger.info("  Will get 20 downloads/day (instead of 5/day)")
+                logger.info("  User login provided — higher download quota available")
             else:
-                logger.info("  ✓ Basic access: 40 searches/10s, 5 downloads/day per IP")
-                logger.info("  💡 Users can login for 20 downloads/day")
+                logger.info("  Basic access: 40 searches/10s, 5 downloads/day per IP")
+                logger.info("  Tip: add username/password in Settings for ~20 downloads/day")
     
     
     def login(self) -> bool:
@@ -281,10 +268,11 @@ class OpenSubtitlesManager(BaseSubtitleProvider):
         if languages is None:
             languages = ['en']
         
-        # Consumer API key is REQUIRED
         if not self.consumer_api_key:
-            logger.info("⚠️ OpenSubtitles skipped - no Consumer API key")
-            logger.info("   Developer must register at: https://www.opensubtitles.com/en/consumers")
+            logger.info(
+                "OpenSubtitles skipped — no API key "
+                "(Settings → Accounts or ENCODEFORGE_OPENSUBTITLES_KEY)"
+            )
             return False, []
         
         # Try to login if user credentials provided (for higher limits)
@@ -668,13 +656,20 @@ def main():
     
     video_file = sys.argv[1]
     
-    api_key = os.getenv("OPENSUBTITLES_API_KEY", "")
-    
+    api_key = (
+        os.getenv("ENCODEFORGE_OPENSUBTITLES_KEY", "")
+        or os.getenv("OPENSUBTITLES_API_KEY", "")
+    )
+
     if not api_key:
-        logger.error("OPENSUBTITLES_API_KEY environment variable is required")
-        logger.error("Get your free API key from: https://www.opensubtitles.com/en/consumers")
+        logger.error(
+            "ENCODEFORGE_OPENSUBTITLES_KEY (or OPENSUBTITLES_API_KEY) is required"
+        )
+        logger.error(
+            "Get a free key from: https://www.opensubtitles.com/en/consumers"
+        )
         return
-    
+
     manager = OpenSubtitlesManager(api_key)
     
     # Search for subtitles

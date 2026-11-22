@@ -43,9 +43,10 @@ class ConversionSettings:
     subtitle_languages: List[str] = field(default_factory=lambda: ["eng"])
     replace_existing_subtitles: bool = False
     whisper_model: str = "base"
-    opensubtitles_api_key: str = ""  # DEPRECATED - Consumer API key now hardcoded
+    opensubtitles_api_key: str = ""  # Consumer API key (Settings or ENCODEFORGE_OPENSUBTITLES_KEY)
     opensubtitles_username: str = ""  # User's OpenSubtitles username (for higher quotas)
     opensubtitles_password: str = ""  # User's OpenSubtitles password (for higher quotas)
+    subdl_api_key: str = ""  # SubDL API key (Settings or ENCODEFORGE_SUBDL_KEY)
     
     # Media renaming
     enable_renaming: bool = False

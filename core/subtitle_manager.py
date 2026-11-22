@@ -34,21 +34,30 @@ logger = logging.getLogger(__name__)
 class SubtitleProviders:
     """Orchestrates multiple subtitle providers"""
     
-    def __init__(self, opensubtitles_key: str = "", username: str = "", password: str = ""):
+    def __init__(
+        self,
+        opensubtitles_key: str = "",
+        username: str = "",
+        password: str = "",
+        subdl_key: str = "",
+    ):
         """
         Initialize subtitle providers.
-        
+
         Args:
-            opensubtitles_key: DEPRECATED - Consumer API key is now hardcoded
+            opensubtitles_key: OpenSubtitles consumer API key (or use env)
             username: OpenSubtitles username (for user login to get higher quotas)
             password: OpenSubtitles password (for user login to get higher quotas)
+            subdl_key: SubDL API key (or use ENCODEFORGE_SUBDL_KEY)
         """
-        self.opensubtitles = OpenSubtitlesManager(api_key=opensubtitles_key, username=username, password=password)
+        self.opensubtitles = OpenSubtitlesManager(
+            api_key=opensubtitles_key, username=username, password=password
+        )
 
         # Initialize modular providers
         self.yify = YifyProvider()
         self.addic7ed = Addic7edProvider()
-        self.subdl = SubDLProvider()
+        self.subdl = SubDLProvider(api_key=subdl_key)
         self.subf2m = Subf2mProvider()
         self.jimaku = JimakuProvider()
         self.podnapisi = PodnapisiProvider()
@@ -98,7 +107,9 @@ class SubtitleProviders:
 
     def _search_opensubtitles(self, video_path: str, lang_codes: List[str]) -> List[Dict]:
         """Adapter giving OpenSubtitles the same signature as the scrapers."""
-        if not self.opensubtitles:
+        if not self.opensubtitles or not getattr(
+            self.opensubtitles, "consumer_api_key", ""
+        ):
             logger.info("  OpenSubtitles.com: Not configured (no API key)")
             return []
         success, results = self.opensubtitles.search_subtitles(video_path, lang_codes)

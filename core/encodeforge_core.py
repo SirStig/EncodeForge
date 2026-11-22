@@ -72,7 +72,8 @@ class EncodeForgeCore:
         self.subtitle_providers = SubtitleProviders(
             opensubtitles_key=self.settings.opensubtitles_api_key,
             username=self.settings.opensubtitles_username,
-            password=self.settings.opensubtitles_password
+            password=self.settings.opensubtitles_password,
+            subdl_key=self.settings.subdl_api_key,
         )
         self.profile_mgr = ProfileManager()
         

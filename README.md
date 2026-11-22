@@ -146,9 +146,12 @@ Run `python cli.py rename --help` for the full option list. `encode` and `subtit
 
 ## Configuration
 
-### API Keys (Optional)
+### API Keys
 
-EncodeForge works out of the box without any API keys. Adding them just unlocks a few extra metadata providers:
+Metadata renaming works without keys via free providers. Subtitle downloads from **OpenSubtitles** and **SubDL** need your own keys (none are shipped in the app). Set them in **Settings → Accounts**, or via environment:
+
+- `ENCODEFORGE_OPENSUBTITLES_KEY`
+- `ENCODEFORGE_SUBDL_KEY`
 
 | Service | Purpose | Free Tier |
 |---------|---------|-----------|
@@ -156,9 +159,10 @@ EncodeForge works out of the box without any API keys. Adding them just unlocks 
 | [TVDB](https://thetvdb.com/dashboard/account/apikey) | TV show metadata | Yes |
 | [OMDB](http://www.omdbapi.com/apikey.aspx) | Alternative movie data | Yes (1,000/day) |
 | [Trakt](https://trakt.tv/oauth/applications) | Tracking & metadata | Yes |
-| [OpenSubtitles](https://www.opensubtitles.com/en/consumers) | Subtitle downloads | Yes (5/day) |
+| [OpenSubtitles](https://www.opensubtitles.com/en/consumers) | Subtitle downloads (required) | Yes (5/day; login raises quota) |
+| [SubDL](https://subdl.com/) | Subtitle downloads (required for API) | Yes |
 
-**Always free, no key needed:** AniDB, Kitsu, Jikan/MAL, TVmaze
+**Always free, no key needed:** AniDB, Kitsu, Jikan/MAL, TVmaze; subtitle scrapers (Addic7ed, Subf2m, YIFY, etc.)
 
 ### Hardware Acceleration
 

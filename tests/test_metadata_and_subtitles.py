@@ -111,29 +111,42 @@ def test_lang_name_to_code(provider):
 
 # ── OpenSubtitlesManager ──────────────────────────────────────────────────────
 
-def test_opensubtitles_extends_base():
+def test_opensubtitles_extends_base(monkeypatch):
     """OpenSubtitlesManager must inherit BaseSubtitleProvider (circular import fix)."""
+    monkeypatch.delenv("ENCODEFORGE_OPENSUBTITLES_KEY", raising=False)
     mgr = OpenSubtitlesManager()
     assert isinstance(mgr, BaseSubtitleProvider)
+    assert mgr.consumer_api_key == ""
     # extract_media_metadata must be callable without circular import crash
     meta = mgr.extract_media_metadata("Test.Show.S01E01.mkv")
     assert meta["is_tv_show"] is True
 
 
-def test_opensubtitles_no_key_returns_empty(tmp_path):
+def test_opensubtitles_no_key_returns_empty(tmp_path, monkeypatch):
     """Without a consumer key, search_subtitles must return (False, []) gracefully."""
-    mgr = OpenSubtitlesManager.__new__(OpenSubtitlesManager)
-    BaseSubtitleProvider.__init__(mgr)
-    mgr.consumer_api_key = ""
-    mgr.username = ""
-    mgr.password = ""
-    mgr.user_token = None
+    monkeypatch.delenv("ENCODEFORGE_OPENSUBTITLES_KEY", raising=False)
+    mgr = OpenSubtitlesManager()
+    assert mgr.consumer_api_key == ""
     # Create a real (tiny) file so calculate_file_hash gets called
     f = tmp_path / "test.mkv"
     f.write_bytes(b"\x00" * 200_000)
     success, results = mgr.search_subtitles(str(f), ["en"])
     assert success is False
     assert results == []
+
+
+def test_subdl_no_key_skips_api(monkeypatch, tmp_path):
+    """Without a SubDL key, API search is skipped (web fallback may still run)."""
+    monkeypatch.delenv("ENCODEFORGE_SUBDL_KEY", raising=False)
+    provider = SubDLProvider()
+    assert provider.api_key == ""
+    video = tmp_path / "Movie.2020.mkv"
+    video.write_bytes(b"\x00" * 1000)
+    # Force no BeautifulSoup so we assert the empty-key path returns [] quickly.
+    monkeypatch.setattr(
+        "core.providers.subtitle.subdl_provider.BS4_AVAILABLE", False
+    )
+    assert provider.search(str(video), ["eng"]) == []
 
 
 # ── SubDLProvider language mapping ───────────────────────────────────────────

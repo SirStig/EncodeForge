@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **No bundled subtitle API keys** — OpenSubtitles and SubDL no longer ship a default consumer/API key in source. Provide your own key in Settings → Accounts, or set `ENCODEFORGE_OPENSUBTITLES_KEY` / `ENCODEFORGE_SUBDL_KEY`. The Subtitles tab banners and Settings fields explain when a key is missing; SubDL may still attempt its web-scraping fallback without a key.
+
 ### Fixed
 
 - **`pip install` missing styles/icons** — `package_data` used an empty-string key with no `MANIFEST.in`, so wheels and sdists omitted `resources/`. Added `MANIFEST.in`, a `resources` package, proper `package_data`, and a `pyproject.toml` build backend so CSS and icons install under `site-packages/resources/`.
@@ -16,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **macOS packaging docs** — README now states official DMG builds are **Apple Silicon only** (no Intel Mac artifacts).
+
+---
 
 ## [0.5.0] — 2026-07-22
 

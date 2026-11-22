@@ -190,7 +190,9 @@ class TestOpenSubtitlesContract:
 
 class TestSubDLContract:
     def test_parses_fixture_response(self, monkeypatch, tmp_path):
-        provider = SubDLProvider()
+        # Contract covers the API path; supply a key so search does not
+        # short-circuit to the web-scraping fallback.
+        provider = SubDLProvider(api_key="test-subdl-key")
         fixture = _load_bytes("subdl_search.json")
 
         monkeypatch.setattr(
