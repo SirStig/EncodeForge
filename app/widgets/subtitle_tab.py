@@ -73,6 +73,8 @@ class SubtitleTab(QWidget):
         # Failures collected during a batch run, shown as one summary dialog
         # rather than one modal per file.
         self._batch_failures: List[tuple] = []
+        # Tracked for the Processes job monitor (cancel + badge).
+        self.active_workers: Dict[str, Any] = {}
 
         self._setup_ui()
         self._update_whisper_status()
@@ -108,8 +110,8 @@ class SubtitleTab(QWidget):
             QSizePolicy.Policy.Maximum,
         )
         quick_outer = QVBoxLayout(quick_host)
-        quick_outer.setContentsMargins(10, 6, 10, 4)
-        quick_outer.setSpacing(6)
+        quick_outer.setContentsMargins(12, 8, 12, 8)
+        quick_outer.setSpacing(8)
 
         mode_row = QHBoxLayout()
         mode_row.setSpacing(12)
@@ -141,22 +143,25 @@ class SubtitleTab(QWidget):
             self.language_list.addItem(item)
             if lang == "English":
                 item.setSelected(True)
-        self.language_list.setMaximumHeight(60)
+        # Tall enough to show several languages without crowding the 720p toolbar.
+        self.language_list.setMinimumHeight(100)
+        self.language_list.setMaximumHeight(160)
         self.language_list.setMinimumWidth(160)
         self.language_list.setSizePolicy(
             QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Preferred,
         )
         lists_grid.addWidget(self.language_list, 0, 1)
         lists_grid.addWidget(StyledLabel("Providers:"), 0, 2, Qt.AlignmentFlag.AlignTop)
         self.provider_list = QListWidget()
         self.provider_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self._populate_provider_list(self.provider_list, select_all=True)
-        self.provider_list.setMaximumHeight(60)
+        self.provider_list.setMinimumHeight(100)
+        self.provider_list.setMaximumHeight(160)
         self.provider_list.setMinimumWidth(200)
         self.provider_list.setSizePolicy(
             QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Preferred,
         )
         lists_grid.addWidget(self.provider_list, 0, 3)
         lists_grid.setColumnStretch(1, 1)
@@ -274,8 +279,8 @@ class SubtitleTab(QWidget):
 
         # --- Bottom Bar: Apply/Batch Apply ---
         bottom_bar = QHBoxLayout()
-        bottom_bar.setContentsMargins(12, 6, 12, 12)
-        bottom_bar.setSpacing(12)
+        bottom_bar.setContentsMargins(12, 8, 12, 12)
+        bottom_bar.setSpacing(8)
         self.apply_btn = QPushButton("Apply")
         self.batch_apply_btn = QPushButton("Batch Apply")
         self.apply_mode_combo = StyledComboBox()
@@ -300,6 +305,13 @@ class SubtitleTab(QWidget):
 
         self._subtitle_rows: List[Dict[str, Any]] = []
         self._show_idle_subtitle_banner()
+
+    def _register_worker(self, key: str, worker: Any) -> None:
+        """Track a worker for the Processes monitor; auto-drop on finish."""
+        self.active_workers[key] = worker
+        worker.signals.finished.connect(
+            lambda *_, k=key: self.active_workers.pop(k, None)
+        )
 
     def _inc_subtitle_bg(self) -> None:
         self._subtitle_bg_tasks += 1
@@ -588,6 +600,7 @@ class SubtitleTab(QWidget):
             lambda: self._set_subtitle_activity("Searching subtitle providers…", "busy")
         )
         worker.signals.finished.connect(self._on_search_worker_finished)
+        self._register_worker(f"search:{path}", worker)
         self._inc_subtitle_bg()
         self.thread_pool.start(worker)
 
@@ -606,6 +619,7 @@ class SubtitleTab(QWidget):
                 lambda: self._set_subtitle_activity("Generating subtitles with Whisper…", "busy")
             )
             worker.signals.finished.connect(self._on_search_worker_finished)
+            self._register_worker(f"generate:{path}", worker)
             self._inc_subtitle_bg()
             self.thread_pool.start(worker)
             return
@@ -796,6 +810,7 @@ class SubtitleTab(QWidget):
             lambda: self._set_subtitle_activity("Downloading / applying subtitle…", "busy")
         )
         worker.signals.finished.connect(self._dec_subtitle_bg)
+        self._register_worker(f"apply:{fp}", worker)
         self._inc_subtitle_bg()
         self.thread_pool.start(worker)
 
@@ -865,6 +880,7 @@ class SubtitleTab(QWidget):
             worker.signals.result.connect(on_res)
             worker.signals.error.connect(on_err)
             worker.signals.finished.connect(self._dec_subtitle_bg)
+            self._register_worker(f"batch:{vp}", worker)
             self.thread_pool.start(worker)
 
     def _on_batch_download_result(self, result: Any, video_path: str, mode: str) -> None:
@@ -902,6 +918,7 @@ class SubtitleTab(QWidget):
         w.signals.result.connect(lambda r, p=video_path: self._on_batch_apply_stage_result(r, p))
         w.signals.error.connect(lambda e, p=video_path: self._on_single_apply_exc(p, e))
         w.signals.finished.connect(self._dec_subtitle_bg)
+        self._register_worker(f"apply:{video_path}", w)
         self._inc_subtitle_bg()
         self.thread_pool.start(w)
 

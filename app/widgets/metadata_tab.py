@@ -98,7 +98,7 @@ class MetadataTab(QWidget):
 
         inner = QWidget()
         inner_layout = QVBoxLayout(inner)
-        inner_layout.setContentsMargins(10, 5, 10, 6)
+        inner_layout.setContentsMargins(12, 8, 12, 8)
         inner_layout.setSpacing(8)
 
         btn_row = QHBoxLayout()
@@ -170,7 +170,7 @@ class MetadataTab(QWidget):
         # --- Content area ---
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(8, 8, 8, 8)
+        content_layout.setContentsMargins(12, 8, 12, 8)
         content_layout.setSpacing(8)
 
         # --- Comparison lists ---
@@ -402,7 +402,7 @@ class MetadataTab(QWidget):
             }
             
             worker = RenamerWorker(file_path, settings)
-            
+
             # Connect signals
             worker.signals.result.connect(
                 lambda result, r=row: self._on_metadata_fetched(r, result)
@@ -410,10 +410,14 @@ class MetadataTab(QWidget):
             worker.signals.error.connect(
                 lambda error, r=row: self._on_metadata_error(r, error)
             )
-            
-            # Track worker
-            self.active_workers[str(file_path)] = worker
-            
+
+            # Track worker for Processes monitor; drop when finished
+            key = str(file_path)
+            self.active_workers[key] = worker
+            worker.signals.finished.connect(
+                lambda k=key: self.active_workers.pop(k, None)
+            )
+
             # Start worker
             self.thread_pool.start(worker)
         
