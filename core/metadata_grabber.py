@@ -65,9 +65,7 @@ class MetadataGrabber:
                  tmdb_key: str = "", 
                  tvdb_key: str = "", 
                  omdb_key: str = "",
-                 trakt_key: str = "",
-                 fanart_key: str = "",
-                 mal_client_id: str = ""):
+                 trakt_key: str = ""):
         """Initialize with API keys"""
         # Initialize providers with API keys
         self.tmdb = TMDBProvider(tmdb_key) if tmdb_key else None
@@ -86,8 +84,6 @@ class MetadataGrabber:
         self.tvdb_key = tvdb_key
         self.omdb_key = omdb_key
         self.trakt_key = trakt_key
-        self.fanart_key = fanart_key
-        self.mal_client_id = mal_client_id
 
     def configure_keys(
         self,
@@ -95,8 +91,6 @@ class MetadataGrabber:
         tvdb_key: Optional[str] = None,
         omdb_key: Optional[str] = None,
         trakt_key: Optional[str] = None,
-        fanart_key: Optional[str] = None,
-        mal_client_id: Optional[str] = None,
     ) -> None:
         """
         Update API keys and rebuild keyed provider instances.
@@ -131,12 +125,6 @@ class MetadataGrabber:
                 self.trakt = TraktProvider(key) if key else None
             self.trakt_key = key
 
-        if fanart_key is not None:
-            self.fanart_key = (fanart_key or "").strip()
-
-        if mal_client_id is not None:
-            self.mal_client_id = (mal_client_id or "").strip()
-
     def get_available_providers(self) -> Dict[str, bool]:
         """
         Get list of available providers based on configured API keys
@@ -156,8 +144,6 @@ class MetadataGrabber:
             "tvdb": bool(self.tvdb_key),
             "omdb": bool(self.omdb_key),
             "trakt": bool(self.trakt_key),
-            "fanart": bool(self.fanart_key),
-            "mal": bool(self.mal_client_id),
         }
     
     def validate_tmdb_key(self) -> Tuple[bool, str]:

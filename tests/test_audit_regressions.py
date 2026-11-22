@@ -1619,3 +1619,120 @@ class TestSubtitleSecretsHygiene:
         data = json.loads(target.read_text())
         assert data["conversion"]["opensubtitles_api_key"] == ""
         assert data["conversion"]["subdl_api_key"] == ""
+
+# P1-D — dead renamer UI: phantoms removed, invent-S01E01 stopped, race fixed
+# --------------------------------------------------------------------------- #
+
+class TestPhantomProvidersRemoved:
+    def test_available_providers_has_no_fanart_or_mal(self):
+        from core.metadata_grabber import MetadataGrabber
+
+        avail = MetadataGrabber().get_available_providers()
+        assert "fanart" not in avail
+        assert "mal" not in avail
+        assert avail["anidb"] is True
+        assert avail["jikan"] is True
+
+    def test_conversion_settings_has_no_phantom_key_fields(self):
+        from dataclasses import fields
+
+        from core.handlers.models import ConversionSettings
+
+        names = {f.name for f in fields(ConversionSettings)}
+        assert "fanart_api_key" not in names
+        assert "anidb_api_key" not in names
+        assert "tmdb_api_key" in names
+
+    def test_metadata_grabber_rejects_fanart_mal_kwargs(self):
+        from core.metadata_grabber import MetadataGrabber
+
+        with pytest.raises(TypeError):
+            MetadataGrabber(fanart_key="x")
+        with pytest.raises(TypeError):
+            MetadataGrabber(mal_client_id="x")
+
+
+class TestFolderInferenceNoInventS01E01:
+    def test_weak_folder_match_returns_title_only(self, tmp_path):
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+        from core.metadata_grabber import MetadataGrabber
+
+        show_dir = tmp_path / "My Show"
+        show_dir.mkdir()
+        video = show_dir / "My.Show.Pilot.1080p.mkv"
+        video.write_bytes(b"x")
+
+        handler = RenamingHandler(ConversionSettings(), MetadataGrabber())
+        result = handler._infer_from_folder_context(str(video))
+
+        assert result is not None
+        assert result["title"] == "My Show"
+        assert result.get("season") is None
+        assert result.get("episode") is None
+
+    def test_preview_skips_provider_search_without_season_episode(self):
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+        from core.metadata_grabber import MetadataGrabber
+
+        grabber = MetadataGrabber()
+        handler = RenamingHandler(ConversionSettings(), grabber)
+        grabber.detect_media_type = MagicMock(return_value="tv")
+        grabber.parse_tv_filename = MagicMock(
+            return_value={"title": "My Show", "season": None, "episode": None}
+        )
+        searched = []
+
+        def fake_search(*_a, **_kw):
+            searched.append(True)
+            return {"show_title": "My Show", "season": 1, "episode": 1}
+
+        grabber.search_tv_show = fake_search
+        handler._extract_metadata_from_file = MagicMock(return_value=None)
+
+        result = handler.preview_rename(
+            ["My.Show.Pilot.mkv"],
+            settings_dict={"selected_provider": "tvmaze"},
+        )
+
+        assert result["status"] == "success"
+        assert searched == []
+        assert result["metadata"] == [{}]
+
+
+class TestProviderMetadataRaceFixed:
+    def test_provider_metadata_aggregated_per_file_order(self):
+        """Workers must not mutate a shared dict; main thread aggregates."""
+        from core.handlers.models import ConversionSettings
+        from core.handlers.renaming_handler import RenamingHandler
+        from core.metadata_grabber import MetadataGrabber
+
+        grabber = MetadataGrabber()
+        handler = RenamingHandler(ConversionSettings(), grabber)
+        grabber.detect_media_type = MagicMock(return_value="movie")
+
+        def parse(name):
+            title = Path(name).stem.split(".")[0]
+            return {"title": title, "year": 2010}
+
+        grabber.parse_movie_filename = MagicMock(side_effect=parse)
+
+        def search(title, year=None, provider=None):
+            return {"title": title, "year": year or 2010, "source": "tmdb"}
+
+        grabber.search_movie = search
+        handler.settings.tmdb_api_key = "k"
+
+        files = ["Alpha.2010.mkv", "Beta.2010.mkv", "Gamma.2010.mkv"]
+        result = handler.preview_rename(
+            files,
+            settings_dict={"selected_provider": "tmdb", "tmdb_api_key": "k"},
+        )
+
+        assert result["status"] == "success"
+        assert "TMDB" in result["provider_metadata"]
+        # One entry per file, in submission order — not a raced/corrupt list.
+        assert len(result["provider_metadata"]["TMDB"]) == 3
+        titles = [m.get("title") for m in result["provider_metadata"]["TMDB"]]
+        assert titles == ["Alpha", "Beta", "Gamma"]

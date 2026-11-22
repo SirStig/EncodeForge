@@ -213,7 +213,7 @@ EncodeForge auto-detects available GPU encoders on startup. Backends are OS-spec
 - ⏳ Plugin system architecture
 - ⏳ Jellyfin & Plex direct integration
 - ⏳ Advanced subtitle synchronization
-- ⏳ Metadata artwork grabber (Fanart.tv key field exists; no provider yet)
+- ⏳ Metadata artwork grabber
 - ⏳ Subtitle preview window
 - ⏳ Rewrite quarantined subtitle scrapers (Podnapisi, SubDivX, Jimaku) or remove them entirely
 

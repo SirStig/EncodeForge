@@ -453,7 +453,6 @@ class MainWindow(GlassmorphicMainWindow):
             tvdb_key=c.tvdb_api_key or "",
             omdb_key=c.omdb_api_key or "",
             trakt_key=c.trakt_api_key or "",
-            fanart_key=c.fanart_api_key or "",
         )
         # Prefer reconfiguring a live Core if one is already held; otherwise
         # keep a session grabber in sync so settings-save exercises C2.

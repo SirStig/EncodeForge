@@ -337,11 +337,13 @@ class RenamingHandler:
                     episode_title = re.sub(r'\s+', ' ', episode_title)
                     episode_title = re.sub(r'[._]', ' ', episode_title)
                     
-                    # Assume first episode of season 1 if we can't determine more
+                    # Title-only: do not invent S01E01 from a weak folder-name
+                    # match. Season/episode need stronger signals (sibling
+                    # SxxExx, embedded tags, or OSDB hash).
                     return {
                         'title': folder_name,
-                        'season': 1,
-                        'episode': 1,
+                        'season': None,
+                        'episode': None,
                         'episode_title': episode_title if episode_title else None
                     }
             
@@ -500,190 +502,183 @@ class RenamingHandler:
             suggested_metadata = []  # Store raw metadata for each file
             providers = []
             errors = []
-            provider_metadata = {}  # Store metadata per provider for comparison (not formatted strings)
-            
-            # Process files in parallel
+            provider_metadata = {}  # Aggregated on main thread after futures complete
+
             def process_single_file(file_path):
-                """Process a single file and return its metadata"""
+                """Process a single file; return metadata, provider, error, per-file provider map."""
+                file_provider_results = {}
                 try:
                     path = Path(file_path)
                     logger.info(f"Processing: {path.name}")
-                    
-                    # Auto-detect media type from filename
+
                     media_type = self.renamer.detect_media_type(path.name)
-                    
                     logger.info(f"  Media type: {media_type}")
-                    
+
                     info = None
-                    new_name = None
                     provider = None
                     error = None
-                    
+
                     if media_type == "unknown":
-                        # Try extracting metadata from file using FFprobe for unknown types
                         logger.info("  Unknown media type, trying FFprobe metadata extraction...")
                         parsed = self._extract_metadata_from_file(file_path)
                         if parsed:
-                            media_type = "tv"  # Assume TV if we can extract S##E## from file
+                            media_type = "tv"
                         else:
                             error = "❌ ERROR: Could not detect media type from filename or file metadata."
-                    
+
                     if media_type == "tv" or media_type == "anime":
                         parsed = self.renamer.parse_tv_filename(path.name)
                         if not parsed:
-                            # Try extracting metadata from file using FFprobe
                             logger.info("  Filename parsing failed, trying FFprobe metadata extraction...")
                             parsed = self._extract_metadata_from_file(file_path)
-                        
+
                         if not parsed:
                             error = "❌ ERROR: Could not parse TV show information from filename or file metadata."
                         else:
-                            # Log what we extracted for searching
                             search_query = f"Title: '{parsed.get('title')}'"
-                            if parsed.get('season') and parsed.get('episode'):
+                            if parsed.get('season') is not None and parsed.get('episode') is not None:
                                 search_query += f", S{parsed['season']:02d}E{parsed['episode']:02d}"
                             if parsed.get('episode_title'):
                                 search_query += f", Episode: '{parsed['episode_title']}'"
                             logger.info(f"  Search query: {search_query}")
-                            
-                            # Search based on selected provider (keyless-first for automatic)
-                            if selected_provider == "automatic":
-                                providers_to_try = list(TV_AUTO_PROVIDERS)
+
+                            title = parsed.get("title")
+                            season = parsed.get("season")
+                            episode = parsed.get("episode")
+
+                            # Require real season/episode — never invent S01E01.
+                            if season is None or episode is None:
+                                logger.info(
+                                    "  Skipping provider search: season/episode unknown "
+                                    "(will not invent S01E01)"
+                                )
                             else:
-                                providers_to_try = [selected_provider]
-                            
-                            # Try ALL providers and store results from each
-                            all_provider_info = []  # Store all results with provider names
-                            # Track which providers we tried for THIS file (for alignment)
-                            file_provider_results = {}
-                            
-                            for prov in providers_to_try:
-                                prov_info = None
-                                prov_name = None
-                                    
-                                try:
-                                    # Extract search parameters (use defaults if not available)
-                                    title = parsed.get("title")
-                                    season = parsed.get("season", 1)  # Default to S01 if not found
-                                    episode = parsed.get("episode", 1)  # Default to E01 if not found
-                                    episode_title = parsed.get("episode_title")  # May be None
-                                    
-                                    # TODO: Future - use episode_title for enhanced matching
-                                    # Episode titles can help identify exact episodes when S##E## is uncertain
+                                if selected_provider == "automatic":
+                                    providers_to_try = list(TV_AUTO_PROVIDERS)
+                                else:
+                                    providers_to_try = [selected_provider]
 
-                                    if prov in KEYED_PROVIDERS and not self._provider_key_configured(prov):
-                                        logger.debug(
-                                            "Soft-skipping %s TV search (no API key)",
-                                            prov,
-                                        )
-                                        continue
+                                all_provider_info = []
 
-                                    if prov in (
-                                        "tvmaze",
-                                        "anidb",
-                                        "kitsu",
-                                        "jikan",
-                                        "tmdb",
-                                        "tvdb",
-                                        "trakt",
-                                        "omdb",
-                                    ):
-                                        prov_info = self.renamer.search_tv_show(
-                                            title,
-                                            season,
-                                            episode,
-                                            provider=prov,
-                                        )
-                                        if prov_info:
-                                            prov_name = _PROVIDER_DISPLAY_NAMES[prov]
-                                    
-                                    # Store raw metadata from this provider (don't format yet - Java will do that)
-                                    if prov_info and prov_name:
-                                        # Store raw metadata (Java will format it)
-                                        all_provider_info.append({
-                                            'info': prov_info,
-                                            'provider': prov_name
-                                        })
-                                        file_provider_results[prov_name] = prov_info
-                                        
-                                        logger.info(f"  Found match via {prov_name}: {prov_info.get('show_title', 'Unknown')} S{prov_info.get('season', 0):02d}E{prov_info.get('episode', 0):02d} - {prov_info.get('episode_title', 'N/A')}")
-                                    elif prov_name:
-                                        # Provider was tried but failed - track it as empty
-                                        file_provider_results[prov_name] = {}
-                                except Exception as e:
-                                    logger.error(f"{prov} lookup failed: {e}")
-                                    if prov in _PROVIDER_DISPLAY_NAMES:
-                                        file_provider_results[_PROVIDER_DISPLAY_NAMES[prov]] = {}
-                            
-                            # Store results from ALL providers for THIS file (including empty ones for alignment)
-                            for prov_name, prov_info in file_provider_results.items():
-                                if prov_name not in provider_metadata:
-                                    provider_metadata[prov_name] = []
-                                provider_metadata[prov_name].append(prov_info if prov_info else {})
-                            
-                            # After trying all providers, prefer English title
-                            if all_provider_info:
-                                # Extract just the info dicts for preference function
-                                info_dicts = [item['info'] for item in all_provider_info]
-                                preferred_info = self._prefer_english_title(info_dicts)
-                                
-                                # Find the matching provider item
-                                for item in all_provider_info:
-                                    if item['info'] == preferred_info:
-                                        info = item['info']
-                                        provider = item['provider']
-                                        logger.info(f"  ✓ Selected result from {provider}: {info.get('show_title', 'Unknown')} S{info.get('season', 0):02d}E{info.get('episode', 0):02d}")
-                                        break
-                            
-                            if not info:
-                                # Don't show error, just leave blank
-                                season_str = f"S{parsed['season']:02d}" if parsed.get('season') else "S??"
-                                episode_str = f"E{parsed['episode']:02d}" if parsed.get('episode') else "E??"
-                                logger.info(f"  No metadata found for '{parsed.get('title', 'Unknown')}' {season_str}{episode_str}")
-                            elif parsed.get('episode2'):
-                                # A double-episode file ("S01E05E06") — `info`
-                                # above only covers the first episode. Fetch
-                                # the second episode's title from the same
-                                # provider so {episode_title} doesn't silently
-                                # cover only half the file.
-                                info = dict(info)
-                                info['episode2'] = parsed['episode2']
-                                prov_key = {
-                                    display: key
-                                    for key, display in _PROVIDER_DISPLAY_NAMES.items()
-                                }.get(provider)
-                                if prov_key:
+                                for prov in providers_to_try:
+                                    prov_info = None
+                                    prov_name = None
+
                                     try:
-                                        info2 = self.renamer.search_tv_show(
-                                            title, season, parsed['episode2'], provider=prov_key
-                                        )
-                                        if info2 and info2.get('episode_title'):
-                                            info['episode_title'] = (
-                                                f"{info.get('episode_title', '')} & {info2['episode_title']}"
-                                            ).strip(' &')
+                                        if prov in KEYED_PROVIDERS and not self._provider_key_configured(prov):
+                                            logger.debug(
+                                                "Soft-skipping %s TV search (no API key)",
+                                                prov,
+                                            )
+                                            continue
+
+                                        if prov in (
+                                            "tvmaze",
+                                            "anidb",
+                                            "kitsu",
+                                            "jikan",
+                                            "tmdb",
+                                            "tvdb",
+                                            "trakt",
+                                            "omdb",
+                                        ):
+                                            prov_info = self.renamer.search_tv_show(
+                                                title,
+                                                season,
+                                                episode,
+                                                provider=prov,
+                                            )
+                                            if prov_info:
+                                                prov_name = _PROVIDER_DISPLAY_NAMES[prov]
+
+                                        if prov_info and prov_name:
+                                            all_provider_info.append({
+                                                'info': prov_info,
+                                                'provider': prov_name,
+                                            })
+                                            file_provider_results[prov_name] = prov_info
+                                            logger.info(
+                                                f"  Found match via {prov_name}: "
+                                                f"{prov_info.get('show_title', 'Unknown')} "
+                                                f"S{prov_info.get('season', 0):02d}"
+                                                f"E{prov_info.get('episode', 0):02d} - "
+                                                f"{prov_info.get('episode_title', 'N/A')}"
+                                            )
+                                        elif prov_name:
+                                            file_provider_results[prov_name] = {}
                                     except Exception as e:
-                                        logger.debug(f"Second-episode title lookup failed: {e}")
-                    
+                                        logger.error(f"{prov} lookup failed: {e}")
+                                        if prov in _PROVIDER_DISPLAY_NAMES:
+                                            file_provider_results[_PROVIDER_DISPLAY_NAMES[prov]] = {}
+
+                                if all_provider_info:
+                                    info_dicts = [item['info'] for item in all_provider_info]
+                                    preferred_info = self._prefer_english_title(info_dicts)
+                                    for item in all_provider_info:
+                                        if item['info'] == preferred_info:
+                                            info = item['info']
+                                            provider = item['provider']
+                                            logger.info(
+                                                f"  ✓ Selected result from {provider}: "
+                                                f"{info.get('show_title', 'Unknown')} "
+                                                f"S{info.get('season', 0):02d}"
+                                                f"E{info.get('episode', 0):02d}"
+                                            )
+                                            break
+
+                                if not info:
+                                    season_str = (
+                                        f"S{parsed['season']:02d}"
+                                        if parsed.get('season') is not None else "S??"
+                                    )
+                                    episode_str = (
+                                        f"E{parsed['episode']:02d}"
+                                        if parsed.get('episode') is not None else "E??"
+                                    )
+                                    logger.info(
+                                        f"  No metadata found for "
+                                        f"'{parsed.get('title', 'Unknown')}' "
+                                        f"{season_str}{episode_str}"
+                                    )
+                                elif parsed.get('episode2'):
+                                    info = dict(info)
+                                    info['episode2'] = parsed['episode2']
+                                    prov_key = {
+                                        display: key
+                                        for key, display in _PROVIDER_DISPLAY_NAMES.items()
+                                    }.get(provider)
+                                    if prov_key:
+                                        try:
+                                            info2 = self.renamer.search_tv_show(
+                                                title, season, parsed['episode2'],
+                                                provider=prov_key,
+                                            )
+                                            if info2 and info2.get('episode_title'):
+                                                info['episode_title'] = (
+                                                    f"{info.get('episode_title', '')} & "
+                                                    f"{info2['episode_title']}"
+                                                ).strip(' &')
+                                        except Exception as e:
+                                            logger.debug(
+                                                f"Second-episode title lookup failed: {e}"
+                                            )
+
                     elif media_type == "movie":
                         parsed = self.renamer.parse_movie_filename(path.name)
                         if not parsed:
                             error = "❌ ERROR: Could not parse movie information."
                         else:
-                            # Search based on selected provider (keyless-first for automatic)
                             if selected_provider == "automatic":
                                 providers_to_try = list(MOVIE_AUTO_PROVIDERS)
                             else:
                                 providers_to_try = [selected_provider]
-                            
-                            # Try ALL providers and store results from each
-                            all_provider_info = []  # Store all results with provider names
-                            # Track which providers we tried for THIS file (for alignment)
-                            file_provider_results = {}
-                            
+
+                            all_provider_info = []
+
                             for prov in providers_to_try:
                                 prov_info = None
                                 prov_name = None
-                                    
+
                                 try:
                                     if prov in KEYED_PROVIDERS and not self._provider_key_configured(prov):
                                         logger.debug(
@@ -707,85 +702,93 @@ class RenamingHandler:
                                         )
                                         if prov_info:
                                             prov_name = _PROVIDER_DISPLAY_NAMES[prov]
-                                    
-                                    # Store result from this provider
+
                                     if prov_info and prov_name:
-                                        # Store raw metadata (Java will format it)
                                         all_provider_info.append({
                                             'info': prov_info,
-                                            'provider': prov_name
+                                            'provider': prov_name,
                                         })
                                         file_provider_results[prov_name] = prov_info
-                                        
-                                        logger.info(f"  Found match via {prov_name}: {prov_info.get('title', 'Unknown')} ({prov_info.get('year', 'N/A')})")
+                                        logger.info(
+                                            f"  Found match via {prov_name}: "
+                                            f"{prov_info.get('title', 'Unknown')} "
+                                            f"({prov_info.get('year', 'N/A')})"
+                                        )
                                     elif prov_name:
-                                        # Provider was tried but failed - track it as empty
                                         file_provider_results[prov_name] = {}
                                 except Exception as e:
                                     logger.error(f"{prov} movie lookup failed: {e}")
                                     if prov in _PROVIDER_DISPLAY_NAMES:
                                         file_provider_results[_PROVIDER_DISPLAY_NAMES[prov]] = {}
-                            
-                            # Store results from ALL providers for THIS file (including empty ones for alignment)
-                            for prov_name, prov_info in file_provider_results.items():
-                                if prov_name not in provider_metadata:
-                                    provider_metadata[prov_name] = []
-                                provider_metadata[prov_name].append(prov_info if prov_info else {})
-                            
-                            # After trying all providers, prefer English title
+
                             if all_provider_info:
-                                
-                                # Extract just the info dicts for preference function
                                 info_dicts = [item['info'] for item in all_provider_info]
                                 preferred_info = self._prefer_english_title(info_dicts)
-                                
-                                # Find the matching provider item
                                 for item in all_provider_info:
                                     if item['info'] == preferred_info:
                                         info = item['info']
                                         provider = item['provider']
-                                        logger.info(f"  ✓ Selected result from {provider}: {info.get('title', 'Unknown')} ({info.get('year', 'N/A')})")
+                                        logger.info(
+                                            f"  ✓ Selected result from {provider}: "
+                                            f"{info.get('title', 'Unknown')} "
+                                            f"({info.get('year', 'N/A')})"
+                                        )
                                         break
-                            
+
                             if not info:
-                                # Don't show error, just leave blank
-                                year_str = f" ({parsed.get('year')})" if parsed.get('year') else ""
-                                logger.info(f"  No metadata found for movie '{parsed['title']}'{year_str}")
-                
+                                year_str = (
+                                    f" ({parsed.get('year')})"
+                                    if parsed.get('year') else ""
+                                )
+                                logger.info(
+                                    f"  No metadata found for movie "
+                                    f"'{parsed['title']}'{year_str}"
+                                )
+
                     if info:
                         logger.info(f"  ✓ Metadata found [via {provider}]")
                     elif error:
                         logger.warning(f"  {error}")
                     else:
                         logger.info("  No metadata found - leaving blank")
-                    return info if info else {}, provider if provider else "None", error if error else ""
+                    return (
+                        info if info else {},
+                        provider if provider else "None",
+                        error if error else "",
+                        file_provider_results,
+                    )
                 except Exception as e:
                     logger.error(f"Error processing {file_path}: {e}", exc_info=True)
-                    return {}, "Error", str(e)
-            
-            # Process files in parallel, preserving submission order
+                    return {}, "Error", str(e), {}
+
+            # Process files in parallel, preserving submission order.
+            # Aggregate provider_metadata on the main thread to avoid races.
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [executor.submit(process_single_file, fp) for fp in file_paths]
 
             for fp, future in zip(file_paths, futures):
                 try:
-                    meta, prov, err = future.result()
+                    meta, prov, err, file_prov = future.result()
                 except Exception as e:
                     logger.error(f"Error processing {fp}: {e}", exc_info=True)
-                    meta, prov, err = {}, "Error", str(e)
+                    meta, prov, err, file_prov = {}, "Error", str(e), {}
                 suggested_metadata.append(meta)
                 providers.append(prov)
                 errors.append(err)
-            
+                for prov_name, prov_info in file_prov.items():
+                    if prov_name not in provider_metadata:
+                        provider_metadata[prov_name] = []
+                    provider_metadata[prov_name].append(prov_info if prov_info else {})
+
             logger.info(f"=== Preview Complete: {len(suggested_metadata)} file(s) processed ===")
             logger.info(f"Provider results: {list(provider_metadata.keys())}")
-            
+
             return {
                 "status": "success",
-                "metadata": suggested_metadata,  # Raw metadata for each file (Java will format)
+                "metadata": suggested_metadata,
                 "providers": providers,
                 "errors": errors,
-                "provider_metadata": provider_metadata  # Per-provider metadata for comparison
+                "provider_metadata": provider_metadata,
             }
         except Exception as e:
             logger.error(f"Error in preview_rename: {e}", exc_info=True)
