@@ -155,9 +155,9 @@ class EncodeForgeCore:
                 
                 logger.info("Creating SubtitleHandler...")
                 logger.info("About to call SubtitleHandler constructor...")
-                # Pass None instead of self to avoid triggering lazy whisper_mgr loading during handler init
-                # SubtitleHandler will get whisper_mgr from the parent later when actually needed
-                self.subtitle_handler = SubtitleHandler(self.settings, None, self.subtitle_providers)
+                # Pass self so SubtitleHandler shares Core's lazy whisper_mgr
+                # (hasattr check on EncodeForgeCore does not trigger the property).
+                self.subtitle_handler = SubtitleHandler(self.settings, self, self.subtitle_providers)
                 logger.info("SubtitleHandler constructor returned")
                 logger.info("SubtitleHandler created successfully")
                 

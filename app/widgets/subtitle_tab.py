@@ -11,15 +11,10 @@ from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QCheckBox,
-    QComboBox,
     QFileDialog,
-    QFormLayout,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -28,7 +23,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QTableWidgetItem,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -36,7 +30,6 @@ from PySide6.QtWidgets import (
 from app.widgets.custom_widgets import (
     AutoResizeTable,
     GlassmorphicButton,
-    StyledCheckBox,
     StyledComboBox,
     StyledLabel,
     StyledTextEdit,
@@ -74,7 +67,6 @@ class SubtitleTab(QWidget):
         super().__init__(parent)
         self.thread_pool = thread_pool
         self.notifier = get_notification_manager()
-        self.active_workers: Dict[str, SubtitleWorker] = {}
         self._splitter_initialized = False
         self._subtitle_bg_tasks = 0
         # Failures collected during a batch run, shown as one summary dialog
@@ -82,7 +74,6 @@ class SubtitleTab(QWidget):
         self._batch_failures: List[tuple] = []
 
         self._setup_ui()
-        self._connect_signals()
         self._update_whisper_status()
         self._update_subtitle_action_buttons()
         logger.debug("Subtitle tab initialized - using base glassmorphism theme")
@@ -222,6 +213,7 @@ class SubtitleTab(QWidget):
         self.file_table.setColumns(headers=["Files"])  # Single column auto-stretches
         self.file_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.file_table.setMinimumWidth(200)
+        self.file_table.enableDragDrop(self._drag_enter_event, self._drop_event)
         file_layout.addWidget(self.file_table)
 
         # File management buttons under the file table
@@ -304,9 +296,6 @@ class SubtitleTab(QWidget):
         self.apply_btn.clicked.connect(self._on_apply_clicked)
         self.batch_apply_btn.clicked.connect(self._on_batch_apply_clicked)
         self.subs_table.itemSelectionChanged.connect(self._on_subtitle_selected)
-
-        # Hide Add Files/Add Folder buttons (now only in sidebar)
-        # Remove sync, encoding, format, and other legacy options
 
         self._subtitle_rows: List[Dict[str, Any]] = []
         self._show_idle_subtitle_banner()
@@ -849,189 +838,6 @@ class SubtitleTab(QWidget):
             msg = result.get("message", "Apply failed.") if isinstance(result, dict) else str(result)
             self._report_subtitle_failure(video_path, msg, quiet=True)
 
-    def _create_file_panel(self) -> QWidget:
-        """Create file list and queue management panel."""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        
-        # Toolbar
-        toolbar = QHBoxLayout()
-        
-        from PySide6.QtWidgets import QStyle
-        
-        self.add_files_btn = QPushButton("Add Files")
-        self.add_files_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
-        self.add_folder_btn = QPushButton("Add Folder")
-        self.add_folder_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
-        self.remove_btn = QPushButton("Remove")
-        self.remove_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
-        self.clear_btn = QPushButton("Clear All")
-        
-        toolbar.addWidget(self.add_files_btn)
-        toolbar.addWidget(self.add_folder_btn)
-        toolbar.addWidget(self.remove_btn)
-        toolbar.addWidget(self.clear_btn)
-        toolbar.addStretch()
-        
-        layout.addLayout(toolbar)
-        
-        # File table
-        self.file_table = AutoResizeTable()
-        self.file_table.setColumns(
-            headers=["File", "Language", "Status", "Progress", "Method"],
-            initial_widths=[250, 100, 100, 100]  # Method column auto-stretches
-        )
-        self.file_table.enableDragDrop(self._drag_enter_event, self._drop_event)
-        
-        layout.addWidget(self.file_table, 1)  # Give table full stretch
-        
-        # Queue controls
-        queue_controls = QHBoxLayout()
-        
-        self.start_btn = QPushButton("Start Processing")
-        self.start_btn.setEnabled(False)
-        self.stop_btn = QPushButton("Stop")
-        self.stop_btn.setEnabled(False)
-        
-        queue_controls.addWidget(self.start_btn)
-        queue_controls.addWidget(self.stop_btn)
-        queue_controls.addStretch()
-        
-        layout.addLayout(queue_controls)
-        
-        return panel
-    
-    def _create_settings_panel(self) -> QWidget:
-        """Create subtitle settings panel."""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        
-        # Mode selection
-        mode_group = QGroupBox("Processing Mode")
-        mode_layout = QVBoxLayout()
-        
-        self.download_radio = StyledCheckBox("Download from Providers")
-        self.download_radio.setChecked(True)
-        self.whisper_radio = StyledCheckBox("Generate with Whisper AI")
-        
-        mode_layout.addWidget(self.download_radio)
-        mode_layout.addWidget(self.whisper_radio)
-        
-        mode_group.setLayout(mode_layout)
-        layout.addWidget(mode_group)
-        
-        # Language selection
-        lang_group = QGroupBox("Language Settings")
-        lang_layout = QFormLayout()
-        
-        self.language_combo = StyledComboBox()
-        self.language_combo.addItems([
-            "English", "Spanish", "French", "German", "Italian",
-            "Portuguese", "Russian", "Japanese", "Korean", "Chinese",
-            "Arabic", "Dutch", "Polish", "Swedish", "Turkish"
-        ])
-        lang_layout.addRow("Primary Language:", self.language_combo)
-        
-        self.fallback_check = StyledCheckBox("Try other languages if not found")
-        self.fallback_check.setChecked(True)
-        lang_layout.addRow("", self.fallback_check)
-        
-        lang_group.setLayout(lang_layout)
-        layout.addWidget(lang_group)
-        
-        # Provider selection (for download mode)
-        self.provider_group = QGroupBox("Subtitle Providers")
-        provider_layout = QVBoxLayout()
-        
-        providers_label = StyledLabel("Select providers to search:")
-        providers_label.setObjectName("providers_label")
-        provider_layout.addWidget(providers_label)
-        
-        self.provider_list = QListWidget()
-        self.provider_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-        self._populate_provider_list(
-            self.provider_list, select_all=False, include_all=False, select_first_n=3
-        )
-        provider_layout.addWidget(self.provider_list)
-        
-        self.provider_group.setLayout(provider_layout)
-        layout.addWidget(self.provider_group)
-        
-        # Whisper AI settings (for generation mode)
-        self.whisper_group = QGroupBox("Whisper AI Settings")
-        whisper_layout = QFormLayout()
-        
-        self.whisper_model_combo = StyledComboBox()
-        self.whisper_model_combo.addItems([
-            "tiny (fastest, least accurate)",
-            "base",
-            "small",
-            "medium (recommended)",
-            "large (best quality, slowest)"
-        ])
-        self.whisper_model_combo.setCurrentIndex(3)  # medium
-        whisper_layout.addRow("Model:", self.whisper_model_combo)
-        
-        self.whisper_device_combo = StyledComboBox()
-        self.whisper_device_combo.addItems(["Auto", "CPU", "CUDA (GPU)", "MPS (Apple Silicon)"])
-        whisper_layout.addRow("Device:", self.whisper_device_combo)
-        
-        self.translate_check = StyledCheckBox("Translate to English")
-        whisper_layout.addRow("", self.translate_check)
-        
-        self.whisper_group.setLayout(whisper_layout)
-        self.whisper_group.setVisible(False)  # Hidden by default
-        layout.addWidget(self.whisper_group)
-        
-        # Output settings
-        output_group = QGroupBox("Output Settings")
-        output_layout = QFormLayout()
-        
-        self.subtitle_format_combo = StyledComboBox()
-        self.subtitle_format_combo.addItems(["SRT", "VTT", "ASS/SSA"])
-        output_layout.addRow("Format:", self.subtitle_format_combo)
-        
-        self.encoding_combo = StyledComboBox()
-        self.encoding_combo.addItems(["UTF-8", "UTF-8 BOM", "ASCII", "ISO-8859-1"])
-        output_layout.addRow("Encoding:", self.encoding_combo)
-        
-        self.sync_check = StyledCheckBox("Attempt to sync subtitles")
-        self.sync_check.setChecked(True)
-        output_layout.addRow("", self.sync_check)
-        
-        output_group.setLayout(output_layout)
-        layout.addWidget(output_group)
-        
-        # Preview section
-        preview_group = QGroupBox("Subtitle Preview")
-        preview_layout = QVBoxLayout()
-        
-        self.preview_text = StyledTextEdit()
-        self.preview_text.setReadOnly(True)
-        self.preview_text.setPlaceholderText("Subtitle preview will appear here...")
-        self.preview_text.setMaximumHeight(150)
-        
-        preview_layout.addWidget(self.preview_text)
-        
-        preview_buttons = QHBoxLayout()
-        self.load_preview_btn = QPushButton("Load Subtitle")
-        self.load_preview_btn.setProperty("secondary", True)
-        preview_buttons.addWidget(self.load_preview_btn)
-        preview_buttons.addStretch()
-        
-        preview_layout.addLayout(preview_buttons)
-        
-        preview_group.setLayout(preview_layout)
-        layout.addWidget(preview_group)
-        
-        layout.addStretch()
-        
-        return panel
-    
-    def _connect_signals(self):
-        # All legacy buttons are removed; only connect signals for new UI if needed
-        pass
-    
     def _on_mode_changed(self):
         """Handle processing mode change."""
         mode = self.mode_combo.currentText()
@@ -1043,16 +849,19 @@ class SubtitleTab(QWidget):
             self._whisper_banner.setVisible(False)
 
     def _update_whisper_status(self):
-        """Check faster-whisper availability and update the status label + banner."""
+        """Check faster-whisper availability via shared EncodeForgeCore."""
         try:
-            from core.providers.subtitle.whisper_manager import WhisperManager
-            mgr = WhisperManager()
-            if mgr.whisper_available and mgr.installed_models:
-                model_list = ", ".join(mgr.installed_models)
+            from core.encodeforge_core import EncodeForgeCore
+
+            status = EncodeForgeCore().check_whisper()
+            available = bool(status.get("whisper_available"))
+            models = status.get("installed_models") or []
+            if available and models:
+                model_list = ", ".join(models)
                 self.whisper_status.setText(f"Whisper: ready ({model_list})")
                 self.whisper_status.setStyleSheet("color: #3fc66d;")
                 self._whisper_banner.setVisible(False)
-            elif mgr.whisper_available:
+            elif available:
                 self.whisper_status.setText("Whisper: installed — no model downloaded")
                 self.whisper_status.setStyleSheet("color: #e8a040;")
                 self._whisper_banner.setVisible(
@@ -1071,6 +880,7 @@ class SubtitleTab(QWidget):
     def _open_whisper_setup(self):
         """Open the Whisper setup dialog and refresh status on close."""
         from app.dialogs.whisper_setup_dialog import WhisperSetupDialog
+
         dlg = WhisperSetupDialog(self)
         dlg.exec()
         self._update_whisper_status()
@@ -1181,51 +991,6 @@ class SubtitleTab(QWidget):
         for row in selected_rows:
             self.file_table.removeRow(row)
     
-    def _clear_all(self):
-        """Clear all files from file list."""
-        self.file_table.setRowCount(0)
-    
-    def _start_processing(self):
-        """Start subtitle processing for all queued files."""
-        logger.info("Starting subtitle processing")
-        
-        # Get selected files from file table
-        for row in range(self.file_table.rowCount()):
-            item = self.file_table.item(row, 0)
-            if item:
-                file_path = Path(item.data(Qt.ItemDataRole.UserRole))
-                self._process_file(row, file_path)
-    
-    def _process_file(self, row: int, file_path: Path):
-        """Process a single file for subtitles."""
-        logger.info(f"Processing subtitles for: {file_path.name}")
-        
-        # Get subtitle settings
-        settings = self._get_subtitle_settings()
-        
-        # Create worker
-        worker = SubtitleWorker(file_path, settings)
-        
-        # Connect signals
-        worker.signals.started.connect(
-            lambda: self._on_subtitle_started(row, str(file_path))
-        )
-        worker.signals.progress.connect(
-            lambda cur, tot, msg: self._on_subtitle_progress(row, cur, tot, msg)
-        )
-        worker.signals.result.connect(
-            lambda result: self._on_subtitle_completed(row, str(file_path))
-        )
-        worker.signals.error.connect(
-            lambda error: self._on_subtitle_error(row, str(file_path), error)
-        )
-        
-        # Track worker
-        self.active_workers[str(file_path)] = worker
-        
-        # Start worker
-        self.thread_pool.start(worker)
-    
     def _get_subtitle_settings(self) -> Dict[str, Any]:
         """Get current subtitle settings as dictionary."""
         # Get selected languages
@@ -1284,90 +1049,3 @@ class SubtitleTab(QWidget):
             'whisper_model': whisper_model
         }
     
-    def _on_subtitle_started(self, row: int, file_path: str):
-        """Handle subtitle processing started."""
-        self.subtitle_started.emit(file_path)
-        logger.debug(f"Subtitle processing started for row {row}: {file_path}")
-    
-    def _on_subtitle_progress(self, row: int, current: int, total: int, message: str):
-        """Handle subtitle processing progress."""
-        self.subtitle_progress.emit("", current, total, message)
-        logger.debug(f"Subtitle progress row {row}: {current}/{total} - {message}")
-    
-    def _on_subtitle_completed(self, _row: int, file_path: str):
-        """Handle subtitle processing completed."""
-        self.subtitle_completed.emit(file_path)
-        logger.info(f"Subtitle processing completed for: {file_path}")
-        
-        # Remove from active workers
-        if file_path in self.active_workers:
-            del self.active_workers[file_path]
-        
-        # Show notification
-        self.notifier.show_notification(
-            title="Subtitles Ready",
-            message=f"Subtitles downloaded/generated for {Path(file_path).name}",
-            notification_type="success"
-        )
-    
-    def _on_subtitle_error(self, _row: int, file_path: str, error: tuple):
-        """Handle subtitle processing error."""
-        error_msg = str(error[1]) if len(error) > 1 else "Unknown error"
-        self.subtitle_error.emit(file_path, error_msg)
-        logger.error(f"Subtitle processing error for {file_path}: {error_msg}")
-        
-        # Remove from active workers
-        if file_path in self.active_workers:
-            del self.active_workers[file_path]
-        
-        # Show notification
-        self.notifier.show_notification(
-            title="Subtitle Error",
-            message=f"Failed to process subtitles for {Path(file_path).name}: {error_msg}",
-            notification_type="error"
-        )
-    
-    def _stop_processing(self):
-        """Stop all subtitle processing."""
-        logger.info("Stopping subtitle processing")
-        
-        for worker in self.active_workers.values():
-            worker.stop()
-        
-        self.active_workers.clear()
-    
-    def _check_queue_complete(self):
-        """Check if all subtitle processing is complete."""
-        return len(self.active_workers) == 0
-    
-    def _load_preview(self):
-        """Load subtitle preview for selected file."""
-        # Get selected file
-        selected_items = self.file_table.selectedItems()
-        if not selected_items:
-            return
-        
-        row = selected_items[0].row()
-        item = self.file_table.item(row, 0)
-        if not item:
-            return
-        
-        file_path = Path(item.data(Qt.ItemDataRole.UserRole))
-        
-        # Look for subtitle files
-        subtitle_files = list(file_path.parent.glob(f"{file_path.stem}*.srt"))
-        subtitle_files.extend(list(file_path.parent.glob(f"{file_path.stem}*.ass")))
-        subtitle_files.extend(list(file_path.parent.glob(f"{file_path.stem}*.vtt")))
-        
-        if subtitle_files and hasattr(self, 'preview_text'):
-            # Load first subtitle file
-            try:
-                with open(subtitle_files[0], 'r', encoding='utf-8') as f:
-                    content = f.read(5000)  # First 5000 chars
-                    self.preview_text.setPlainText(content)
-                    logger.info(f"Loaded subtitle preview: {subtitle_files[0].name}")
-            except Exception as e:
-                logger.error(f"Failed to load subtitle preview: {e}")
-                self.preview_text.setPlainText(f"Error loading subtitle: {e}")
-        elif hasattr(self, 'preview_text'):
-            self.preview_text.setPlainText("No subtitle files found for this video.")

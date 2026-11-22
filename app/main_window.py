@@ -598,10 +598,11 @@ class MainWindow(GlassmorphicMainWindow):
         self._ffmpeg_status_btn.style().polish(self._ffmpeg_status_btn)
 
         try:
-            from core.providers.subtitle.whisper_manager import WhisperManager
-            wm = WhisperManager()
-            whisper_installed = wm.whisper_available
-            whisper_has_models = bool(wm.installed_models)
+            from core.encodeforge_core import EncodeForgeCore
+
+            status = EncodeForgeCore().check_whisper()
+            whisper_installed = bool(status.get("whisper_available"))
+            whisper_has_models = bool(status.get("installed_models"))
         except Exception:
             whisper_installed = False
             whisper_has_models = False
@@ -629,9 +630,17 @@ class MainWindow(GlassmorphicMainWindow):
 
     def _open_whisper_setup(self):
         from app.dialogs.whisper_setup_dialog import WhisperSetupDialog
+        from core.encodeforge_core import EncodeForgeCore
+
         dlg = WhisperSetupDialog(self)
         dlg.exec()
+        # Any long-lived Core already probed Whisper before install must re-check.
+        core = getattr(self, "_encodeforge_core", None)
+        if isinstance(core, EncodeForgeCore):
+            core.reset_whisper_check()
         self._refresh_tool_status()
+        if self.subtitle_tab is not None and hasattr(self.subtitle_tab, "_update_whisper_status"):
+            self.subtitle_tab._update_whisper_status()
 
     def _update_status(self, message: str):
         try:

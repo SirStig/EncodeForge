@@ -1394,3 +1394,80 @@ class TestKeylessFirstMetadataProviders:
         grabber.anidb.search_movie.assert_called_once()
         grabber.kitsu.search_movie.assert_called_once()
         grabber.jikan.search_movie.assert_called_once()
+
+# P2-C — SubtitleHandler shares Core Whisper; dead dual-UI removed
+# --------------------------------------------------------------------------- #
+
+class TestSubtitleWhisperSharedViaCore:
+    def test_handler_uses_parent_core_whisper_mgr(self, isolated_app_data):
+        """Passing Core into SubtitleHandler must not spawn a second WhisperManager."""
+        from core.encodeforge_core import EncodeForgeCore
+        from core.handlers.subtitle_handler import SubtitleHandler
+
+        sentinel = object()
+        core = EncodeForgeCore()
+        core._handlers_initialized = True  # skip full handler init for this unit test
+        core._whisper_checked = True
+        core._whisper_mgr = sentinel
+
+        handler = SubtitleHandler(core.settings, core, None)
+        assert handler._lazy_load is False
+        assert handler._core is core
+        assert handler.whisper_mgr is sentinel
+
+    def test_handler_init_does_not_probe_core_whisper(self, isolated_app_data):
+        """Parent-core detection must not invoke Core.whisper_mgr during __init__."""
+        from core.encodeforge_core import EncodeForgeCore
+        from core.handlers.subtitle_handler import SubtitleHandler
+
+        core = EncodeForgeCore()
+        core._handlers_initialized = True
+        assert core._whisper_checked is False
+
+        handler = SubtitleHandler(core.settings, core, None)
+        assert core._whisper_checked is False
+        assert handler._whisper_mgr is None
+        assert handler._core is core
+
+    def test_ensure_handlers_passes_self_not_none(self, isolated_app_data, monkeypatch):
+        from core.encodeforge_core import EncodeForgeCore
+        from core.handlers.subtitle_handler import SubtitleHandler
+
+        captured = {}
+
+        def fake_init(self, settings, core_or_whisper_mgr, subtitle_providers):
+            captured["arg"] = core_or_whisper_mgr
+            self.settings = settings
+            self._core = core_or_whisper_mgr
+            self._whisper_mgr = None
+            self._lazy_load = False
+            self.subtitle_providers = subtitle_providers
+
+        monkeypatch.setattr(SubtitleHandler, "__init__", fake_init)
+
+        core = EncodeForgeCore()
+        # Force handler construction (also builds other handlers; stub heavy deps).
+        monkeypatch.setattr(core, "ffmpeg_mgr", MagicMock())
+        monkeypatch.setattr(core, "renamer", MagicMock())
+        monkeypatch.setattr(core, "subtitle_providers", MagicMock())
+        core._ensure_handlers_initialized()
+        assert captured["arg"] is core
+
+
+class TestSubtitleDeadDualUiRemoved:
+    def test_unmounted_panel_builders_are_gone(self):
+        # Read source so this assertion does not require a display/PySide import.
+        src = Path(__file__).resolve().parents[1] / "app" / "widgets" / "subtitle_tab.py"
+        text = src.read_text(encoding="utf-8")
+        for name in (
+            "_create_file_panel",
+            "_create_settings_panel",
+            "_connect_signals",
+            "_start_processing",
+            "_process_file",
+            "_load_preview",
+            "_clear_all",
+            "_stop_processing",
+        ):
+            assert f"def {name}" not in text, name
+        assert "enableDragDrop(self._drag_enter_event, self._drop_event)" in text

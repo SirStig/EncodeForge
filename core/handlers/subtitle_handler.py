@@ -20,15 +20,16 @@ class SubtitleHandler:
         logger.info("SubtitleHandler.__init__ ENTRY")
         self.settings = settings
         logger.info("SubtitleHandler.__init__ - settings assigned")
-        # Support three modes: None (truly lazy), parent core, or direct whisper_mgr
+        # Support three modes: None (truly lazy), parent core, or direct whisper_mgr.
+        # Detect Core via reset_whisper_check — hasattr(..., "whisper_mgr") would
+        # invoke EncodeForgeCore's @property and force-load Whisper at init.
         if core_or_whisper_mgr is None:
             logger.info("SubtitleHandler.__init__ - no core/whisper_mgr provided, will load lazily when needed")
             self._core = None
             self._whisper_mgr = None
             self._lazy_load = True
-        elif hasattr(core_or_whisper_mgr, 'whisper_mgr'):
+        elif callable(getattr(core_or_whisper_mgr, "reset_whisper_check", None)):
             logger.info("SubtitleHandler.__init__ - detected parent core, setting up lazy access")
-            # It's the parent core - access whisper_mgr lazily
             self._core = core_or_whisper_mgr
             self._whisper_mgr = None
             self._lazy_load = False
