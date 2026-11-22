@@ -59,8 +59,8 @@ class LogsTab(QWidget):
     def _setup_ui(self):
         """Set up the logs viewer UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
         
         # Top controls
         controls_layout = QHBoxLayout()

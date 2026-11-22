@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QInputDialog,
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QTableWidgetItem,
     QVBoxLayout,
@@ -48,6 +50,12 @@ from utils.settings_manager import get_settings_manager
 from utils.workers import EncoderWorker, merge_encoder_ui_into_conversion_settings
 
 logger = logging.getLogger(__name__)
+
+# Layout density (matches design_tokens space_sm / space_md).
+TOOLBAR_MARGINS = (12, 8, 12, 8)
+TOOLBAR_SPACING = 8
+SIDEBAR_MARGINS = (12, 12, 12, 12)
+SIDEBAR_SPACING = 8
 
 
 class EncoderTab(QWidget):
@@ -171,8 +179,8 @@ class EncoderTab(QWidget):
         settings_widget = QWidget()
         settings_widget.setObjectName("encoder_toolbar")
         settings_main_layout = QVBoxLayout(settings_widget)
-        settings_main_layout.setContentsMargins(10, 5, 10, 5)
-        settings_main_layout.setSpacing(6)
+        settings_main_layout.setContentsMargins(*TOOLBAR_MARGINS)
+        settings_main_layout.setSpacing(TOOLBAR_SPACING)
 
         enc_grid = QGridLayout()
         enc_grid.setHorizontalSpacing(12)
@@ -364,19 +372,30 @@ class EncoderTab(QWidget):
         parent_layout.addWidget(table_group, 1)  # Give the whole group a stretch factor
     
     def _setup_file_info_sidebar(self, splitter):
-        """Set up the file info sidebar on the right."""
+        """Set up the scrollable file info sidebar on the right."""
         sidebar = QWidget()
         sidebar.setMinimumWidth(220)
-        sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(10, 10, 10, 10)
-        sidebar_layout.setSpacing(10)
-        
+        outer = QVBoxLayout(sidebar)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setObjectName("encoder_inspector_scroll")
+
+        content = QWidget()
+        sidebar_layout = QVBoxLayout(content)
+        sidebar_layout.setContentsMargins(*SIDEBAR_MARGINS)
+        sidebar_layout.setSpacing(SIDEBAR_SPACING)
+
         # Title
         title_label = StyledLabel("File Information")
         title_label.setProperty("heading", True)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sidebar_layout.addWidget(title_label)
-        
+
         # Preview area
         preview_group = SectionCard("Preview")
         preview_layout = preview_group.content_layout()
@@ -386,68 +405,70 @@ class EncoderTab(QWidget):
         self.preview_label.setMinimumHeight(120)
         preview_layout.addWidget(self.preview_label)
         sidebar_layout.addWidget(preview_group)
-        
+
         # File Information Section
         file_group = SectionCard("File Details")
         file_layout = QFormLayout()
         file_layout.setSpacing(6)
         file_layout.setContentsMargins(8, 12, 8, 8)
         file_group.content_layout().addLayout(file_layout)
-        
+
         self.name_label = StyledLabel("-")
         self.size_label = StyledLabel("-")
         self.duration_label = StyledLabel("-")
         self.path_label = StyledLabel("-")
         self.path_label.setObjectName("path_label")
         self.path_label.setWordWrap(True)
-        
+
         file_layout.addRow("Name:", self.name_label)
         file_layout.addRow("Size:", self.size_label)
         file_layout.addRow("Duration:", self.duration_label)
         file_layout.addRow("Path:", self.path_label)
-        
+
         sidebar_layout.addWidget(file_group)
-        
+
         # Video Information Section
         video_group = SectionCard("Video Properties")
         video_layout = QFormLayout()
         video_layout.setSpacing(6)
         video_layout.setContentsMargins(8, 12, 8, 8)
         video_group.content_layout().addLayout(video_layout)
-        
+
         self.codec_label = StyledLabel("-")
         self.resolution_label = StyledLabel("-")
         self.frame_rate_label = StyledLabel("-")
         self.bitrate_label = StyledLabel("-")
-        
+
         video_layout.addRow("Codec:", self.codec_label)
         video_layout.addRow("Resolution:", self.resolution_label)
         video_layout.addRow("Frame Rate:", self.frame_rate_label)
         video_layout.addRow("Bitrate:", self.bitrate_label)
-        
+
         sidebar_layout.addWidget(video_group)
-        
+
         # Audio Information Section
         audio_group = SectionCard("Audio Properties")
         audio_layout = QFormLayout()
         audio_layout.setSpacing(6)
         audio_layout.setContentsMargins(8, 12, 8, 8)
         audio_group.content_layout().addLayout(audio_layout)
-        
+
         self.audio_codec_label = StyledLabel("-")
         self.audio_channels_label = StyledLabel("-")
         self.sample_rate_label = StyledLabel("-")
         self.audio_bitrate_label = StyledLabel("-")
-        
+
         audio_layout.addRow("Codec:", self.audio_codec_label)
         audio_layout.addRow("Channels:", self.audio_channels_label)
         audio_layout.addRow("Sample Rate:", self.sample_rate_label)
         audio_layout.addRow("Bitrate:", self.audio_bitrate_label)
-        
+
         sidebar_layout.addWidget(audio_group)
-        
+
         sidebar_layout.addStretch()
-        
+
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
         splitter.addWidget(sidebar)
     
     def _connect_signals(self):

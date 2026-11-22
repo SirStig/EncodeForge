@@ -7,13 +7,11 @@ from pathlib import Path
 
 import qtawesome as qta
 from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
-    QListWidget,
-    QListWidgetItem,
     QMessageBox,
     QSizePolicy,
     QStackedLayout,
@@ -56,6 +54,15 @@ try:
 except Exception:
     LogsTab = None
 
+try:
+    from app.widgets.processes_tab import ProcessesTab
+except Exception:
+    ProcessesTab = None
+
+# Sidebar nav hit targets (consistent across SYSTEM / MODES).
+_SIDEBAR_BTN_MIN_H = 28
+_SIDEBAR_BTN_MAX_H = 28
+
 
 class MainWindow(AppMainWindow):
     def __init__(self):
@@ -66,9 +73,9 @@ class MainWindow(AppMainWindow):
         # Frameless window stays opaque (flat dark theme; no translucent glass)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         
-        # Set proper window sizing with responsive constraints
-        self.setMinimumSize(1000, 640)
-        self.resize(1300, 750)
+        # Usable at 1280×720; still opens comfortably on 1080p.
+        self.setMinimumSize(1100, 680)
+        self.resize(1280, 720)
         
         # Initialize thread pool
         from PySide6.QtCore import QThreadPool
@@ -92,6 +99,7 @@ class MainWindow(AppMainWindow):
         self._setup_ui()
         self._create_statusbar()
         self._apply_statusbar_visibility()
+        self._install_shortcuts()
         QTimer.singleShot(2000, self._maybe_auto_check_updates)
         logger.debug("Main window initialized - theme loaded at startup")
 
@@ -191,20 +199,26 @@ class MainWindow(AppMainWindow):
         ]
         self.sidebar_buttons = {}
         
+        mode_tips = {
+            "encoder": "Encoder (Ctrl+1)",
+            "subtitles": "Subtitles (Ctrl+2)",
+            "metadata": "Metadata (Ctrl+3)",
+        }
         for idx, (key, label, icon_name) in enumerate(self.modes):
             btn = QToolButton()
             btn.setText(f"  {label}")  # Add space for icon spacing
             btn.setIcon(qta.icon(icon_name))
             btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
             btn.setCheckable(True)
+            btn.setToolTip(mode_tips.get(key, label))
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-            btn.setMinimumHeight(24)
-            btn.setMaximumHeight(28)
+            btn.setMinimumHeight(_SIDEBAR_BTN_MIN_H)
+            btn.setMaximumHeight(_SIDEBAR_BTN_MAX_H)
             btn.clicked.connect(lambda checked, i=idx: self._switch_mode(i))
             sidebar_layout.addWidget(btn)
             self.sidebar_buttons[key] = btn
 
-        sidebar_layout.addSpacing(10)
+        sidebar_layout.addSpacing(8)
 
         # Files section
         files_label = StyledLabel("FILES")
@@ -216,18 +230,20 @@ class MainWindow(AppMainWindow):
         add_files_btn.setText("  Add Files")
         add_files_btn.setIcon(qta.icon('fa5s.file'))
         add_files_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        add_files_btn.setToolTip("Add files (Ctrl+O)")
         add_files_btn.clicked.connect(self._handle_add_files)
-        add_files_btn.setMinimumHeight(24)
-        add_files_btn.setMaximumHeight(28)
+        add_files_btn.setMinimumHeight(_SIDEBAR_BTN_MIN_H)
+        add_files_btn.setMaximumHeight(_SIDEBAR_BTN_MAX_H)
         sidebar_layout.addWidget(add_files_btn)
 
         add_folder_btn = QToolButton()
         add_folder_btn.setText("  Add Folder")
         add_folder_btn.setIcon(qta.icon('fa5s.folder'))
         add_folder_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        add_folder_btn.setToolTip("Add folder (Ctrl+Shift+O)")
         add_folder_btn.clicked.connect(self._handle_add_folder)
-        add_folder_btn.setMinimumHeight(24)
-        add_folder_btn.setMaximumHeight(28)
+        add_folder_btn.setMinimumHeight(_SIDEBAR_BTN_MIN_H)
+        add_folder_btn.setMaximumHeight(_SIDEBAR_BTN_MAX_H)
         sidebar_layout.addWidget(add_folder_btn)
 
         sidebar_layout.addSpacing(4)
@@ -248,9 +264,10 @@ class MainWindow(AppMainWindow):
         logs_btn.setIcon(qta.icon('fa5s.list'))
         logs_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         logs_btn.setCheckable(True)
+        logs_btn.setToolTip("Logs (Ctrl+L)")
         logs_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        logs_btn.setMinimumHeight(24)
-        logs_btn.setMaximumHeight(28)
+        logs_btn.setMinimumHeight(_SIDEBAR_BTN_MIN_H)
+        logs_btn.setMaximumHeight(_SIDEBAR_BTN_MAX_H)
         logs_btn.clicked.connect(lambda checked: self._switch_mode(3))
         sidebar_layout.addWidget(logs_btn)
         self.sidebar_buttons["logs"] = logs_btn
@@ -260,9 +277,10 @@ class MainWindow(AppMainWindow):
         settings_btn.setIcon(qta.icon('fa5s.cogs'))
         settings_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         settings_btn.setCheckable(True)
+        settings_btn.setToolTip("Settings (Ctrl+,)")
         settings_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        settings_btn.setMinimumHeight(28)
-        settings_btn.setMaximumHeight(34)
+        settings_btn.setMinimumHeight(_SIDEBAR_BTN_MIN_H)
+        settings_btn.setMaximumHeight(_SIDEBAR_BTN_MAX_H)
         settings_btn.clicked.connect(lambda checked: self._switch_mode(4))
         sidebar_layout.addWidget(settings_btn)
         self.sidebar_buttons["settings"] = settings_btn
@@ -270,14 +288,15 @@ class MainWindow(AppMainWindow):
         # Processes button with badge
         self.processes_btn = QToolButton()
         self.processes_btn.setText("  Processes")
-        self.processes_btn.setIcon(qta.icon('fa5s.cog'))
+        self.processes_btn.setIcon(qta.icon('fa5s.tasks'))
         self.processes_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.processes_btn.setCheckable(True)
+        self.processes_btn.setToolTip("Active jobs (Ctrl+J)")
         self.processes_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.processes_btn.setObjectName("processes_btn")
         self.processes_btn.clicked.connect(lambda checked: self._switch_mode(5))
-        self.processes_btn.setMinimumHeight(24)
-        self.processes_btn.setMaximumHeight(28)
+        self.processes_btn.setMinimumHeight(_SIDEBAR_BTN_MIN_H)
+        self.processes_btn.setMaximumHeight(_SIDEBAR_BTN_MAX_H)
         sidebar_layout.addWidget(self.processes_btn)
         self.sidebar_buttons["processes"] = self.processes_btn
 
@@ -308,7 +327,10 @@ class MainWindow(AppMainWindow):
             self.settings_panel.settings_changed.connect(self._on_settings_changed)
         except Exception:
             self.settings_panel = None
-        self.processes_tab = self._create_processes_tab()
+        if ProcessesTab is not None:
+            self.processes_tab = ProcessesTab()
+        else:
+            self.processes_tab = self._create_processes_tab_fallback()
 
         self.tabs = [
             self.encoder_tab,
@@ -326,58 +348,65 @@ class MainWindow(AppMainWindow):
 
         # If mode widgets expose signals we want to react to, connect them safely
         self._safe_connect_signals()
-    
-    def _create_processes_tab(self):
-        """Create the processes monitoring tab."""
-        processes_widget = QWidget()
-        layout = QVBoxLayout(processes_widget)
-        layout.setContentsMargins(20, 20, 20, 20)
-        
-        # Title
-        title = StyledLabel("Active Encoding Processes")
-        title.setProperty("heading", True)
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-        
-        # Process list
-        self.process_list = QListWidget()
-        self.process_list.setAlternatingRowColors(True)
-        layout.addWidget(self.process_list)
-        
-        # Info label
-        self.process_info_label = StyledLabel("No active processes")
-        self.process_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.process_info_label)
-        
-        # Setup timer to update process list
-        from PySide6.QtCore import QTimer
-        self.process_timer = QTimer()
-        self.process_timer.timeout.connect(self._update_process_list)
-        self.process_timer.start(1000)  # Update every second
-        
-        return processes_widget
-    
-    def _update_process_list(self):
-        """Update the process list with current active processes."""
-        if not hasattr(self, 'process_list'):
-            return
-            
-        self.process_list.clear()
-        
-        active_processes = []
-        if self.encoder_tab is not None and hasattr(self.encoder_tab, 'active_workers') and self.encoder_tab.active_workers:
-            for file_path, _worker in self.encoder_tab.active_workers.items():
-                item = QListWidgetItem(f"Encoding: {Path(file_path).name}")
-                item.setIcon(qta.icon('fa5s.cog'))
-                self.process_list.addItem(item)
-                active_processes.append(file_path)
-        
-        if active_processes:
-            self.process_info_label.setText(f"{len(active_processes)} active process(es)")
-        else:
-            self.process_info_label.setText("No active processes")
-    
 
+        self.process_timer = QTimer(self)
+        self.process_timer.timeout.connect(self._update_process_list)
+        self.process_timer.start(500)
+
+    def _create_processes_tab_fallback(self) -> QWidget:
+        """Minimal placeholder if ProcessesTab fails to import."""
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.addWidget(StyledLabel("Processes monitor unavailable"))
+        return w
+
+    def _install_shortcuts(self) -> None:
+        """Primary keyboard shortcuts for modes and common actions."""
+        bindings = [
+            ("Ctrl+1", lambda: self._switch_mode(0)),
+            ("Ctrl+2", lambda: self._switch_mode(1)),
+            ("Ctrl+3", lambda: self._switch_mode(2)),
+            ("Ctrl+L", lambda: self._switch_mode(3)),
+            ("Ctrl+,", lambda: self._switch_mode(4)),
+            ("Ctrl+J", lambda: self._switch_mode(5)),
+            ("Ctrl+O", self._handle_add_files),
+            ("Ctrl+Shift+O", self._handle_add_folder),
+            ("Ctrl+Return", self._shortcut_start_encoding),
+            ("Ctrl+.", self._shortcut_stop_encoding),
+        ]
+        for seq, slot in bindings:
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.setContext(Qt.ShortcutContext.WindowShortcut)
+            sc.activated.connect(slot)
+
+    def _shortcut_start_encoding(self) -> None:
+        if self.encoder_tab is None:
+            return
+        self._switch_mode(0)
+        if hasattr(self.encoder_tab, "_start_encoding"):
+            self.encoder_tab._start_encoding()
+
+    def _shortcut_stop_encoding(self) -> None:
+        if self.encoder_tab is not None and hasattr(self.encoder_tab, "_stop_encoding"):
+            self.encoder_tab._stop_encoding()
+
+    def _update_process_list(self) -> None:
+        """Refresh the Processes job table and sidebar badge."""
+        jobs = []
+        if ProcessesTab is not None:
+            jobs = ProcessesTab.collect_jobs(
+                self.encoder_tab, self.subtitle_tab, self.metadata_tab
+            )
+        else:
+            for tab in (self.encoder_tab, self.subtitle_tab, self.metadata_tab):
+                workers = getattr(tab, "active_workers", None) or {}
+                jobs.extend(workers.keys())
+
+        if ProcessesTab is not None and isinstance(self.processes_tab, ProcessesTab):
+            self.processes_tab.refresh(jobs)
+
+        self._update_processes_badge(len(jobs))
 
     def _safe_connect_signals(self):
         # Connect common signals if present, but don't fail if they are missing
@@ -660,36 +689,56 @@ class MainWindow(AppMainWindow):
     def _on_encode_started(self, file_path: str):
         self._update_status(f"Encoding: {Path(file_path).name}")
 
-    def _on_encode_progress(self, _file_path: str, current: int, total: int, message: str = ""):
+    def _on_encode_progress(self, file_path: str, current: int, total: int, message: str = ""):
         pct = int((current / total) * 100) if total else 0
         self.progress_label.setText(f"{pct}% - {message}")
+        if ProcessesTab is not None and isinstance(self.processes_tab, ProcessesTab) and file_path:
+            self.processes_tab.note_progress(str(file_path), current, total, message)
 
     def _on_encode_completed(self, file_path: str):
         self._update_status(f"Completed: {Path(file_path).name}")
         self.progress_label.setText("")
+        if ProcessesTab is not None and isinstance(self.processes_tab, ProcessesTab) and file_path:
+            self.processes_tab.clear_progress(str(file_path))
 
     def _on_process_count_changed(self, *_args):
-        """Update the processes badge when process count changes."""
+        """Refresh Processes badge/table when encode jobs start or finish."""
         try:
-            if self.encoder_tab is not None and hasattr(self.encoder_tab, 'active_workers'):
-                count = len(self.encoder_tab.active_workers)
-                self._update_processes_badge(count)
+            self._update_process_list()
         except Exception:
             pass
 
-    def _on_subtitle_progress(self, _file_path: str, _current: int, _total: int, message: str = ""):
+    def _on_subtitle_progress(self, file_path: str, current: int, total: int, message: str = ""):
         if message:
             self._update_status(message)
+        if ProcessesTab is not None and isinstance(self.processes_tab, ProcessesTab):
+            # Subtitle workers use prefixed keys; prefer path when present.
+            job_id = str(file_path) if file_path else ""
+            workers = getattr(self.subtitle_tab, "active_workers", {}) or {}
+            if not job_id and len(workers) == 1:
+                job_id = next(iter(workers))
+            if job_id:
+                if job_id not in workers:
+                    for key in workers:
+                        if key.endswith(job_id) or key.endswith(f":{job_id}"):
+                            job_id = key
+                            break
+                self.processes_tab.note_progress(job_id, current, total, message)
 
     def _on_subtitle_completed(self, file_path: str):
         self._update_status(f"Subtitles: done — {Path(file_path).name}")
+        self._update_process_list()
 
     def _on_subtitle_error(self, file_path: str, error_message: str):
         self._update_status(f"Subtitles failed — {Path(file_path).name}")
         self.progress_label.setText(error_message[:120] + ("…" if len(error_message) > 120 else ""))
+        self._update_process_list()
 
-    def _on_rename_progress(self, *_args, **_kwargs):
-        pass
+    def _on_rename_progress(self, file_path: str = "", current: int = 0, total: int = 0, message: str = ""):
+        if ProcessesTab is not None and isinstance(self.processes_tab, ProcessesTab) and file_path:
+            self.processes_tab.note_progress(str(file_path), current, total, message)
+        if message:
+            self._update_status(message)
 
     def _maybe_auto_check_updates(self) -> None:
         from utils.settings_manager import SettingsManager
