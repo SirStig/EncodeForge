@@ -836,36 +836,6 @@ class SettingsPanel(QWidget):
         meta_form.addRow("Trakt:", self._make_api_key_row(
             self.trakt_key_edit, "trakt", "https://trakt.tv/oauth/applications"))
 
-        self.fanart_key_edit = QLineEdit()
-        self.fanart_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.fanart_key_edit.setPlaceholderText("Paste your Fanart.tv API key…")
-        self.fanart_key_edit.setToolTip(
-            "Fanart.tv — free personal key at fanart.tv/get-an-api-key\n"
-            "High-resolution artwork, logos, and backgrounds for movies and TV."
-        )
-        fanart_container = QWidget()
-        fanart_vbox = QVBoxLayout(fanart_container)
-        fanart_vbox.setContentsMargins(0, 0, 0, 0)
-        fanart_vbox.setSpacing(3)
-        fanart_vbox.addWidget(self.fanart_key_edit)
-        fanart_vbox.addWidget(_link("Get free API key →", "https://fanart.tv/get-an-api-key/"))
-        meta_form.addRow("Fanart.tv:", fanart_container)
-
-        self.anidb_key_edit = QLineEdit()
-        self.anidb_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.anidb_key_edit.setPlaceholderText("Paste your AniDB client name…")
-        self.anidb_key_edit.setToolTip(
-            "AniDB — requires a free account at anidb.net\n"
-            "Comprehensive anime database with detailed episode and character data."
-        )
-        anidb_container = QWidget()
-        anidb_vbox = QVBoxLayout(anidb_container)
-        anidb_vbox.setContentsMargins(0, 0, 0, 0)
-        anidb_vbox.setSpacing(3)
-        anidb_vbox.addWidget(self.anidb_key_edit)
-        anidb_vbox.addWidget(_link("Register a client → anidb.net/software/add", "https://anidb.net/software/add"))
-        meta_form.addRow("AniDB:", anidb_container)
-
         layout.addWidget(meta)
 
         subs = QGroupBox("Subtitle API Keys")
@@ -1260,8 +1230,6 @@ class SettingsPanel(QWidget):
         self.tvdb_key_edit.setText(c.tvdb_api_key)
         self.omdb_key_edit.setText(c.omdb_api_key)
         self.trakt_key_edit.setText(c.trakt_api_key)
-        self.fanart_key_edit.setText(c.fanart_api_key)
-        self.anidb_key_edit.setText(c.anidb_api_key)
         self.os_key_edit.setText(c.opensubtitles_api_key)
         self.os_user_edit.setText(c.opensubtitles_username)
         self.os_pass_edit.setText(c.opensubtitles_password)
@@ -1322,8 +1290,6 @@ class SettingsPanel(QWidget):
         c.tvdb_api_key = self.tvdb_key_edit.text().strip()
         c.omdb_api_key = self.omdb_key_edit.text().strip()
         c.trakt_api_key = self.trakt_key_edit.text().strip()
-        c.fanart_api_key = self.fanart_key_edit.text().strip()
-        c.anidb_api_key = self.anidb_key_edit.text().strip()
         c.opensubtitles_api_key = self.os_key_edit.text().strip()
         c.opensubtitles_username = self.os_user_edit.text().strip()
         c.opensubtitles_password = self.os_pass_edit.text().strip()

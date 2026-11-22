@@ -27,6 +27,13 @@ def tab(qapp, isolated_app_data, qt_widget):
     return qt_widget(MetadataTab(QThreadPool()))
 
 
+def test_metadata_tab_has_no_language_combo(tab):
+    """P1-D: decorative Language combo never reached providers — removed."""
+    assert not hasattr(tab, "language_combo")
+    assert hasattr(tab, "provider_combo")
+    assert hasattr(tab, "pattern_input")
+
+
 def _seed_row(tab, file_path: Path, metadata: dict):
     tab._add_file_to_table(file_path)
     row = tab.file_table.rowCount() - 1

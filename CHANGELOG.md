@@ -108,7 +108,6 @@ First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line 
 - Several subtitle scrapers (Podnapisi, SubDivX, Jimaku) target site layouts that have since changed. They are **quarantined**: shown as unavailable in the Subtitles tab and skipped during search until rewritten (no silent empty “success”).
 - CLI: `rename` and `gui` work and share `EncodeForgeCore` with the desktop app; `encode` and `subtitle` are stubs that exit with status 2 (use the GUI for those).
 - Theme Light/Auto, app language, toolbar, and two-pass encoding are not offered in Settings until implemented; status bar visibility is wired.
-- Fanart.tv appears in Settings (API key field) but has no provider implementation; artwork grab from Fanart is not available.
 - Screenshots under `docs/screenshots/` show an older menu-bar / three-table UI, not the current frameless sidebar layout.
 
 ### Release Links
@@ -126,7 +125,7 @@ Renamer overhaul, smarter provider selection, a cleaner Settings experience, and
 
 - **Auto & All Providers mode** — Two new options sit at the top of the provider picker. *Auto* tries providers in priority order and returns the first good match (fast). *All Providers* queries every source in parallel and picks the most complete result — best episode title, air date, and overview wins.
 - **API key test buttons** — Each key field in Settings → Accounts now has a **Test** button. Click it and a live ✓ / ✗ status appears next to the field without leaving the dialog.
-- **Direct links to API key sign-up pages** — Every provider field shows a small “Get free API key →” link that opens the registration page directly in your browser (TMDB, TVDB, OMDb, Trakt, Fanart.tv, AniDB, OpenSubtitles).
+- **Direct links to API key sign-up pages** — Every provider field shows a small “Get free API key →” link that opens the registration page directly in your browser (TMDB, TVDB, OMDb, Trakt, OpenSubtitles).
 
 ### Improved
 

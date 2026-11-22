@@ -534,7 +534,6 @@ class RenamerWorker(Worker):
             tvdb_key=cs.tvdb_api_key,
             omdb_key=cs.omdb_api_key,
             trakt_key=cs.trakt_api_key,
-            fanart_key=getattr(cs, "fanart_api_key", "") or "",
         )
         preview_only = renaming_settings.get("preview_only", False)
         dry_run = renaming_settings.get("dry_run", False)

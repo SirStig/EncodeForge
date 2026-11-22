@@ -67,7 +67,6 @@ class EncodeForgeCore:
             tvdb_key=self.settings.tvdb_api_key,
             omdb_key=self.settings.omdb_api_key,
             trakt_key=self.settings.trakt_api_key,
-            fanart_key=self.settings.fanart_api_key,
         )
         self.subtitle_providers = SubtitleProviders(
             opensubtitles_key=self.settings.opensubtitles_api_key,
@@ -86,8 +85,6 @@ class EncodeForgeCore:
         tvdb_key: Optional[str] = None,
         omdb_key: Optional[str] = None,
         trakt_key: Optional[str] = None,
-        fanart_key: Optional[str] = None,
-        mal_client_id: Optional[str] = None,
     ) -> None:
         """
         Apply metadata API keys and rebuild keyed provider instances.
@@ -104,16 +101,12 @@ class EncodeForgeCore:
             self.settings.omdb_api_key = omdb_key
         if trakt_key is not None:
             self.settings.trakt_api_key = trakt_key
-        if fanart_key is not None:
-            self.settings.fanart_api_key = fanart_key
 
         self.renamer.configure_keys(
             tmdb_key=tmdb_key,
             tvdb_key=tvdb_key,
             omdb_key=omdb_key,
             trakt_key=trakt_key,
-            fanart_key=fanart_key,
-            mal_client_id=mal_client_id,
         )
     
     @property

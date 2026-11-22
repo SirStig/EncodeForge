@@ -61,8 +61,6 @@ class ConversionSettings:
     tvdb_api_key: str = ""
     omdb_api_key: str = ""
     trakt_api_key: str = ""
-    fanart_api_key: str = ""
-    anidb_api_key: str = ""
     
     # Audio options
     audio_codec: str = "copy"
