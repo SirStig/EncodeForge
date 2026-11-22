@@ -130,17 +130,19 @@ That's it. Most options have sensible defaults, so you can dive straight in.
 
 > **Note:** Screenshots on the [project site](https://sirstig.github.io/EncodeForge/#screenshots) (`docs/screenshots/`) show an older menu-bar UI, not the current frameless sidebar layout.
 
-### Scripting Renames from the CLI
+### Scripting from the CLI
 
-`cli.py rename` shares the same renaming engine as the GUI, so you can batch-rename a library without opening a window:
+`cli.py encode` and `cli.py rename` share the same engines as the GUI:
 
 ```bash
+python cli.py encode /path/to/video.mp4 -o /path/to/out.mp4 --dry-run
+python cli.py encode /path/to/folder -y --codec h264 --crf 23
 python cli.py rename /path/to/library --dry-run          # preview only
 python cli.py rename /path/to/library -y                 # rename in place
 python cli.py rename /path/to/library -d /path/to/sorted --action move
 ```
 
-Run `python cli.py rename --help` for the full option list. `encode` and `subtitle` CLI subcommands are not implemented yet — use the GUI for those (see [Roadmap](#roadmap)).
+Run `python cli.py encode --help` / `python cli.py rename --help` for the full option lists. The `subtitle` CLI subcommand is not implemented yet — use the GUI for that (see [Roadmap](#roadmap)).
 
 ---
 
@@ -205,8 +207,8 @@ EncodeForge auto-detects available GPU encoders on startup. Backends are OS-spec
 - ✅ GPU-accelerated faster-whisper for local AI subtitles
 - ✅ Shared core backend (GUI & CLI)
 - ✅ Nuitka compilation for all platforms
-- ✅ Scriptable CLI renaming (`cli.py rename`)
-- ⏳ CLI support for `encode` and `subtitle` commands (stubs today; use the GUI)
+- ✅ Scriptable CLI encoding (`cli.py encode`) and renaming (`cli.py rename`)
+- ⏳ CLI support for `subtitle` command (stub today; use the GUI)
 - ⏳ Light & Auto theme options (hidden until a light token set exists)
 - ⏳ Two-pass encoding (hidden until ConversionHandler supports it)
 - ⏳ Enhanced concurrent task processing

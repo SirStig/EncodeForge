@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CLI `encode`** — Wired to `EncodeForgeCore` / `ConversionHandler` (codec, CRF, preset, optional NVENC/QSV/AMF, output path/dir, overwrite, recursive folder scan, `--dry-run`). Software encode is the default unless a hardware flag is set.
 - **VAAPI hardware encoding on Linux** — AMD and Intel GPUs on Linux can use `h264_vaapi` / `hevc_vaapi` (libva). Settings and Auto HW Accel expose a VAAPI backend; encode commands set `-vaapi_device` and `format=nv12,hwupload`.
 
 ### Fixed
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GPU / encoder OS matrix documented** — README, CLAUDE.md, and encoder docs spell out NVENC (all), AMF (Windows), VAAPI (Linux), QSV (Windows/Linux), VideoToolbox (macOS).
 - **Removed leftover PyTorch helpers** from `utils/gpu_detector.py` (`recommend_torch_variant`, `get_torch_install_command`). Whisper uses faster-whisper / CTranslate2.
 - **FFmpeg Apple Silicon download** — In-app download uses `eugeneware/ffmpeg-static` `darwin-arm64` / `darwin-x64` binaries (not evermeet). Linux aarch64 already maps to johnvansickle’s arm64 static build; README and packaging scripts note that official CI packages remain x86_64 while local ARM packaging is supported.
+- **Conversion dry-run** — `ConversionSettings.dry_run` now short-circuits after building the FFmpeg command and reports the planned output/encoder without writing a file.
 
 ---
 
@@ -106,7 +108,7 @@ First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line 
 ### Known limitations
 
 - Several subtitle scrapers (Podnapisi, SubDivX, Jimaku) target site layouts that have since changed. They are **quarantined**: shown as unavailable in the Subtitles tab and skipped during search until rewritten (no silent empty “success”).
-- CLI: `rename` and `gui` work and share `EncodeForgeCore` with the desktop app; `encode` and `subtitle` are stubs that exit with status 2 (use the GUI for those).
+- CLI: `encode`, `rename`, and `gui` work and share `EncodeForgeCore` with the desktop app; `subtitle` is still a stub that exits with status 2 (use the GUI).
 - Theme Light/Auto, app language, toolbar, and two-pass encoding are not offered in Settings until implemented; status bar visibility is wired.
 - Screenshots under `docs/screenshots/` show an older menu-bar / three-table UI, not the current frameless sidebar layout.
 
