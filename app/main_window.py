@@ -423,7 +423,8 @@ class MainWindow(GlassmorphicMainWindow):
         logging.getLogger().setLevel(getattr(logging, sm.application.log_level, logging.INFO))
         if hasattr(self, 'threadpool'):
             self.threadpool.setMaxThreadCount(sm.application.max_threads)
-        self._apply_statusbar_visibility()
+        if hasattr(self, "_apply_statusbar_visibility"):
+            self._apply_statusbar_visibility()
         if self.subtitle_tab is not None:
             if hasattr(self.subtitle_tab, "_show_idle_subtitle_banner"):
                 self.subtitle_tab._show_idle_subtitle_banner()
