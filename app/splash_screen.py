@@ -257,9 +257,9 @@ class SplashScreenManager:
         """Check for required dependencies."""
         # Check FFmpeg
         try:
-            from core.ffmpeg_manager import FFmpegManager
-            ffmpeg_mgr = FFmpegManager()
-            success, info = ffmpeg_mgr.detect_ffmpeg()
+            from utils.ffmpeg_manager import get_ffmpeg_manager
+            ffmpeg_mgr = get_ffmpeg_manager()
+            success, _info = ffmpeg_mgr.detect_ffmpeg_info()
             if success:
                 logger.info("FFmpeg detected")
             else:
