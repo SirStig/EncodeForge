@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.gui
+
 pyside6 = pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt, QThreadPool  # noqa: E402
 from PySide6.QtWidgets import QTableWidgetItem  # noqa: E402
@@ -65,9 +67,9 @@ class TestMatchPickerDialog:
 
 class TestMetadataTabMatchLock:
     @pytest.fixture
-    def tab(self, qapp, isolated_app_data):
+    def tab(self, qapp, isolated_app_data, qt_widget):
         from app.widgets.metadata_tab import MetadataTab
-        return MetadataTab(QThreadPool())
+        return qt_widget(MetadataTab(QThreadPool()))
 
     def test_manual_match_locks_the_row_against_bulk_refetch(self, tab, qapp, tmp_path):
         video = tmp_path / "Show.S01E05.1080p.mkv"

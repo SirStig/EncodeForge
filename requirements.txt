@@ -6,13 +6,18 @@
 # drag a compiler toolchain onto end-user machines.
 
 # ==================== UI Framework ====================
-PySide6>=6.6.0
-PySide6-Addons>=6.6.0
-PySide6-Essentials>=6.6.0
+# Upper-bound PySide6: 6.12.0 segfaults under pytest GC while constructing
+# MetadataTab / SettingsManager (CI Tests matrix, exit 139 / Aborted).
+# Last green 0.5.0 run (2026-09-27) resolved to the 6.11.x line.
+PySide6>=6.6.0,<6.12.0
+PySide6-Addons>=6.6.0,<6.12.0
+PySide6-Essentials>=6.6.0,<6.12.0
 qtawesome>=1.3.0
 
 # ==================== Notifications ====================
-desktop-notifier>=3.5.0
+# Major versions can change native backends (dbus_fast / WinRT / UNUserNotificationCenter);
+# keep installs reproducible and let tests stub the async send path.
+desktop-notifier>=3.5.0,<7
 
 # ==================== HTTP & Web Scraping ====================
 requests>=2.31.0
