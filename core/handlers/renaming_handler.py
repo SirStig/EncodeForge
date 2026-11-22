@@ -15,6 +15,23 @@ from .models import ConversionSettings
 
 logger = logging.getLogger(__name__)
 
+# GUI/settings use "auto" / "all"; CLI historically used "automatic".
+# All three mean "try providers in priority order."
+_EXPAND_ALL_PROVIDER_TOKENS = frozenset({"auto", "all", "automatic"})
+
+
+def normalize_selected_provider(provider: Optional[str]) -> str:
+    """Map GUI/CLI provider tokens to a canonical handler value.
+
+    ``auto``, ``all``, and ``automatic`` (any case / surrounding whitespace)
+    all expand to the multi-provider fallback list. Specific provider ids
+    are lowercased and otherwise left unchanged.
+    """
+    token = (provider or "automatic").strip().lower()
+    if token in _EXPAND_ALL_PROVIDER_TOKENS:
+        return "automatic"
+    return token
+
 
 class RenamingHandler:
     """Handles media file renaming with metadata lookups"""
@@ -429,6 +446,8 @@ class RenamingHandler:
                     self.renamer.trakt_key = settings_dict.get("trakt_api_key", "")
                 if "selected_provider" in settings_dict:
                     selected_provider = settings_dict["selected_provider"]
+
+            selected_provider = normalize_selected_provider(selected_provider)
             
             logger.info(f"Selected Provider: {selected_provider}")
             
