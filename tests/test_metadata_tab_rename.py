@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.gui
+
 pyside6 = pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt, QThreadPool  # noqa: E402
 from PySide6.QtWidgets import QMessageBox, QTableWidgetItem  # noqa: E402

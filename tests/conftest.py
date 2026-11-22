@@ -16,6 +16,16 @@ def qapp():
 
     app = QApplication.instance() or QApplication([])
     yield app
+    # Drain deferred deletes so session teardown does not trip
+    # "shared QObject was deleted" / pure-virtual aborts on CI.
+    try:
+        app.processEvents()
+        for widget in list(app.topLevelWidgets()):
+            widget.close()
+            widget.deleteLater()
+        app.processEvents()
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True)
@@ -33,13 +43,16 @@ def _no_real_desktop_notifications(monkeypatch):
     notification unit tests still win over this class-level stub.
     """
     from desktop_notifier import DesktopNotifier
-    from utils.notifications import NotificationManager
+    import utils.notifications as notif
 
     async def _noop_send(self, *args, **kwargs):
         return None
 
     monkeypatch.setattr(DesktopNotifier, "send", _noop_send)
-    monkeypatch.setattr(NotificationManager, "_ensure_loop", lambda self: None)
+    notif._notification_manager = None
+    monkeypatch.setattr(notif.NotificationManager, "_ensure_loop", lambda self: None)
+    yield
+    notif._notification_manager = None
 
 
 @pytest.fixture
