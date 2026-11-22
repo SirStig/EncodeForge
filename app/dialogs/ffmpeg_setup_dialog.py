@@ -73,7 +73,7 @@ class FFmpegSetupDialog(QDialog):
             self._auto_detect()
     
     def _apply_theme(self):
-        """Apply glassmorphism theme to dialog."""
+        """Apply flat dark theme to dialog."""
         try:
             theme_manager = get_theme_manager()
             theme_manager.apply_dialog_theme(self)

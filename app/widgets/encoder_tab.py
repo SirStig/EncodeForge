@@ -36,8 +36,8 @@ from core.profile_manager import ProfileManager
 
 from app.widgets.custom_widgets import (
     AutoResizeTable,
-    GlassmorphicButton,
-    GlassmorphicCard,
+    StyledButton,
+    SectionCard,
     StyledCheckBox,
     StyledComboBox,
     StyledLabel,
@@ -164,7 +164,7 @@ class EncoderTab(QWidget):
 
         layout.addWidget(self._main_splitter)
         
-        logger.debug("Encoder tab initialized - using base glassmorphism theme")
+        logger.debug("Encoder tab initialized - using base flat dark theme")
     
     def _setup_video_settings(self, parent_layout):
         """Set up the top video settings panel with grid + compact control rows."""
@@ -231,9 +231,9 @@ class EncoderTab(QWidget):
         self.profile_combo = StyledComboBox()
         self.profile_combo.setMinimumContentsLength(20)
         self.profile_combo.setMinimumWidth(160)
-        load_profile_btn = GlassmorphicButton("Load", qta.icon("fa5s.folder-open"))
+        load_profile_btn = StyledButton("Load", qta.icon("fa5s.folder-open"))
         load_profile_btn.setToolTip("Apply the selected profile to these encoder controls")
-        save_profile_btn = GlassmorphicButton("Save as…", qta.icon("fa5s.save"))
+        save_profile_btn = StyledButton("Save as…", qta.icon("fa5s.save"))
         save_profile_btn.setToolTip("Save current encoder options as a custom profile (JSON)")
         profile_row.addWidget(profile_label)
         profile_row.addWidget(self.profile_combo, 1)
@@ -293,7 +293,7 @@ class EncoderTab(QWidget):
     def _setup_tables_area(self, parent_layout):
         """Set up the single file table with all encoding states."""
         # Main table container
-        table_group = GlassmorphicCard("Files")
+        table_group = SectionCard("Files")
         table_layout = table_group.content_layout()
         table_layout.setContentsMargins(0, 5, 0, 0)
         table_layout.setSpacing(8)
@@ -319,32 +319,32 @@ class EncoderTab(QWidget):
         
         table_layout.addWidget(self.files_table, 1)  # Give table the stretch factor
         
-        # Table control buttons using glassmorphic buttons
+        # Table control buttons using styled buttons
         buttons_layout = QHBoxLayout()
         buttons_layout.setContentsMargins(0, 4, 0, 0)
         buttons_layout.setSpacing(8)
         
-        self.add_files_btn = GlassmorphicButton("Add Files", qta.icon('fa5s.plus'))
+        self.add_files_btn = StyledButton("Add Files", qta.icon('fa5s.plus'))
         self.add_files_btn.clicked.connect(lambda: self._add_files())
         self.add_files_btn.setMinimumWidth(80)
         
-        self.add_folder_btn = GlassmorphicButton("Add Folder", qta.icon('fa5s.folder-plus'))
+        self.add_folder_btn = StyledButton("Add Folder", qta.icon('fa5s.folder-plus'))
         self.add_folder_btn.clicked.connect(lambda: self._add_folder())
         self.add_folder_btn.setMinimumWidth(85)
         
-        self.remove_selected_btn = GlassmorphicButton("Remove Selected", qta.icon('fa5s.trash'))
+        self.remove_selected_btn = StyledButton("Remove Selected", qta.icon('fa5s.trash'))
         self.remove_selected_btn.clicked.connect(self._remove_selected_files)
         self.remove_selected_btn.setMinimumWidth(110)
         
-        self.clear_completed_btn = GlassmorphicButton("Clear Completed", qta.icon('fa5s.broom'))
+        self.clear_completed_btn = StyledButton("Clear Completed", qta.icon('fa5s.broom'))
         self.clear_completed_btn.clicked.connect(self._clear_completed_files)
         self.clear_completed_btn.setMinimumWidth(110)
 
-        self.queue_up_btn = GlassmorphicButton("Up", qta.icon("fa5s.arrow-up"))
+        self.queue_up_btn = StyledButton("Up", qta.icon("fa5s.arrow-up"))
         self.queue_up_btn.setToolTip("Move selected queued row up")
         self.queue_up_btn.clicked.connect(lambda: self._move_selected_queue(-1))
         self.queue_up_btn.setMinimumWidth(52)
-        self.queue_down_btn = GlassmorphicButton("Down", qta.icon("fa5s.arrow-down"))
+        self.queue_down_btn = StyledButton("Down", qta.icon("fa5s.arrow-down"))
         self.queue_down_btn.setToolTip("Move selected queued row down")
         self.queue_down_btn.clicked.connect(lambda: self._move_selected_queue(1))
         self.queue_down_btn.setMinimumWidth(68)
@@ -378,7 +378,7 @@ class EncoderTab(QWidget):
         sidebar_layout.addWidget(title_label)
         
         # Preview area
-        preview_group = GlassmorphicCard("Preview")
+        preview_group = SectionCard("Preview")
         preview_layout = preview_group.content_layout()
         self.preview_label = StyledLabel("No file selected")
         self.preview_label.setObjectName("preview_label")
@@ -388,7 +388,7 @@ class EncoderTab(QWidget):
         sidebar_layout.addWidget(preview_group)
         
         # File Information Section
-        file_group = GlassmorphicCard("File Details")
+        file_group = SectionCard("File Details")
         file_layout = QFormLayout()
         file_layout.setSpacing(6)
         file_layout.setContentsMargins(8, 12, 8, 8)
@@ -409,7 +409,7 @@ class EncoderTab(QWidget):
         sidebar_layout.addWidget(file_group)
         
         # Video Information Section
-        video_group = GlassmorphicCard("Video Properties")
+        video_group = SectionCard("Video Properties")
         video_layout = QFormLayout()
         video_layout.setSpacing(6)
         video_layout.setContentsMargins(8, 12, 8, 8)
@@ -428,7 +428,7 @@ class EncoderTab(QWidget):
         sidebar_layout.addWidget(video_group)
         
         # Audio Information Section
-        audio_group = GlassmorphicCard("Audio Properties")
+        audio_group = SectionCard("Audio Properties")
         audio_layout = QFormLayout()
         audio_layout.setSpacing(6)
         audio_layout.setContentsMargins(8, 12, 8, 8)

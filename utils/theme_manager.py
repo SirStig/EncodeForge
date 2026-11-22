@@ -9,8 +9,8 @@ from typing import Optional
 
 from PySide6.QtWidgets import QApplication
 
-from utils.app_stylesheet import build_app_stylesheet
-from utils.design_tokens import default_tokens
+from utils.app_stylesheet import build_app_stylesheet, build_splash_stylesheet
+from utils.design_tokens import THEME_NAME, default_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +29,14 @@ class ThemeManager:
     def __init__(self):
         if not hasattr(self, 'initialized'):
             self.initialized = True
-            self.current_theme = "glassmorphism"
+            self.current_theme = THEME_NAME
             self.styles_dir = Path(__file__).parent.parent / "resources" / "styles"
             self.loaded_styles = {}
+            self._tokens = default_tokens()
     
     def load_base_theme(self) -> bool:
         """
-        Load the base glassmorphism theme for the entire application.
+        Load the flat-dark theme for the entire application.
         
         Returns:
             True if successful, False otherwise
@@ -46,14 +47,15 @@ class ThemeManager:
                 logger.warning(f"Base theme file not found: {theme_file}")
                 return False
 
-            tokens = default_tokens()
-            css = build_app_stylesheet(tokens)
+            self._tokens = default_tokens()
+            css = build_app_stylesheet(self._tokens)
             app = QApplication.instance()
             if app:
                 app.setStyleSheet(css)
                 self.loaded_styles["base"] = css
                 ThemeManager._styles_loaded = True
-                logger.info("Base glassmorphism theme loaded successfully")
+                self.current_theme = THEME_NAME
+                logger.info("Flat dark theme loaded successfully")
                 return True
 
             logger.error("Failed to build base theme stylesheet")
@@ -87,6 +89,8 @@ class ThemeManager:
             
             css = self._read_css_file(css_file)
             if css:
+                if component_name == "splash_screen":
+                    css = build_splash_stylesheet(self._tokens)
                 self.loaded_styles[component_name] = css
                 if widget:
                     widget.setStyleSheet(css)
@@ -141,15 +145,15 @@ class ThemeManager:
 
     @staticmethod
     def get_success_color() -> str:
-        return "#4ade80"
+        return default_tokens().success
 
     @staticmethod
     def get_warning_color() -> str:
-        return "#fbbf24"
+        return default_tokens().warning
 
     @staticmethod
     def get_error_color() -> str:
-        return "#f87171"
+        return default_tokens().error
     
     @staticmethod
     def configure_table_columns(table_widget) -> None:

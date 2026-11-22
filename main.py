@@ -79,11 +79,11 @@ def main():
     app.setApplicationVersion(APP_VERSION)
     app.setOrganizationName("EncodeForge")
     
-    # Load glassmorphism theme
+    # Load flat dark theme
     try:
         from utils.theme_manager import load_theme
         if load_theme():
-            logger.info("Glassmorphism theme loaded successfully")
+            logger.info("Flat dark theme loaded successfully")
         else:
             logger.warning("Failed to load theme, using default styling")
     except Exception as e:

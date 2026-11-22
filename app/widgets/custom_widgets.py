@@ -1,6 +1,6 @@
 """
 EncodeForge Custom Widget Library
-Glassmorphic UI components — styling delegated to theme_base.css
+Flat-dark UI components — styling delegated to theme_base.css / DesignTokens.
 """
 
 from PySide6.QtCore import QSize, Qt
@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
-    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -106,7 +105,7 @@ class AutoResizeTable(QTableWidget):
 # CONTAINER WIDGETS
 # ============================================================================
 
-class GlassmorphicCard(QFrame):
+class SectionCard(QFrame):
     """
     Section title above a single rounded surface (styled in theme_base.css).
     Add children via content_layout() or add a QFormLayout with content_layout().addLayout(...).
@@ -114,7 +113,7 @@ class GlassmorphicCard(QFrame):
 
     def __init__(self, title="", parent=None):
         super().__init__(parent)
-        self.setObjectName("glass_card")
+        self.setObjectName("section_card")
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -125,7 +124,7 @@ class GlassmorphicCard(QFrame):
         root.setSpacing(0)
         if title:
             tl = QLabel(title)
-            tl.setObjectName("glass_card_title")
+            tl.setObjectName("section_card_title")
             tl.setSizePolicy(
                 QSizePolicy.Policy.Preferred,
                 QSizePolicy.Policy.Fixed,
@@ -133,7 +132,7 @@ class GlassmorphicCard(QFrame):
             root.addWidget(tl)
             root.setSpacing(8)
         self._body = QFrame()
-        self._body.setObjectName("glass_card_body")
+        self._body.setObjectName("section_card_body")
         self._body.setFrameShape(QFrame.Shape.NoFrame)
         self._body.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -142,7 +141,6 @@ class GlassmorphicCard(QFrame):
         self._body_layout = QVBoxLayout(self._body)
         self._body_layout.setContentsMargins(0, 0, 0, 0)
         root.addWidget(self._body, 1)
-        self.setGraphicsEffect(self._create_shadow())
 
     def body(self) -> QFrame:
         return self._body
@@ -150,19 +148,9 @@ class GlassmorphicCard(QFrame):
     def content_layout(self) -> QVBoxLayout:
         return self._body_layout
 
-    def _create_shadow(self):
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(18)
-        shadow.setColor(Qt.GlobalColor.black)
-        shadow.setOffset(0, 3)
-        return shadow
 
-
-class GlassmorphicPanel(QWidget):
-    """
-    Generic panel — styling delegated to CSS.
-    Only sets shadow effect.
-    """
+class ContentPanel(QWidget):
+    """Generic expanding panel — styling delegated to CSS."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -170,21 +158,13 @@ class GlassmorphicPanel(QWidget):
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding
         )
-        self.setGraphicsEffect(self._create_shadow())
-
-    def _create_shadow(self):
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(15)
-        shadow.setColor(Qt.GlobalColor.black)
-        shadow.setOffset(0, 2)
-        return shadow
 
 
 # ============================================================================
 # BUTTON WIDGETS
 # ============================================================================
 
-class GlassmorphicButton(QPushButton):
+class StyledButton(QPushButton):
     """
     Button — styling via CSS QPushButton rules.
     Only enforces size constraints.
@@ -218,7 +198,7 @@ class GlassmorphicButton(QPushButton):
             self.setMinimumWidth(28)
 
 
-class PrimaryButton(GlassmorphicButton):
+class PrimaryButton(StyledButton):
     """Accent-coloured primary action button (primary=true CSS property)."""
 
     def __init__(self, text="", icon=None, parent=None):
@@ -360,7 +340,7 @@ class StyledLabel(QLabel):
 # LAYOUT WIDGETS
 # ============================================================================
 
-class GlassmorphicToolBar(QToolBar):
+class AppToolBar(QToolBar):
     """
     Toolbar — styling via CSS QToolBar rules.
     Only enforces size constraints.
@@ -375,7 +355,7 @@ class GlassmorphicToolBar(QToolBar):
         self.setIconSize(QSize(16, 16))
 
 
-class GlassmorphicStatusBar(QStatusBar):
+class AppStatusBar(QStatusBar):
     """
     Status bar — styling via CSS QStatusBar rules.
     Only enforces size constraints.
@@ -394,10 +374,10 @@ class GlassmorphicStatusBar(QStatusBar):
 # WINDOW WIDGETS
 # ============================================================================
 
-class GlassmorphicMainWindow(QMainWindow):
+class AppMainWindow(QMainWindow):
     """
     Main window — background styling via CSS QMainWindow rule.
-    No inline stylesheet needed.
+    Frameless chrome; title bar is AppTitleBar.
     """
 
     def __init__(self, parent=None):
@@ -427,7 +407,7 @@ class ButtonRow(QWidget):
         )
 
     def addButton(self, text, icon=None, callback=None):
-        btn = GlassmorphicButton(text, icon)
+        btn = StyledButton(text, icon)
         if callback:
             btn.clicked.connect(callback)
         self.layout.addWidget(btn)
@@ -474,9 +454,9 @@ class SectionDivider(QFrame):
 
 __all__ = [
     "AutoResizeTable",
-    "GlassmorphicCard",
-    "GlassmorphicPanel",
-    "GlassmorphicButton",
+    "SectionCard",
+    "ContentPanel",
+    "StyledButton",
     "PrimaryButton",
     "StyledComboBox",
     "StyledLineEdit",
@@ -484,9 +464,9 @@ __all__ = [
     "StyledTextEdit",
     "StyledCheckBox",
     "StyledLabel",
-    "GlassmorphicToolBar",
-    "GlassmorphicStatusBar",
-    "GlassmorphicMainWindow",
+    "AppToolBar",
+    "AppStatusBar",
+    "AppMainWindow",
     "ButtonRow",
     "FormRow",
     "SectionDivider",

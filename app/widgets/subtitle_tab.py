@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from app.widgets.custom_widgets import (
     AutoResizeTable,
-    GlassmorphicButton,
+    StyledButton,
     StyledComboBox,
     StyledLabel,
     StyledTextEdit,
@@ -76,7 +76,7 @@ class SubtitleTab(QWidget):
         self._setup_ui()
         self._update_whisper_status()
         self._update_subtitle_action_buttons()
-        logger.debug("Subtitle tab initialized - using base glassmorphism theme")
+        logger.debug("Subtitle tab initialized - using base flat dark theme")
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -218,11 +218,11 @@ class SubtitleTab(QWidget):
 
         # File management buttons under the file table
         file_btn_layout = QHBoxLayout()
-        self.add_files_btn = GlassmorphicButton("Add Files")
+        self.add_files_btn = StyledButton("Add Files")
         self.add_files_btn.clicked.connect(self._add_files)
-        self.add_folder_btn = GlassmorphicButton("Add Folder")
+        self.add_folder_btn = StyledButton("Add Folder")
         self.add_folder_btn.clicked.connect(self._add_folder)
-        self.remove_sub_btn = GlassmorphicButton("Remove")
+        self.remove_sub_btn = StyledButton("Remove")
         self.remove_sub_btn.clicked.connect(self._remove_selected)
         file_btn_layout.addWidget(self.add_files_btn)
         file_btn_layout.addWidget(self.add_folder_btn)

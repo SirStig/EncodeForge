@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Design system cleanup (P5-A)** — Renamed leftover `Glassmorphic*` widgets to real names (`SectionCard`, `StyledButton`, `AppMainWindow`, …), dropped card drop-shadows, and drove `theme_base.css` / splash CSS from a single `DesignTokens` flat-dark set (steel-blue accent, no purple/glow). Screenshot docs note the PNGs are still legacy menu-bar captures.
 - **macOS packaging docs** — README now states official DMG builds are **Apple Silicon only** (no Intel Mac artifacts).
 - **Test foundation (P3-D)** — Unit CI now enforces `--cov=core --cov=utils --cov-fail-under=30`, locks C1/C2 via `audit_c1`/`audit_c2` markers, and adds Encoder/Subtitle widget smoke tests. A scheduled/on-demand workflow runs the FFmpeg integration suite that the PR matrix still excludes.
 - **GPU / encoder OS matrix documented** — README, CLAUDE.md, and encoder docs spell out NVENC (all), AMF (Windows), VAAPI (Linux), QSV (Windows/Linux), VideoToolbox (macOS).
@@ -110,7 +111,7 @@ First stable release of the PySide6 rewrite. This promotes the 0.5.0 alpha line 
 - Several subtitle scrapers (Podnapisi, SubDivX, Jimaku) target site layouts that have since changed. They are **quarantined**: shown as unavailable in the Subtitles tab and skipped during search until rewritten (no silent empty “success”).
 - CLI: `encode`, `rename`, and `gui` work and share `EncodeForgeCore` with the desktop app; `subtitle` is still a stub that exits with status 2 (use the GUI).
 - Theme Light/Auto, app language, toolbar, and two-pass encoding are not offered in Settings until implemented; status bar visibility is wired.
-- Screenshots under `docs/screenshots/` show an older menu-bar / three-table UI, not the current frameless sidebar layout.
+- Screenshots under `docs/screenshots/` are legacy menu-bar / three-table captures (see `docs/screenshots/README.md`); the shipping UI is frameless sidebar + flat dark tokens.
 
 ### Release Links
 
