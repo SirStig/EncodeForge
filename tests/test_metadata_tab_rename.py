@@ -193,9 +193,11 @@ class TestSettingsRefresh:
             subtitle_tab=None,
             metadata_tab=metadata_tab,
             _sync_metadata_api_keys=MagicMock(),
+            _apply_statusbar_visibility=MagicMock(),
         )
         MainWindow._on_settings_changed(host)
         host._sync_metadata_api_keys.assert_called_once()
+        host._apply_statusbar_visibility.assert_called_once()
 
         assert metadata_tab.provider_combo.findData("omdb") >= 0
         assert metadata_tab.lowercase_check.isChecked() is True
