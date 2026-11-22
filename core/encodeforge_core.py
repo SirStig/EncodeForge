@@ -17,10 +17,10 @@ from core.handlers import (
     RenamingHandler,
     SubtitleHandler,
 )
-from core.ffmpeg_manager import FFmpegManager
 from core.metadata_grabber import MetadataGrabber
 from core.profile_manager import ProfileManager
 from core.subtitle_manager import SubtitleProviders
+from utils.ffmpeg_manager import get_ffmpeg_manager
 
 # Logging is configured by the entry point (main.py / cli.py), not here.
 # Reconfiguring it from a library module tore down and re-created the root
@@ -55,8 +55,8 @@ class EncodeForgeCore:
         self._init_lock = threading.Lock()
         self._handlers_initialized = False
         
-        # Initialize managers
-        self.ffmpeg_mgr = FFmpegManager(self.settings.ffmpeg_path)
+        # Single shared FFmpeg manager (detection + download + HW probe)
+        self.ffmpeg_mgr = get_ffmpeg_manager(self.settings.ffmpeg_path)
         
         # Whisper manager initialized lazily (allows detection after installation)
         self._whisper_mgr = None
@@ -182,14 +182,14 @@ class EncodeForgeCore:
     
     def check_ffmpeg(self) -> Dict:
         """Check FFmpeg availability"""
-        success, info = self.ffmpeg_mgr.detect_ffmpeg()
-        
+        success, info = self.ffmpeg_mgr.detect_ffmpeg_info()
+
         if success:
             self.settings.ffmpeg_path = str(info["ffmpeg_path"])
             self.settings.ffprobe_path = str(info["ffprobe_path"])
-            
+
             hwaccel = self.ffmpeg_mgr.get_hwaccel_options()
-            
+
             return {
                 "status": "success",
                 "ffmpeg_available": True,
@@ -198,14 +198,13 @@ class EncodeForgeCore:
                 "ffprobe_path": info["ffprobe_path"],
                 "hardware_encoders": info["encoders"],
                 "hardware_decoders": info["decoders"],
-                "hwaccel_options": hwaccel
+                "hwaccel_options": hwaccel,
             }
-        else:
-            return {
-                "status": "error",
-                "ffmpeg_available": False,
-                "message": info.get("error", "FFmpeg not found")
-            }
+        return {
+            "status": "error",
+            "ffmpeg_available": False,
+            "message": info.get("error", "FFmpeg not found"),
+        }
     
     def check_whisper(self) -> Dict:
         """Check Whisper availability"""

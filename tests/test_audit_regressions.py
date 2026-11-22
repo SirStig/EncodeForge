@@ -301,7 +301,7 @@ def test_bitmap_subtitles_are_not_transcoded():
 
 
 # --------------------------------------------------------------------------- #
-# core/ffmpeg_manager — ffprobe path derivation
+# utils/ffmpeg_manager — ffprobe path derivation + OS search roots
 # --------------------------------------------------------------------------- #
 
 @pytest.mark.parametrize(
@@ -317,8 +317,87 @@ def test_bitmap_subtitles_are_not_transcoded():
     ],
 )
 def test_ffprobe_path_derivation(ffmpeg_path, expected):
-    from core.ffmpeg_manager import FFmpegManager
+    from utils.ffmpeg_manager import FFmpegManager, derive_ffprobe_path
+
+    assert derive_ffprobe_path(ffmpeg_path) == expected
     assert FFmpegManager._derive_ffprobe_path(ffmpeg_path) == expected
+
+
+@pytest.mark.parametrize(
+    "system,expected_fragment",
+    [
+        ("Windows", "EncodeForge/ffmpeg"),
+        ("Windows", "C:/ffmpeg"),
+        ("Darwin", "/opt/homebrew/bin"),
+        ("Darwin", "/usr/local/bin"),
+        ("Linux", "/usr/bin"),
+        ("Linux", "/snap/bin"),
+        ("Linux", ".local/bin"),
+    ],
+)
+def test_common_search_paths_per_os(system, expected_fragment):
+    from utils.ffmpeg_manager import common_search_paths_for_system
+
+    paths = common_search_paths_for_system(system)
+    assert any(expected_fragment in p for p in paths)
+
+
+@pytest.mark.parametrize(
+    "system,expected_fragment",
+    [
+        ("Windows", "ffmpeg"),
+        ("Darwin", "homebrew"),
+        ("Linux", "usr"),
+    ],
+)
+def test_manager_common_paths_respect_os(monkeypatch, system, expected_fragment):
+    import platform
+
+    from utils.ffmpeg_manager import FFmpegManager
+
+    FFmpegManager.reset_instance()
+    monkeypatch.setattr(platform, "system", lambda: system)
+    mgr = FFmpegManager()
+    paths = [str(p).replace("\\", "/") for p in mgr._get_common_paths()]
+    assert any(expected_fragment.lower() in p.lower() for p in paths)
+    # Java embed runtime dir must never appear as a search root
+    assert not any("FFMPEG_RUNTIME" in p for p in paths)
+    FFmpegManager.reset_instance()
+
+
+def test_download_urls_matrix_is_platform_aware():
+    from utils.ffmpeg_manager import get_download_urls
+
+    urls = get_download_urls()
+    assert "supported" in urls
+    assert "url" in urls
+    assert "direct_binary" in urls
+    if urls["supported"] and urls["system"] == "Darwin":
+        assert urls["direct_binary"] is True
+        assert "ffmpeg-darwin-" in urls["url"]
+        assert urls["ffprobe_url"]
+
+
+def test_java_embed_path_removed_from_unified_manager():
+    """P2-A: FFMPEG_RUNTIME_DIR / Java bridge embed path must not exist."""
+    import inspect
+
+    import utils.ffmpeg_manager as ffmpeg_mod
+
+    source = inspect.getsource(ffmpeg_mod)
+    assert "FFMPEG_RUNTIME_DIR" not in source
+    assert "_check_embedded_ffmpeg" not in source
+    assert "JavaBridge" not in source
+
+
+def test_core_ffmpeg_manager_is_thin_facade():
+    """core.ffmpeg_manager must re-export the utils singleton, not a second class."""
+    import core.ffmpeg_manager as core_ff
+    import utils.ffmpeg_manager as utils_ff
+
+    assert core_ff.FFmpegManager is utils_ff.FFmpegManager
+    assert core_ff.get_ffmpeg_manager is utils_ff.get_ffmpeg_manager
+    assert core_ff.derive_ffprobe_path is utils_ff.derive_ffprobe_path
 
 
 # --------------------------------------------------------------------------- #

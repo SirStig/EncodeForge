@@ -574,8 +574,8 @@ class MainWindow(GlassmorphicMainWindow):
     def _refresh_tool_status(self):
         """Update FFmpeg and Whisper status indicator buttons."""
         try:
-            from utils.ffmpeg_manager import FFmpegManager
-            ffmpeg_ok = bool(FFmpegManager().get_ffmpeg_path())
+            from utils.ffmpeg_manager import get_ffmpeg_manager
+            ffmpeg_ok = bool(get_ffmpeg_manager().get_ffmpeg_path())
         except Exception:
             ffmpeg_ok = False
 

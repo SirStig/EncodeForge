@@ -26,9 +26,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from core.path_manager import get_bin_dir
-from utils.download_manager import DownloadError, DownloadManager
-from utils.ffmpeg_manager import get_ffmpeg_manager
+from utils.download_manager import DownloadError
+from utils.ffmpeg_manager import get_download_urls, get_ffmpeg_manager
 from utils.settings_manager import SettingsManager
 from utils.theme_manager import get_theme_manager
 from utils.workers import Worker
@@ -61,7 +60,6 @@ class FFmpegSetupDialog(QDialog):
         super().__init__(parent)
         self.required = required
         self.settings = SettingsManager()
-        self.download_manager = DownloadManager()
         self.thread_pool = QThreadPool.globalInstance()
         
         self.ffmpeg_path: Optional[Path] = None
@@ -320,157 +318,49 @@ class FFmpegSetupDialog(QDialog):
             self._reset_ui()
     
     def _download_ffmpeg(self):
-        """Download FFmpeg automatically."""
+        """Download FFmpeg via the shared utils.ffmpeg_manager download path."""
         self._update_status("Preparing to download FFmpeg...")
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        
-        system = platform.system().lower()
-        machine = platform.machine().lower()
-        is_arm = "arm" in machine or machine == "arm64" or machine == "aarch64"
 
-        # eugeneware/ffmpeg-static: direct binary downloads, no archive extraction needed.
-        # evermeet.cx is Intel-only and uses version-pinned URLs that go stale.
-        # John Van Sickle provides archives for Linux static builds.
-        _STATIC_BASE = "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1"
-
-        if system == "windows":
-            url = "https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip"
-            ffprobe_url = None
-            direct_binary = False
-        elif system == "linux":
-            if is_arm:
-                url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz"
-            else:
-                url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-            ffprobe_url = None
-            direct_binary = False
-        elif system == "darwin":
-            # eugeneware/ffmpeg-static: bare executables, no archive
-            arch = "arm64" if is_arm else "x64"
-            url = f"{_STATIC_BASE}/ffmpeg-darwin-{arch}"
-            ffprobe_url = f"{_STATIC_BASE}/ffprobe-darwin-{arch}"
-            direct_binary = True
-        else:
+        urls = get_download_urls()
+        if not urls["supported"]:
             QMessageBox.critical(
                 self,
                 "Unsupported Platform",
-                f"Automatic download is not supported for {system}.\n"
-                "Please install FFmpeg manually and select the path."
+                f"Automatic download is not supported for {urls['system']}.\n"
+                "Please install FFmpeg manually and select the path.",
             )
             self._reset_ui()
             return
 
-        # Start download in worker (must not touch widgets here — QThreadPool worker thread)
+        self._log(f"Downloading from: {urls['url']}")
+
         def download_and_extract(progress_callback=None):
-            import stat as stat_mod
-
-            bin_dir = get_bin_dir()
-            ffmpeg_dir = bin_dir / "ffmpeg"
-            ffmpeg_dir.mkdir(parents=True, exist_ok=True)
-
-            def _dl_progress(downloaded, total, percentage):
+            def _bridge(update):
                 if not progress_callback:
                     return
-                pct = min(99, int(percentage * 0.9))
-                mb_dl = downloaded / (1024 * 1024)
-                mb_tot = total / (1024 * 1024) if total else 0
-                msg = f"Downloading: {mb_dl:.1f} / {mb_tot:.1f} MB ({percentage:.0f}%)"
-                progress_callback({"progress": pct, "total": 100, "message": msg})
-
-            try:
-                if direct_binary:
-                    # macOS: download bare executables directly
-                    ffmpeg_dest = ffmpeg_dir / "ffmpeg"
-                    self._log_to_ui.emit("Downloading ffmpeg binary…")
-                    self.download_manager.download(
-                        url=url,
-                        destination=str(ffmpeg_dest),
-                        progress_callback=_dl_progress,
-                        resume=False,
-                    )
-                    ffmpeg_dest.chmod(ffmpeg_dest.stat().st_mode | stat_mod.S_IEXEC)
-
-                    ffprobe_dest = ffmpeg_dir / "ffprobe"
-                    if ffprobe_url:
-                        self._log_to_ui.emit("Downloading ffprobe binary…")
-                        if progress_callback:
-                            progress_callback(
-                                {
-                                    "progress": 90,
-                                    "total": 100,
-                                    "message": "Downloading ffprobe…",
-                                }
-                            )
-                        self.download_manager.download(
-                            url=ffprobe_url,
-                            destination=str(ffprobe_dest),
-                            resume=False,
-                        )
-                        ffprobe_dest.chmod(ffprobe_dest.stat().st_mode | stat_mod.S_IEXEC)
-
-                    return {
-                        "ffmpeg": str(ffmpeg_dest),
-                        "ffprobe": str(ffprobe_dest) if ffprobe_dest.exists() else str(ffmpeg_dest),
+                progress_callback(
+                    {
+                        "progress": int(update.get("progress", 0)),
+                        "total": 100,
+                        "message": update.get("message", ""),
                     }
+                )
 
-                else:
-                    # Windows / Linux: download archive and extract.
-                    # Keep the archive's real extension so the file stays
-                    # identifiable on disk and can be inspected by hand if
-                    # extraction ever fails.
-                    archive_name = url.split("/")[-1].split("?")[0] or "ffmpeg_download"
-                    self._log_to_ui.emit(f"Downloading from: {url}")
-                    archive_path = self.download_manager.download(
-                        url=url,
-                        destination=str(bin_dir / archive_name),
-                        progress_callback=_dl_progress,
-                        resume=True,
-                    )
+            mgr = get_ffmpeg_manager()
+            success, message = mgr.download_ffmpeg(progress_callback=_bridge)
+            if not success:
+                raise DownloadError(message)
+            ffmpeg_path = mgr.get_ffmpeg_path()
+            ffprobe_path = mgr.get_ffprobe_path()
+            if not ffmpeg_path:
+                raise DownloadError("Download reported success but FFmpeg path is missing")
+            return {
+                "ffmpeg": str(ffmpeg_path),
+                "ffprobe": str(ffprobe_path) if ffprobe_path else str(ffmpeg_path),
+            }
 
-                    self._log_to_ui.emit("Extracting archive…")
-                    if progress_callback:
-                        progress_callback(
-                            {
-                                "progress": 95,
-                                "total": 100,
-                                "message": "Extracting FFmpeg…",
-                            }
-                        )
-                    try:
-                        self.download_manager.extract_archive(archive_path, ffmpeg_dir)
-                    finally:
-                        # Always clear the archive: a stale one left on disk makes
-                        # the next attempt resume from a complete file and get
-                        # rejected by the server.
-                        archive_path.unlink(missing_ok=True)
-
-                    ffmpeg_exe = "ffmpeg.exe" if system == "windows" else "ffmpeg"
-                    ffprobe_exe = "ffprobe.exe" if system == "windows" else "ffprobe"
-
-                    found_ffmpeg = next(
-                        (p for p in ffmpeg_dir.rglob(ffmpeg_exe) if p.is_file()), None
-                    )
-                    found_ffprobe = next(
-                        (p for p in ffmpeg_dir.rglob(ffprobe_exe) if p.is_file()), None
-                    )
-
-                    if not found_ffmpeg:
-                        raise DownloadError("Could not find ffmpeg executable in downloaded archive")
-
-                    if system == "linux":
-                        found_ffmpeg.chmod(found_ffmpeg.stat().st_mode | stat_mod.S_IEXEC)
-                        if found_ffprobe:
-                            found_ffprobe.chmod(found_ffprobe.stat().st_mode | stat_mod.S_IEXEC)
-
-                    return {
-                        "ffmpeg": str(found_ffmpeg),
-                        "ffprobe": str(found_ffprobe) if found_ffprobe else str(found_ffmpeg),
-                    }
-
-            except Exception as e:
-                raise DownloadError(f"Download failed: {e}")
-        
         worker = Worker(download_and_extract)
         worker.signals.progress.connect(self._on_download_worker_progress)
         worker.signals.result.connect(self._on_download_complete)
